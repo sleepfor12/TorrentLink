@@ -1,0 +1,73 @@
+add_library(p2p_ui STATIC
+  input_ime_utils.h
+  input_ime_utils.cc
+  main_window.h
+  main_window.cc
+  main_window_layout.cc
+  main_window_actions_menu.cc
+  main_window_actions_context_menu.cc
+  main_window_actions_shortcuts.cc
+  main_window_state.cc
+  rss/rss_module_page.h
+  rss/rss_module_page.cc
+  rss/rss_feeds_page.h
+  rss/rss_feeds_page.cc
+  rss/rss_items_page.h
+  rss/rss_items_page.cc
+  rss/rss_rules_page.h
+  rss/rss_rules_page.cc
+  rss/rss_series_page.h
+  rss/rss_series_page.cc
+  rss/rss_settings_page.h
+  rss/rss_settings_page.cc
+  search_tab.h
+  search_tab.cc
+  system_tray.h
+  system_tray.cc
+  settings_dialog.h
+  settings_dialog.cc
+  log_center_dialog.h
+  log_center_dialog.cc
+  add_torrent_dialog.h
+  add_torrent_dialog.cc
+  pages/transfer_page.h
+  pages/transfer_page.cc
+  pages/detail/general_detail_page.h
+  pages/detail/general_detail_page.cc
+  pages/detail/speed_chart_model.h
+  pages/detail/speed_chart_model.cc
+  pages/detail/speed_chart_page.h
+  pages/detail/speed_chart_page.cc
+  pages/detail/task_detail_panel.h
+  pages/detail/task_detail_panel.cc
+  pages/detail/tracker_detail_page.h
+  pages/detail/tracker_detail_page.cc
+  pages/detail/peer_list_page.h
+  pages/detail/peer_list_page.cc
+  pages/detail/http_source_page.h
+  pages/detail/http_source_page.cc
+  pages/detail/content_tree_page.h
+  pages/detail/content_tree_page.cc
+  pages/detail/detail_qml.qrc
+  state/state_store.h
+  state/state_store.cc
+  widgets/bottom_status_bar.h
+  widgets/bottom_status_bar.cc
+)
+
+target_link_libraries(p2p_ui
+  PUBLIC
+    Qt6::Core
+    Qt6::Widgets
+    Qt6::Network
+    Qt6::Qml
+    Qt6::Quick
+    Qt6::QuickWidgets
+    p2p_core
+    p2p_lt
+)
+
+target_compile_features(p2p_ui PUBLIC cxx_std_17)
+pfd_set_target_warnings(p2p_ui)
+
+ 

@@ -1,0 +1,96 @@
+build*/
+dist/
+out/
+cmake-build-*/
+*.exe
+*.out
+*.app
+*.dll
+*.so
+*.so.*
+*.dylib
+*.a
+*.lib
+*.o
+*.obj
+*.pdb
+*.idb
+*.dSYM/
+*.su
+
+.vscode/
+*.code-workspace
+*.suo
+*.VC.db
+.idea/
+*.iml
+xcuserdata/
+DerivedData/
+*.pbxuser
+*.mode1v3
+*.mode2v3
+
+vcpkg_installed/
+__pycache__/
+*.py[cod]
+env/
+venv/
+
+*.tmp
+*.temp
+*.swp
+*~
+*.bak
+*.backup
+*.log
+logs/
+.DS_Store
+Desktop.ini
+
+# 下载和缓存
+downloads/
+*.torrent
+cache/
+.cache/
+
+# 配置文件（保留模板）
+config.ini
+settings.json
+nextorrent.conf
+
+# 测试和覆盖率
+Testing/
+test-results/
+coverage/
+benchmark-results/
+*.profdata
+*.gcda
+*.gcno
+
+# 文档生成
+docs/_build/
+docs/html/
+docs/latex/
+Doxyfile.bak
+
+# Python工具缓存
+.pytest_cache/
+__pycache__/
+
+# IDE特定
+/.cursor/
+.clangd/
+compile_commands.json
+compile_commands.json.backup
+
+# 临时和日志文件
+*.log
+logs/
+nextorrent_*.log
+dht_nodes.dat
+peer_cache.dat
+
+# 大文件测试数据
+test_data/*.iso
+test_data/*.bin
+test_data/large_*

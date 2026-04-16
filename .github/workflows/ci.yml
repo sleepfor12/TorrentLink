@@ -1,0 +1,86 @@
+# CI：格式检查 + 多平台构建（Linux/Windows）
+name: CI
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+    branches: [master, main]
+
+jobs:
+  format:
+    name: 格式检查
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 安装 clang-format
+        run: sudo apt-get update && sudo apt-get install -y clang-format
+
+      - name: 检查代码格式
+        run: bash scripts/format_check.sh
+
+  build-and-test:
+    name: 构建与测试
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 安装依赖
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            cmake \
+            pkg-config \
+            qt6-base-dev \
+            libtorrent-rasterbar-dev
+
+      - name: 配置与构建（含测试）
+        run: bash scripts/build.sh
+
+  build-windows:
+    name: Windows 构建
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 安装 Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: "6.7.2"
+          host: windows
+          target: desktop
+          cache: true
+
+      - name: 缓存 vcpkg
+        uses: actions/cache@v4
+        with:
+          path: |
+            C:/vcpkg
+            ~\AppData\Local\vcpkg\archives
+          key: vcpkg-${{ runner.os }}-${{ hashFiles('vcpkg.json') }}
+          restore-keys: |
+            vcpkg-${{ runner.os }}-
+
+      - name: 安装 libtorrent（vcpkg）
+        shell: pwsh
+        run: |
+          if (-not (Test-Path C:/vcpkg/.git)) {
+            git clone https://github.com/microsoft/vcpkg.git C:/vcpkg
+          }
+          & C:/vcpkg/bootstrap-vcpkg.bat -disableMetrics
+          & C:/vcpkg/vcpkg.exe install libtorrent-rasterbar:x64-windows
+
+      - name: 配置（Windows）
+        shell: pwsh
+        run: >
+          cmake -S . -B build-win
+          -DCMAKE_BUILD_TYPE=Release
+          -DBUILD_TESTING=OFF
+          -DBUILD_BENCHMARKS=OFF
+          -DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake
+          -DVCPKG_TARGET_TRIPLET=x64-windows
+
+      - name: 构建（Windows）
+        run: cmake --build build-win --config Release --parallel
