@@ -28,9 +28,11 @@ QString extractMagnetFromText(const QString& text) {
 
 QDateTime parseDateTime(const QString& text) {
   QDateTime dt = QDateTime::fromString(text, Qt::RFC2822Date);
-  if (dt.isValid()) return dt;
+  if (dt.isValid())
+    return dt;
   dt = QDateTime::fromString(text, Qt::ISODate);
-  if (dt.isValid()) return dt;
+  if (dt.isValid())
+    return dt;
   dt = QDateTime::fromString(text, QStringLiteral("ddd, d MMM yyyy HH:mm:ss"));
   return dt;
 }
@@ -42,9 +44,11 @@ bool isHttpOrHttpsScheme(const QString& scheme) {
 
 /// HTTP(S) URL whose path ends with .torrent (case-insensitive), query allowed.
 bool looksLikeTorrentHttpUrl(const QString& urlText) {
-  if (urlText.isEmpty()) return false;
+  if (urlText.isEmpty())
+    return false;
   const QUrl u(urlText);
-  if (!u.isValid() || !isHttpOrHttpsScheme(u.scheme())) return false;
+  if (!u.isValid() || !isHttpOrHttpsScheme(u.scheme()))
+    return false;
   const QString path = u.path();
   return path.endsWith(QStringLiteral(".torrent"), Qt::CaseInsensitive);
 }
@@ -56,18 +60,21 @@ bool mimeTypeLooksLikeTorrent(const QString& mime) {
 
 /// 从 HTML/纯文本正文中取第一个可信的 http(s) .torrent 链接（用于 description 内嵌 href）。
 QString extractFirstTorrentHttpUrlFromText(const QString& text) {
-  if (text.isEmpty()) return {};
+  if (text.isEmpty())
+    return {};
   static const QRegularExpression re(
       QStringLiteral(R"((https?://[^\s"'<>]+\.torrent(?:\?[^\s"'<>]*)?))"),
       QRegularExpression::CaseInsensitiveOption);
   const auto m = re.match(text);
-  if (!m.hasMatch()) return {};
+  if (!m.hasMatch())
+    return {};
   const QString u = m.captured(1);
   return looksLikeTorrentHttpUrl(u) ? u : QString();
 }
 
 void fillTorrentUrlFromBodyIfNeeded(RssItem& item) {
-  if (!item.torrent_url.isEmpty()) return;
+  if (!item.torrent_url.isEmpty())
+    return;
   QString t = extractFirstTorrentHttpUrlFromText(item.summary);
   if (t.isEmpty()) {
     t = extractFirstTorrentHttpUrlFromText(item.link);
@@ -91,7 +98,8 @@ ParseResult parseRss2(const QString& feed_id, QXmlStreamReader& xml) {
 
       while (!(xml.isEndElement() && xml.name() == QStringLiteral("item"))) {
         xml.readNext();
-        if (!xml.isStartElement()) continue;
+        if (!xml.isStartElement())
+          continue;
 
         const auto tag = xml.name();
         if (tag == QStringLiteral("title")) {
@@ -133,8 +141,10 @@ ParseResult parseRss2(const QString& feed_id, QXmlStreamReader& xml) {
 
       if (item.magnet.isEmpty()) {
         QString candidate = extractMagnetFromText(item.link);
-        if (candidate.isEmpty()) candidate = extractMagnetFromText(item.summary);
-        if (!candidate.isEmpty()) item.magnet = candidate;
+        if (candidate.isEmpty())
+          candidate = extractMagnetFromText(item.summary);
+        if (!candidate.isEmpty())
+          item.magnet = candidate;
       }
 
       fillTorrentUrlFromBodyIfNeeded(item);
@@ -167,7 +177,8 @@ ParseResult parseAtom(const QString& feed_id, QXmlStreamReader& xml) {
 
       while (!(xml.isEndElement() && xml.name() == QStringLiteral("entry"))) {
         xml.readNext();
-        if (!xml.isStartElement()) continue;
+        if (!xml.isStartElement())
+          continue;
 
         const auto tag = xml.name();
         if (tag == QStringLiteral("title")) {
@@ -190,7 +201,8 @@ ParseResult parseAtom(const QString& feed_id, QXmlStreamReader& xml) {
           } else if (item.link.isEmpty()) {
             item.link = href;
           }
-          if (!xml.isEndElement()) xml.skipCurrentElement();
+          if (!xml.isEndElement())
+            xml.skipCurrentElement();
         } else if (tag == QStringLiteral("id")) {
           item.guid = xml.readElementText().trimmed();
         } else if (tag == QStringLiteral("summary") || tag == QStringLiteral("content")) {
@@ -208,8 +220,10 @@ ParseResult parseAtom(const QString& feed_id, QXmlStreamReader& xml) {
 
       if (item.magnet.isEmpty()) {
         QString candidate = extractMagnetFromText(item.link);
-        if (candidate.isEmpty()) candidate = extractMagnetFromText(item.summary);
-        if (!candidate.isEmpty()) item.magnet = candidate;
+        if (candidate.isEmpty())
+          candidate = extractMagnetFromText(item.summary);
+        if (!candidate.isEmpty())
+          item.magnet = candidate;
       }
 
       fillTorrentUrlFromBodyIfNeeded(item);
@@ -239,7 +253,8 @@ ParseResult RssParser::parse(const QString& feed_id, const QByteArray& xml_data)
 
   while (!xml.atEnd()) {
     xml.readNext();
-    if (!xml.isStartElement()) continue;
+    if (!xml.isStartElement())
+      continue;
 
     const auto root = xml.name();
     if (root == QStringLiteral("rss") || root == QStringLiteral("channel")) {

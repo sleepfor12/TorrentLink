@@ -1,10 +1,10 @@
 #include "core/rss/rss_service.h"
 
-#include <algorithm>
-
 #include <QtCore/QDateTime>
 #include <QtCore/QSet>
 #include <QtCore/QUuid>
+
+#include <algorithm>
 
 #include "core/logger.h"
 #include "core/rss/rss_series_tracker.h"
@@ -36,12 +36,22 @@ void RssService::saveState() const {
   repository_.saveSettings(settings_);
 }
 
-const std::vector<RssFeed>& RssService::feeds() const { return feeds_; }
-const std::vector<RssItem>& RssService::items() const { return items_; }
-const std::vector<RssRule>& RssService::rules() const { return rules_; }
-const std::vector<SeriesSubscription>& RssService::series() const { return series_; }
+const std::vector<RssFeed>& RssService::feeds() const {
+  return feeds_;
+}
+const std::vector<RssItem>& RssService::items() const {
+  return items_;
+}
+const std::vector<RssRule>& RssService::rules() const {
+  return rules_;
+}
+const std::vector<SeriesSubscription>& RssService::series() const {
+  return series_;
+}
 
-bool RssService::autoDownloadEnabled() const { return auto_download_enabled_; }
+bool RssService::autoDownloadEnabled() const {
+  return auto_download_enabled_;
+}
 void RssService::setAutoDownloadEnabled(bool enabled) {
   auto_download_enabled_ = enabled;
   settings_.global_auto_download = enabled;
@@ -55,15 +65,16 @@ void RssService::setDownloadRequestCallback(DownloadRequestCallback cb) {
 }
 
 void RssService::upsertFeed(const RssFeed& feed) {
-  auto it = std::find_if(feeds_.begin(), feeds_.end(),
-                         [&](const RssFeed& x) { return x.id == feed.id; });
+  auto it =
+      std::find_if(feeds_.begin(), feeds_.end(), [&](const RssFeed& x) { return x.id == feed.id; });
   if (it == feeds_.end() && !feed.url.isEmpty()) {
     it = std::find_if(feeds_.begin(), feeds_.end(),
                       [&](const RssFeed& x) { return x.url == feed.url; });
   }
   if (it == feeds_.end()) {
     RssFeed copy = feed;
-    if (copy.id.isEmpty()) copy.id = QUuid::createUuid().toString(QUuid::WithoutBraces);
+    if (copy.id.isEmpty())
+      copy.id = QUuid::createUuid().toString(QUuid::WithoutBraces);
     feeds_.push_back(std::move(copy));
     LOG_INFO(QStringLiteral("[rss] Feed added id=%1 title=%2 enabled=%3")
                  .arg(feeds_.back().id, feeds_.back().title)
@@ -107,7 +118,8 @@ void RssService::clearItemsForFeed(const QString& feed_id) {
 }
 
 void RssService::clearItemsForFeeds(const QStringList& feed_ids) {
-  if (feed_ids.isEmpty()) return;
+  if (feed_ids.isEmpty())
+    return;
   const QSet<QString> idset(feed_ids.begin(), feed_ids.end());
   const int before = static_cast<int>(items_.size());
   items_.erase(std::remove_if(items_.begin(), items_.end(),
@@ -121,11 +133,12 @@ void RssService::clearItemsForFeeds(const QStringList& feed_ids) {
 }
 
 void RssService::upsertRule(const RssRule& rule) {
-  auto it = std::find_if(rules_.begin(), rules_.end(),
-                         [&](const RssRule& x) { return x.id == rule.id; });
+  auto it =
+      std::find_if(rules_.begin(), rules_.end(), [&](const RssRule& x) { return x.id == rule.id; });
   if (it == rules_.end()) {
     RssRule copy = rule;
-    if (copy.id.isEmpty()) copy.id = QUuid::createUuid().toString(QUuid::WithoutBraces);
+    if (copy.id.isEmpty())
+      copy.id = QUuid::createUuid().toString(QUuid::WithoutBraces);
     rules_.push_back(std::move(copy));
   } else {
     *it = rule;
@@ -143,7 +156,8 @@ void RssService::upsertSeries(const SeriesSubscription& entry) {
                          [&](const SeriesSubscription& x) { return x.id == entry.id; });
   if (it == series_.end()) {
     SeriesSubscription copy = entry;
-    if (copy.id.isEmpty()) copy.id = QUuid::createUuid().toString(QUuid::WithoutBraces);
+    if (copy.id.isEmpty())
+      copy.id = QUuid::createUuid().toString(QUuid::WithoutBraces);
     series_.push_back(std::move(copy));
   } else {
     *it = entry;
@@ -167,9 +181,10 @@ void RssService::refreshAllFeeds() {
 }
 
 void RssService::refreshFeed(const QString& feed_id) {
-  auto fit = std::find_if(feeds_.begin(), feeds_.end(),
-                          [&](const RssFeed& x) { return x.id == feed_id; });
-  if (fit == feeds_.end()) return;
+  auto fit =
+      std::find_if(feeds_.begin(), feeds_.end(), [&](const RssFeed& x) { return x.id == feed_id; });
+  if (fit == feeds_.end())
+    return;
 
   LOG_INFO(QStringLiteral("[rss] Refreshing feed: %1 (%2)").arg(fit->title, fit->url));
 
@@ -217,21 +232,29 @@ void RssService::refreshFeed(const QString& feed_id) {
 
 void RssService::markItemRead(const QString& item_id) {
   for (auto& it : items_) {
-    if (it.id == item_id) { it.read = true; return; }
+    if (it.id == item_id) {
+      it.read = true;
+      return;
+    }
   }
 }
 
 void RssService::markItemIgnored(const QString& item_id) {
   for (auto& it : items_) {
-    if (it.id == item_id) { it.ignored = true; return; }
+    if (it.id == item_id) {
+      it.ignored = true;
+      return;
+    }
   }
 }
 
 void RssService::markItemsIgnored(const QStringList& item_ids) {
-  if (item_ids.isEmpty()) return;
+  if (item_ids.isEmpty())
+    return;
   const QSet<QString> idset(item_ids.begin(), item_ids.end());
   for (auto& it : items_) {
-    if (idset.contains(it.id)) it.ignored = true;
+    if (idset.contains(it.id))
+      it.ignored = true;
   }
 }
 
@@ -275,7 +298,8 @@ void RssService::applyRssDownloadSettlement(const RssDownloadSettlement& s, bool
 
 bool RssService::downloadItem(const QString& item_id) {
   for (auto& it : items_) {
-    if (it.id != item_id) continue;
+    if (it.id != item_id)
+      continue;
     if (it.magnet.isEmpty() && it.torrent_url.isEmpty()) {
       LOG_WARN(QStringLiteral("[rss] Cannot download item \"%1\": no magnet or torrent URL")
                    .arg(it.title));
@@ -325,15 +349,16 @@ bool RssService::downloadItem(const QString& item_id) {
 }
 
 std::optional<RssFeed> RssService::findFeed(const QString& feed_id) const {
-  auto it = std::find_if(feeds_.begin(), feeds_.end(),
-                         [&](const RssFeed& x) { return x.id == feed_id; });
+  auto it =
+      std::find_if(feeds_.begin(), feeds_.end(), [&](const RssFeed& x) { return x.id == feed_id; });
   return it != feeds_.end() ? std::optional<RssFeed>(*it) : std::nullopt;
 }
 
 std::vector<RssItem> RssService::itemsForFeed(const QString& feed_id) const {
   std::vector<RssItem> out;
   for (const auto& it : items_) {
-    if (it.feed_id == feed_id) out.push_back(it);
+    if (it.feed_id == feed_id)
+      out.push_back(it);
   }
   return out;
 }
@@ -348,12 +373,16 @@ std::optional<EpisodeInfo> RssService::parseEpisode(const QString& title) const 
 
 std::optional<SeriesSubscription> RssService::matchSeries(const RssItem& item) const {
   auto ep = RssSeriesTracker::parseTitle(item.title);
-  if (!ep.has_value()) return std::nullopt;
+  if (!ep.has_value())
+    return std::nullopt;
 
   for (const auto& sub : series_) {
-    if (!sub.enabled) continue;
-    if (!RssSeriesTracker::matchesSeries(*ep, sub)) continue;
-    if (!RssSeriesTracker::isNewerEpisode(*ep, sub)) continue;
+    if (!sub.enabled)
+      continue;
+    if (!RssSeriesTracker::matchesSeries(*ep, sub))
+      continue;
+    if (!RssSeriesTracker::isNewerEpisode(*ep, sub))
+      continue;
     return sub;
   }
   return std::nullopt;
@@ -367,9 +396,8 @@ int RssService::pruneHistory() {
   const int removed = RssDedup::pruneHistory(items_, history_policy_);
   if (removed > 0) {
     dedup_.buildIndex(items_);
-    LOG_INFO(QStringLiteral("[rss] Pruned %1 old items, remaining: %2")
-                 .arg(removed)
-                 .arg(items_.size()));
+    LOG_INFO(
+        QStringLiteral("[rss] Pruned %1 old items, remaining: %2").arg(removed).arg(items_.size()));
   }
   return removed;
 }
@@ -377,21 +405,20 @@ int RssService::pruneHistory() {
 void RssService::dedupIncoming(std::vector<RssItem>& incoming) {
   const int before = static_cast<int>(incoming.size());
   incoming.erase(std::remove_if(incoming.begin(), incoming.end(),
-                                [&](const RssItem& it) {
-                                  return dedup_.isDuplicate(it);
-                                }),
+                                [&](const RssItem& it) { return dedup_.isDuplicate(it); }),
                  incoming.end());
   const int after = static_cast<int>(incoming.size());
   if (before != after) {
-    LOG_INFO(QStringLiteral("[rss] Dedup incoming dropped=%1 kept=%2")
-                 .arg(before - after)
-                 .arg(after));
+    LOG_INFO(
+        QStringLiteral("[rss] Dedup incoming dropped=%1 kept=%2").arg(before - after).arg(after));
   } else {
     LOG_DEBUG(QStringLiteral("[rss] Dedup incoming no duplicates count=%1").arg(after));
   }
 }
 
-RssSettings RssService::settings() const { return settings_; }
+RssSettings RssService::settings() const {
+  return settings_;
+}
 
 void RssService::applySettings(const RssSettings& s) {
   settings_ = s;
@@ -413,8 +440,8 @@ bool RssService::tryAutoDownload(RssItem& item) {
     return false;
   }
   if (item.magnet.isEmpty() && item.torrent_url.isEmpty()) {
-    LOG_DEBUG(QStringLiteral("[rss] Auto-download skipped(no magnet/torrent URL) item=%1")
-                  .arg(item.id));
+    LOG_DEBUG(
+        QStringLiteral("[rss] Auto-download skipped(no magnet/torrent URL) item=%1").arg(item.id));
     return false;
   }
   if (item.downloaded || item.ignored) {
@@ -474,7 +501,8 @@ bool RssService::tryAutoDownload(RssItem& item) {
 }
 
 bool RssService::trySeriesAutoDownload(RssItem& item) {
-  if (!auto_download_enabled_) return false;
+  if (!auto_download_enabled_)
+    return false;
   if ((item.magnet.isEmpty() && item.torrent_url.isEmpty()) || item.downloaded || item.ignored) {
     return false;
   }
@@ -491,16 +519,23 @@ bool RssService::trySeriesAutoDownload(RssItem& item) {
   const QString referer = fit != feeds_.end() ? fit->url : QString();
 
   for (auto& sub : series_) {
-    if (!sub.enabled || !sub.auto_download_enabled) continue;
-    if (!RssSeriesTracker::matchesSeries(*ep, sub)) continue;
-    if (!RssSeriesTracker::isNewerEpisode(*ep, sub)) continue;
+    if (!sub.enabled || !sub.auto_download_enabled)
+      continue;
+    if (!RssSeriesTracker::matchesSeries(*ep, sub))
+      continue;
+    if (!RssSeriesTracker::isNewerEpisode(*ep, sub))
+      continue;
 
     if (!sub.quality_keywords.isEmpty()) {
       bool qualityOk = false;
       for (const auto& q : sub.quality_keywords) {
-        if (item.title.contains(q, Qt::CaseInsensitive)) { qualityOk = true; break; }
+        if (item.title.contains(q, Qt::CaseInsensitive)) {
+          qualityOk = true;
+          break;
+        }
       }
-      if (!qualityOk) continue;
+      if (!qualityOk)
+        continue;
     }
 
     if (on_download_request_) {

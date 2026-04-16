@@ -8,8 +8,8 @@
 
 #include <utility>
 
-#include "ui/pages/detail/general_detail_page.h"
 #include "ui/pages/detail/content_tree_page.h"
+#include "ui/pages/detail/general_detail_page.h"
 #include "ui/pages/detail/http_source_page.h"
 #include "ui/pages/detail/peer_list_page.h"
 #include "ui/pages/detail/speed_chart_page.h"
@@ -17,7 +17,9 @@
 
 namespace pfd::ui {
 
-TaskDetailPanel::TaskDetailPanel(QWidget* parent) : QWidget(parent) { buildLayout(); }
+TaskDetailPanel::TaskDetailPanel(QWidget* parent) : QWidget(parent) {
+  buildLayout();
+}
 
 void TaskDetailPanel::buildLayout() {
   auto* root = new QVBoxLayout(this);
@@ -45,18 +47,17 @@ void TaskDetailPanel::buildLayout() {
   // Tab bar
   auto* tabBar = new QWidget(this);
   tabBar->setObjectName(QStringLiteral("DetailTabBar"));
-  tabBar->setStyleSheet(QStringLiteral(
-      "#DetailTabBar{background:#f9fafb;border-top:1px solid #e5e7eb;}"));
+  tabBar->setStyleSheet(
+      QStringLiteral("#DetailTabBar{background:#f9fafb;border-top:1px solid #e5e7eb;}"));
   auto* tabLayout = new QHBoxLayout(tabBar);
   tabLayout->setContentsMargins(8, 4, 8, 4);
   tabLayout->setSpacing(4);
 
-  const QStringList labels = {
-      QStringLiteral("普通"), QStringLiteral("Tracker"), QStringLiteral("用户"),
-      QStringLiteral("HTTP源"), QStringLiteral("内容"), QStringLiteral("速度")};
-  const QStringList icons = {
-      QStringLiteral("📋"), QStringLiteral("📡"), QStringLiteral("👥"),
-      QStringLiteral("🌐"), QStringLiteral("📁"), QStringLiteral("📈")};
+  const QStringList labels = {QStringLiteral("普通"), QStringLiteral("Tracker"),
+                              QStringLiteral("用户"), QStringLiteral("HTTP源"),
+                              QStringLiteral("内容"), QStringLiteral("速度")};
+  const QStringList icons = {QStringLiteral("📋"), QStringLiteral("📡"), QStringLiteral("👥"),
+                             QStringLiteral("🌐"), QStringLiteral("📁"), QStringLiteral("📈")};
 
   for (int i = 0; i < 6; ++i) {
     tabButtons_[i] = new QPushButton(icons[i] + QStringLiteral(" ") + labels[i], tabBar);
@@ -76,7 +77,8 @@ void TaskDetailPanel::buildLayout() {
 }
 
 void TaskDetailPanel::switchTab(int index) {
-  if (index < 0 || index > 5) return;
+  if (index < 0 || index > 5)
+    return;
   currentTab_ = index;
   stack_->setCurrentIndex(index);
   for (int i = 0; i < 6; ++i) {
@@ -108,8 +110,9 @@ void TaskDetailPanel::setTrackerHandlers(TrackerDetailPage::QueryTrackersFn quer
                                          TrackerDetailPage::RemoveTrackerFn removeFn,
                                          TrackerDetailPage::ReannounceTrackerFn reannounceFn,
                                          TrackerDetailPage::ReannounceAllFn reannounceAllFn) {
-  trackerPage_->setHandlers(std::move(queryFn), std::move(addFn), std::move(editFn), std::move(removeFn),
-                            std::move(reannounceFn), std::move(reannounceAllFn));
+  trackerPage_->setHandlers(std::move(queryFn), std::move(addFn), std::move(editFn),
+                            std::move(removeFn), std::move(reannounceFn),
+                            std::move(reannounceAllFn));
 }
 
 void TaskDetailPanel::setPeerHandlers(PeerListPage::QueryPeersFn queryFn) {

@@ -1,15 +1,15 @@
-#include <gtest/gtest.h>
-
 #include <QtCore/QDir>
 #include <QtCore/QTemporaryDir>
+
+#include <gtest/gtest.h>
 
 #include "core/save_path_policy.h"
 #include "core/task_add_builder.h"
 
+using pfd::core::buildTaskAdd;
 using pfd::core::ContentLayout;
 using pfd::core::SavePathPolicy;
 using pfd::core::TaskAddInput;
-using pfd::core::buildTaskAdd;
 
 class TaskAddBuilderTest : public ::testing::Test {
 protected:

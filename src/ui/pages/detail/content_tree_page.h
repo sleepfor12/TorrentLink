@@ -20,8 +20,8 @@ class ContentTreePage : public QWidget {
   Q_OBJECT
 
 public:
-  using QueryFilesFn =
-      std::function<std::vector<pfd::lt::SessionWorker::FileEntrySnapshot>(const pfd::base::TaskId&)>;
+  using QueryFilesFn = std::function<std::vector<pfd::lt::SessionWorker::FileEntrySnapshot>(
+      const pfd::base::TaskId&)>;
   using SetPriorityFn = std::function<void(const pfd::base::TaskId&, const std::vector<int>&,
                                            pfd::lt::SessionWorker::FilePriorityLevel)>;
   using RenameFn = std::function<void(const pfd::base::TaskId&, const QString&, const QString&)>;

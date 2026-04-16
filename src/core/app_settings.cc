@@ -46,7 +46,8 @@ AppSettings AppSettings::load() {
   out.per_torrent_upload_slots_limit =
       s.value(QStringLiteral("network/per_torrent_upload_slots_limit"), 0).toInt();
   out.listen_port = s.value(QStringLiteral("network/listen_port"), 0).toInt();
-  out.listen_port_forwarding = s.value(QStringLiteral("network/listen_port_forwarding"), true).toBool();
+  out.listen_port_forwarding =
+      s.value(QStringLiteral("network/listen_port_forwarding"), true).toBool();
   out.active_downloads = s.value(QStringLiteral("queue/active_downloads"), 0).toInt();
   out.active_seeds = s.value(QStringLiteral("queue/active_seeds"), 0).toInt();
   out.active_limit = s.value(QStringLiteral("queue/active_limit"), 0).toInt();
@@ -116,11 +117,10 @@ AppSettings AppSettings::load() {
   if (out.proxy_type != QStringLiteral("socks5") && out.proxy_type != QStringLiteral("http")) {
     out.proxy_type = QStringLiteral("socks5");
   }
-  out.close_behavior =
-      s.value(QStringLiteral("ui/close_behavior"), QStringLiteral("minimize"))
-          .toString()
-          .trimmed()
-          .toLower();
+  out.close_behavior = s.value(QStringLiteral("ui/close_behavior"), QStringLiteral("minimize"))
+                           .toString()
+                           .trimmed()
+                           .toLower();
   if (out.close_behavior != QStringLiteral("minimize") &&
       out.close_behavior != QStringLiteral("quit")) {
     out.close_behavior = QStringLiteral("minimize");
@@ -135,7 +135,8 @@ AppSettings AppSettings::load() {
       out.timed_action != QStringLiteral("shutdown")) {
     out.timed_action = QStringLiteral("none");
   }
-  out.timed_action_delay_minutes = s.value(QStringLiteral("ui/timed_action_delay_minutes"), 0).toInt();
+  out.timed_action_delay_minutes =
+      s.value(QStringLiteral("ui/timed_action_delay_minutes"), 0).toInt();
   out.timed_action_delay_minutes = std::clamp(out.timed_action_delay_minutes, 0, 10080);
 
   if (out.default_download_dir.isEmpty()) {

@@ -23,7 +23,9 @@ FetchResult RssFetcher::fetch(const QString& url, const QString& referer) const 
     return {false, 0, {}, QStringLiteral("Invalid URL: %1").arg(url)};
   }
   if (!isAllowedScheme(parsed.scheme().toLower())) {
-    return {false, 0, {},
+    return {false,
+            0,
+            {},
             QStringLiteral("Scheme \"%1\" not allowed (http/https only)").arg(parsed.scheme())};
   }
 
@@ -34,8 +36,7 @@ FetchResult RssFetcher::fetch(const QString& url, const QString& referer) const 
     QNetworkAccessManager nam;
     QNetworkRequest req(parsed);
     req.setTransferTimeout(kFetchTimeoutMs);
-    req.setHeader(QNetworkRequest::UserAgentHeader,
-                  QStringLiteral("pfd-rss-reader/1.0"));
+    req.setHeader(QNetworkRequest::UserAgentHeader, QStringLiteral("pfd-rss-reader/1.0"));
     if (!refTrim.isEmpty()) {
       req.setRawHeader(QByteArrayLiteral("Referer"), refTrim.toUtf8());
     }
@@ -61,8 +62,7 @@ FetchResult RssFetcher::fetch(const QString& url, const QString& referer) const 
 
     const int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
     if (reply->error() != QNetworkReply::NoError) {
-      result = {false, status, {},
-                QStringLiteral("Network error: %1").arg(reply->errorString())};
+      result = {false, status, {}, QStringLiteral("Network error: %1").arg(reply->errorString())};
       reply->deleteLater();
       if (status >= 500) {
         continue;
@@ -74,7 +74,9 @@ FetchResult RssFetcher::fetch(const QString& url, const QString& referer) const 
     reply->deleteLater();
 
     if (body.size() > kFetchMaxBodyBytes) {
-      return {false, status, {},
+      return {false,
+              status,
+              {},
               QStringLiteral("Response too large (%1 bytes, max %2)")
                   .arg(body.size())
                   .arg(kFetchMaxBodyBytes)};

@@ -9,7 +9,8 @@
 
 namespace pfd::lt::session_ops {
 
-bool handleOne(libtorrent::session& ses, Context& ctx, const session_cmds::ApplyRuntimeSettingsCmd& c) {
+bool handleOne(libtorrent::session& ses, Context& ctx,
+               const session_cmds::ApplyRuntimeSettingsCmd& c) {
   libtorrent::settings_pack pack;
   if (c.download_rate_limit_kib > 0) {
     pack.set_int(libtorrent::settings_pack::download_rate_limit, c.download_rate_limit_kib * 1024);
@@ -31,8 +32,9 @@ bool handleOne(libtorrent::session& ses, Context& ctx, const session_cmds::Apply
   } else if (c.upload_slots_limit == 0) {
     pack.set_int(libtorrent::settings_pack::unchoke_slots_limit, -1);
   }
-  pack.set_str(libtorrent::settings_pack::listen_interfaces,
-               QStringLiteral("0.0.0.0:%1,[::]:%1").arg(std::clamp(c.listen_port, 0, 65535)).toStdString());
+  pack.set_str(
+      libtorrent::settings_pack::listen_interfaces,
+      QStringLiteral("0.0.0.0:%1,[::]:%1").arg(std::clamp(c.listen_port, 0, 65535)).toStdString());
 
   if (c.active_downloads > 0) {
     pack.set_int(libtorrent::settings_pack::active_downloads, c.active_downloads);
@@ -86,7 +88,8 @@ bool handleOne(libtorrent::session& ses, Context& ctx, const session_cmds::Apply
     pack.set_int(libtorrent::settings_pack::proxy_type, proxyType);
     pack.set_str(libtorrent::settings_pack::proxy_hostname, c.proxy_host.trimmed().toStdString());
     pack.set_int(libtorrent::settings_pack::proxy_port, std::clamp(c.proxy_port, 1, 65535));
-    pack.set_str(libtorrent::settings_pack::proxy_username, c.proxy_username.trimmed().toStdString());
+    pack.set_str(libtorrent::settings_pack::proxy_username,
+                 c.proxy_username.trimmed().toStdString());
     pack.set_str(libtorrent::settings_pack::proxy_password, c.proxy_password.toStdString());
     pack.set_bool(libtorrent::settings_pack::proxy_peer_connections, true);
     pack.set_bool(libtorrent::settings_pack::proxy_hostnames, true);

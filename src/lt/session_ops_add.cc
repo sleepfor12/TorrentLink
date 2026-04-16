@@ -1,3 +1,5 @@
+#include <QtCore/QDateTime>
+
 #include <libtorrent/add_torrent_params.hpp>
 #include <libtorrent/download_priority.hpp>
 #include <libtorrent/info_hash.hpp>
@@ -6,8 +8,6 @@
 #include <libtorrent/session.hpp>
 #include <libtorrent/torrent_flags.hpp>
 #include <libtorrent/torrent_info.hpp>
-
-#include <QtCore/QDateTime>
 
 #include <algorithm>
 
@@ -219,7 +219,8 @@ bool handleOne(libtorrent::session& ses, Context& ctx, const session_cmds::AddTo
   return true;
 }
 
-bool handleOne(libtorrent::session& ses, Context& ctx, const session_cmds::AddFromResumeDataCmd& c) {
+bool handleOne(libtorrent::session& ses, Context& ctx,
+               const session_cmds::AddFromResumeDataCmd& c) {
   if (c.resumeData.isEmpty()) {
     LOG_ERROR(QStringLiteral("[lt.worker] AddFromResumeData ignored: empty data."));
     return true;

@@ -637,7 +637,8 @@ SessionWorker::SessionStats SessionWorker::querySessionStats() {
   return {};
 }
 
-SessionWorker::TaskTrackerSnapshot SessionWorker::queryTaskTrackers(const pfd::base::TaskId& taskId) {
+SessionWorker::TaskTrackerSnapshot
+SessionWorker::queryTaskTrackers(const pfd::base::TaskId& taskId) {
   auto done = std::make_shared<std::promise<SessionWorker::TaskTrackerSnapshot>>();
   auto fut = done->get_future();
   impl_->enqueue(Impl::QueryTaskTrackersCmd{taskId, done});
@@ -686,8 +687,8 @@ void SessionWorker::setTaskFilePriority(const pfd::base::TaskId& taskId,
   impl_->enqueue(Impl::SetTaskFilePriorityCmd{taskId, fileIndices, level});
 }
 
-void SessionWorker::renameTaskFileOrFolder(const pfd::base::TaskId& taskId, const QString& logicalPath,
-                                           const QString& newName) {
+void SessionWorker::renameTaskFileOrFolder(const pfd::base::TaskId& taskId,
+                                           const QString& logicalPath, const QString& newName) {
   impl_->enqueue(Impl::RenameTaskFileOrFolderCmd{taskId, logicalPath, newName});
 }
 

@@ -90,10 +90,13 @@ public:
   void setOnQueuePositionBottom(std::function<void(const pfd::base::TaskId&)> cb);
   void
   setOnQueryCopyPayload(std::function<CopyPayload(const pfd::base::TaskId&)> onQueryCopyPayload);
-  void setOnQueryTaskFiles(
-      std::function<std::vector<pfd::lt::SessionWorker::FileEntrySnapshot>(const pfd::base::TaskId&)> cb);
-  void setOnSetTaskFilePriority(std::function<void(const pfd::base::TaskId&, const std::vector<int>&,
-                                                   pfd::lt::SessionWorker::FilePriorityLevel)> cb);
+  void setOnQueryTaskFiles(std::function<std::vector<pfd::lt::SessionWorker::FileEntrySnapshot>(
+                               const pfd::base::TaskId&)>
+                               cb);
+  void
+  setOnSetTaskFilePriority(std::function<void(const pfd::base::TaskId&, const std::vector<int>&,
+                                              pfd::lt::SessionWorker::FilePriorityLevel)>
+                               cb);
   void setOnRenameTaskFileOrFolder(
       std::function<void(const pfd::base::TaskId&, const QString&, const QString&)> cb);
   void setOnQueryTaskTrackerSnapshot(
@@ -102,13 +105,15 @@ public:
   void setOnEditTaskTracker(
       std::function<void(const pfd::base::TaskId&, const QString&, const QString&)> cb);
   void setOnRemoveTaskTracker(std::function<void(const pfd::base::TaskId&, const QString&)> cb);
-  void setOnForceReannounceTracker(
-      std::function<void(const pfd::base::TaskId&, const QString&)> cb);
+  void
+  setOnForceReannounceTracker(std::function<void(const pfd::base::TaskId&, const QString&)> cb);
   void setOnForceReannounceAllTrackers(std::function<void(const pfd::base::TaskId&)> cb);
   void setOnQueryTaskPeers(
-      std::function<std::vector<pfd::lt::SessionWorker::PeerSnapshot>(const pfd::base::TaskId&)> cb);
+      std::function<std::vector<pfd::lt::SessionWorker::PeerSnapshot>(const pfd::base::TaskId&)>
+          cb);
   void setOnQueryTaskWebSeeds(
-      std::function<std::vector<pfd::lt::SessionWorker::WebSeedSnapshot>(const pfd::base::TaskId&)> cb);
+      std::function<std::vector<pfd::lt::SessionWorker::WebSeedSnapshot>(const pfd::base::TaskId&)>
+          cb);
   void setSearchDataSources(SearchTab::QuerySnapshotsFn snapshotsFn,
                             SearchTab::QueryRssItemsFn rssItemsFn);
   void setRssService(pfd::core::rss::RssService* service);

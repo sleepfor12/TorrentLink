@@ -1,8 +1,11 @@
 ## 项目简介
 
-本项目为本人毕业设计，部分 UI 设计参考了 qBittorrent。
+English version: [README.md](README.md)
 
-这是一个基于 **Qt 6（Widgets）+ libtorrent（2.6）** 的桌面端 P2P 下载器，目标是实现一个稳定、可扩展、易维护的 BitTorrent 客户端。当前以 Linux 为主线开发，Windows 已接入 CI 构建。
+本项目为本人毕业设计，实现了一套轻量级P2P文件传输桌面应用，遵循MIT协议，许可证: [LICENSE](LICENSE)。
+
+这是一个基于 **Qt 6（Widgets）+ libtorrent（2.0.5）** 的桌面端 P2P 下载器，目标是实现一个稳定、可扩展、易维护的 BitTorrent 客户端。
+在部分 UI 设计上参考了 qBittorrent。
 
 ## 已实现功能
 
@@ -16,13 +19,19 @@
 - 系统托盘、下载完成通知、速度图表、日志中心
 - 持久化与 Resume Data 断点续传
 - CMake 跨平台工程（Linux `pkg-config` 回退，Windows 优先 CMake/vcpkg）
-- GoogleTest 单元测试（`ctest` 可运行，当前 196 用例）
+- GoogleTest 单元测试
 
-## 项目依赖说明
+## 开发环境
 
-- `libtorrent 2.6`
-- `GoogleTest`
-- `qt`
+- 操作系统：`Ubuntu 22.04.5 LTS`
+- 编译器（GCC）：`13.1.0`
+- 编译器（Clang）：`18.1.8`
+- CMake：`3.22.1`
+- Qt（qmake6）：`6.2.4`
+- libtorrent（`pkg-config`）：`2.0.5`
+- GoogleTest
+
+声明: [NOTICE](NOTICE)
 
 ## 快速构建与运行
 
@@ -63,6 +72,11 @@ ctest --test-dir build --output-on-failure
 - 诊断包导出
 - 开机自启
 
-## 联系方式
+## 作者信息
 
-邮箱：zbysleepallday@outloo.com / zbymeiqian414@163.com
+作者：sleepfor12
+邮箱：[zbysleepallday@outloo.com](mailto:zbysleepallday@outloo.com) / [zbymeiqian414@163.com](mailto:zbymeiqian414@163.com)
+
+## 致谢
+
+感谢母校及指导老师在毕业设计期间帮助。

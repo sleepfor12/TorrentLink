@@ -35,7 +35,8 @@ RssOpml::ImportResult RssOpml::importFromString(const QString& xml) {
       if (feed.title.isEmpty()) {
         feed.title = attrs.value(QStringLiteral("text")).toString().trimmed();
       }
-      if (feed.title.isEmpty()) feed.title = xmlUrl;
+      if (feed.title.isEmpty())
+        feed.title = xmlUrl;
       result.feeds.push_back(std::move(feed));
     }
   }
@@ -48,7 +49,8 @@ RssOpml::ImportResult RssOpml::importFromString(const QString& xml) {
 
 bool RssOpml::exportToFile(const QString& path, const std::vector<RssFeed>& feeds) {
   QFile f(path);
-  if (!f.open(QIODevice::WriteOnly | QIODevice::Text)) return false;
+  if (!f.open(QIODevice::WriteOnly | QIODevice::Text))
+    return false;
   const QString xml = exportToString(feeds);
   f.write(xml.toUtf8());
   return true;
@@ -64,7 +66,7 @@ QString RssOpml::exportToString(const std::vector<RssFeed>& feeds) {
 
   w.writeStartElement(QStringLiteral("head"));
   w.writeTextElement(QStringLiteral("title"), QStringLiteral("P2P File Downloader RSS Feeds"));
-  w.writeEndElement(); // head
+  w.writeEndElement();  // head
 
   w.writeStartElement(QStringLiteral("body"));
   for (const auto& feed : feeds) {
@@ -73,10 +75,10 @@ QString RssOpml::exportToString(const std::vector<RssFeed>& feeds) {
     w.writeAttribute(QStringLiteral("text"), feed.title);
     w.writeAttribute(QStringLiteral("title"), feed.title);
     w.writeAttribute(QStringLiteral("xmlUrl"), feed.url);
-    w.writeEndElement(); // outline
+    w.writeEndElement();  // outline
   }
-  w.writeEndElement(); // body
-  w.writeEndElement(); // opml
+  w.writeEndElement();  // body
+  w.writeEndElement();  // opml
   w.writeEndDocument();
   return out;
 }

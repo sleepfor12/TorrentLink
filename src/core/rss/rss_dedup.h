@@ -1,10 +1,10 @@
 #ifndef PFD_CORE_RSS_RSS_DEDUP_H
 #define PFD_CORE_RSS_RSS_DEDUP_H
 
+#include <QtCore/QDateTime>
+
 #include <unordered_set>
 #include <vector>
-
-#include <QtCore/QDateTime>
 
 #include "core/rss/rss_types.h"
 
@@ -22,12 +22,10 @@ public:
   [[nodiscard]] bool isDuplicate(const RssItem& item) const;
   void recordItem(const RssItem& item);
 
-  static std::vector<RssItem> filterDuplicates(
-      const std::vector<RssItem>& existing,
-      std::vector<RssItem>& incoming);
+  static std::vector<RssItem> filterDuplicates(const std::vector<RssItem>& existing,
+                                               std::vector<RssItem>& incoming);
 
-  static int pruneHistory(std::vector<RssItem>& items,
-                          const HistoryPolicy& policy);
+  static int pruneHistory(std::vector<RssItem>& items, const HistoryPolicy& policy);
 
   static QString extractInfoHash(const QString& magnet);
 

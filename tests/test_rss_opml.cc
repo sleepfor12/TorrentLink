@@ -1,8 +1,8 @@
-#include <gtest/gtest.h>
-
 #include <QtCore/QDir>
 #include <QtCore/QFile>
 #include <QtCore/QUuid>
+
+#include <gtest/gtest.h>
 
 #include "core/rss/rss_opml.h"
 

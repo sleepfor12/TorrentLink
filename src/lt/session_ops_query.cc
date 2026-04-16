@@ -1,16 +1,16 @@
-#include <QtCore/QUuid>
 #include <QtCore/QUrl>
+#include <QtCore/QUuid>
 
+#include <libtorrent/announce_entry.hpp>
 #include <libtorrent/magnet_uri.hpp>
 #include <libtorrent/peer_info.hpp>
 #include <libtorrent/session.hpp>
 #include <libtorrent/session_status.hpp>
-#include <libtorrent/announce_entry.hpp>
 #include <libtorrent/torrent_handle.hpp>
 #include <libtorrent/torrent_info.hpp>
 
-#include <sstream>
 #include <algorithm>
+#include <sstream>
 
 #include "core/logger.h"
 #include "lt/session_ids.h"
@@ -51,9 +51,12 @@ static SessionWorker::TrackerStatus mapTrackerStatus(const libtorrent::announce_
     hasError = hasError || static_cast<bool>(ep.last_error) || ep.fails > 0;
     worked = worked || ep.is_working();
   }
-  if (updating) return SessionWorker::TrackerStatus::kUpdating;
-  if (worked) return SessionWorker::TrackerStatus::kWorking;
-  if (hasError) return SessionWorker::TrackerStatus::kCannotConnect;
+  if (updating)
+    return SessionWorker::TrackerStatus::kUpdating;
+  if (worked)
+    return SessionWorker::TrackerStatus::kWorking;
+  if (hasError)
+    return SessionWorker::TrackerStatus::kCannotConnect;
   return SessionWorker::TrackerStatus::kNotWorking;
 }
 
@@ -66,9 +69,12 @@ static SessionWorker::TrackerStatus mapEndpointStatus(const libtorrent::announce
     hasError = hasError || static_cast<bool>(ih.last_error) || ih.fails > 0;
     worked = worked || (ih.fails == 0 && !ih.updating);
   }
-  if (updating) return SessionWorker::TrackerStatus::kUpdating;
-  if (worked) return SessionWorker::TrackerStatus::kWorking;
-  if (hasError) return SessionWorker::TrackerStatus::kCannotConnect;
+  if (updating)
+    return SessionWorker::TrackerStatus::kUpdating;
+  if (worked)
+    return SessionWorker::TrackerStatus::kWorking;
+  if (hasError)
+    return SessionWorker::TrackerStatus::kCannotConnect;
   return SessionWorker::TrackerStatus::kNotWorking;
 }
 
@@ -135,9 +141,8 @@ bool handleOne(libtorrent::session&, Context& ctx, const session_cmds::QueryTask
           s.downloadedBytes = static_cast<qint64>(fileProgress[static_cast<size_t>(i)]);
         }
         if (s.sizeBytes > 0) {
-          s.progress01 = std::clamp(static_cast<double>(s.downloadedBytes) /
-                                        static_cast<double>(s.sizeBytes),
-                                    0.0, 1.0);
+          s.progress01 = std::clamp(
+              static_cast<double>(s.downloadedBytes) / static_cast<double>(s.sizeBytes), 0.0, 1.0);
         }
         s.availability = fileAvailability;
         if (i < static_cast<int>(priorities.size())) {
@@ -188,16 +193,24 @@ bool handleOne(libtorrent::session&, Context& ctx, const session_cmds::QueryTask
       row.url = QString::fromStdString(ae.url);
       row.tier = ae.tier;
       const QString low = row.url.toLower();
-      if (low.startsWith(QStringLiteral("udp://"))) row.btProtocol = QStringLiteral("UDP");
-      else if (low.startsWith(QStringLiteral("http://")) || low.startsWith(QStringLiteral("https://"))) row.btProtocol = QStringLiteral("HTTP");
-      else if (low.startsWith(QStringLiteral("wss://"))) row.btProtocol = QStringLiteral("WSS");
-      else row.btProtocol = QStringLiteral("N/A");
+      if (low.startsWith(QStringLiteral("udp://")))
+        row.btProtocol = QStringLiteral("UDP");
+      else if (low.startsWith(QStringLiteral("http://")) ||
+               low.startsWith(QStringLiteral("https://")))
+        row.btProtocol = QStringLiteral("HTTP");
+      else if (low.startsWith(QStringLiteral("wss://")))
+        row.btProtocol = QStringLiteral("WSS");
+      else
+        row.btProtocol = QStringLiteral("N/A");
       row.status = mapTrackerStatus(ae);
 
       for (const auto& ep : ae.endpoints) {
-        if (row.users < 0 && ep.scrape_incomplete >= 0) row.users = ep.scrape_incomplete;
-        if (row.seeds < 0 && ep.scrape_complete >= 0) row.seeds = ep.scrape_complete;
-        if (row.downloads < 0 && ep.scrape_downloaded >= 0) row.downloads = ep.scrape_downloaded;
+        if (row.users < 0 && ep.scrape_incomplete >= 0)
+          row.users = ep.scrape_incomplete;
+        if (row.seeds < 0 && ep.scrape_complete >= 0)
+          row.seeds = ep.scrape_complete;
+        if (row.downloads < 0 && ep.scrape_downloaded >= 0)
+          row.downloads = ep.scrape_downloaded;
         SessionWorker::TrackerEndpointSnapshot endpoint;
         endpoint.ip = QString::fromStdString(ep.local_endpoint.address().to_string());
         endpoint.port = ep.local_endpoint.port();
@@ -207,10 +220,14 @@ bool handleOne(libtorrent::session&, Context& ctx, const session_cmds::QueryTask
         endpoint.downloads = ep.scrape_downloaded;
         const bool hasV1 = h.info_hashes().has_v1();
         const bool hasV2 = h.info_hashes().has_v2();
-        if (hasV1 && hasV2) endpoint.btProtocol = QStringLiteral("hybrid");
-        else if (hasV2) endpoint.btProtocol = QStringLiteral("v2");
-        else endpoint.btProtocol = QStringLiteral("v1");
-        if (!endpoint.ip.isEmpty() && endpoint.port > 0) row.endpoints.push_back(endpoint);
+        if (hasV1 && hasV2)
+          endpoint.btProtocol = QStringLiteral("hybrid");
+        else if (hasV2)
+          endpoint.btProtocol = QStringLiteral("v2");
+        else
+          endpoint.btProtocol = QStringLiteral("v1");
+        if (!endpoint.ip.isEmpty() && endpoint.port > 0)
+          row.endpoints.push_back(endpoint);
         if (row.nextAnnounceSec < 0 && ep.next_announce != (libtorrent::time_point32::min)()) {
           row.nextAnnounceSec = 0;
         }
@@ -226,9 +243,12 @@ bool handleOne(libtorrent::session&, Context& ctx, const session_cmds::QueryTask
           endpoint.port = u.port();
           const bool hasV1 = h.info_hashes().has_v1();
           const bool hasV2 = h.info_hashes().has_v2();
-          if (hasV1 && hasV2) endpoint.btProtocol = QStringLiteral("hybrid");
-          else if (hasV2) endpoint.btProtocol = QStringLiteral("v2");
-          else endpoint.btProtocol = QStringLiteral("v1");
+          if (hasV1 && hasV2)
+            endpoint.btProtocol = QStringLiteral("hybrid");
+          else if (hasV2)
+            endpoint.btProtocol = QStringLiteral("v2");
+          else
+            endpoint.btProtocol = QStringLiteral("v1");
           endpoint.status = row.status;
           endpoint.users = row.users;
           endpoint.seeds = row.seeds;
@@ -272,12 +292,18 @@ bool handleOne(libtorrent::session&, Context& ctx, const session_cmds::QueryTask
       s.totalDownloaded = p.total_download;
       s.totalUploaded = p.total_upload;
       QString flags;
-      if (p.flags & libtorrent::peer_info::seed) flags += QStringLiteral("S");
-      if (p.flags & libtorrent::peer_info::interesting) flags += QStringLiteral("I");
-      if (p.flags & libtorrent::peer_info::choked) flags += QStringLiteral("C");
-      if (p.flags & libtorrent::peer_info::remote_interested) flags += QStringLiteral("i");
-      if (p.flags & libtorrent::peer_info::remote_choked) flags += QStringLiteral("c");
-      if (p.flags & libtorrent::peer_info::rc4_encrypted) flags += QStringLiteral("E");
+      if (p.flags & libtorrent::peer_info::seed)
+        flags += QStringLiteral("S");
+      if (p.flags & libtorrent::peer_info::interesting)
+        flags += QStringLiteral("I");
+      if (p.flags & libtorrent::peer_info::choked)
+        flags += QStringLiteral("C");
+      if (p.flags & libtorrent::peer_info::remote_interested)
+        flags += QStringLiteral("i");
+      if (p.flags & libtorrent::peer_info::remote_choked)
+        flags += QStringLiteral("c");
+      if (p.flags & libtorrent::peer_info::rc4_encrypted)
+        flags += QStringLiteral("E");
       s.flags = flags;
       if (p.connection_type == libtorrent::peer_info::standard_bittorrent)
         s.connection = QStringLiteral("BT");

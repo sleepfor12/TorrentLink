@@ -4,8 +4,8 @@
 #include <QtCore/QString>
 #include <QtCore/QStringList>
 
-#include <functional>
 #include <cstdint>
+#include <functional>
 #include <vector>
 
 #include "base/types.h"
@@ -202,7 +202,8 @@ public:
   void renameTaskFileOrFolder(const pfd::base::TaskId& taskId, const QString& logicalPath,
                               const QString& newName);
   void addTaskTracker(const pfd::base::TaskId& taskId, const QString& url);
-  void editTaskTracker(const pfd::base::TaskId& taskId, const QString& oldUrl, const QString& newUrl);
+  void editTaskTracker(const pfd::base::TaskId& taskId, const QString& oldUrl,
+                       const QString& newUrl);
   void removeTaskTracker(const pfd::base::TaskId& taskId, const QString& url);
   void forceReannounceTracker(const pfd::base::TaskId& taskId, const QString& url);
   void forceReannounceAllTrackers(const pfd::base::TaskId& taskId);

@@ -48,8 +48,7 @@ bool handleOne(libtorrent::session& ses, Context& ctx,
 bool handleOne(libtorrent::session& ses, Context& ctx, const session_cmds::QueryTaskFilesCmd& cmd);
 bool handleOne(libtorrent::session& ses, Context& ctx,
                const session_cmds::QueryTaskTrackersCmd& cmd);
-bool handleOne(libtorrent::session& ses, Context& ctx,
-               const session_cmds::QueryTaskPeersCmd& cmd);
+bool handleOne(libtorrent::session& ses, Context& ctx, const session_cmds::QueryTaskPeersCmd& cmd);
 bool handleOne(libtorrent::session& ses, Context& ctx,
                const session_cmds::QueryTaskWebSeedsCmd& cmd);
 bool handleOne(libtorrent::session& ses, Context& ctx,

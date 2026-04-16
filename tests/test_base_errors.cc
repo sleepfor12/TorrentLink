@@ -62,12 +62,12 @@ TEST(BaseErrors, FromStdErrorMapsErrcCommonCases) {
       std::make_error_code(std::errc::no_such_file_or_directory), QStringLiteral("open"));
   EXPECT_EQ(missing.code(), ErrorCode::kFileNotFound);
 
-  const auto denied = pfd::base::fromStdError(
-      std::make_error_code(std::errc::permission_denied), QStringLiteral("write"));
+  const auto denied = pfd::base::fromStdError(std::make_error_code(std::errc::permission_denied),
+                                              QStringLiteral("write"));
   EXPECT_EQ(denied.code(), ErrorCode::kPathPermissionDenied);
 
-  const auto full = pfd::base::fromStdError(
-      std::make_error_code(std::errc::no_space_on_device), QStringLiteral("save"));
+  const auto full = pfd::base::fromStdError(std::make_error_code(std::errc::no_space_on_device),
+                                            QStringLiteral("save"));
   EXPECT_EQ(full.code(), ErrorCode::kDiskFull);
 }
 

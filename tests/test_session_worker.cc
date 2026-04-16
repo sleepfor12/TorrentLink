@@ -62,8 +62,8 @@ TEST(SessionWorker, DuplicateMagnetSecondAddEmitsErrorView) {
     all.insert(all.end(), views.begin(), views.end());
   });
 
-  const QString magnet = QStringLiteral(
-      "magnet:?xt=urn:btih:08ada5a7a618133027292e316d4054bfb324ad96");
+  const QString magnet =
+      QStringLiteral("magnet:?xt=urn:btih:08ada5a7a618133027292e316d4054bfb324ad96");
   worker.addMagnet(magnet, QStringLiteral("/tmp"));
 
   bool sawAdded = false;

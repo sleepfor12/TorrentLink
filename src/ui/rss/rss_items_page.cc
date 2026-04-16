@@ -1,7 +1,5 @@
 #include "ui/rss/rss_items_page.h"
 
-#include <algorithm>
-
 #include <QtCore/QItemSelectionModel>
 #include <QtCore/QSet>
 #include <QtCore/QSignalBlocker>
@@ -21,6 +19,8 @@
 #include <QtWidgets/QTextBrowser>
 #include <QtWidgets/QVBoxLayout>
 
+#include <algorithm>
+
 #include "base/format.h"
 #include "base/types.h"
 #include "core/external_player.h"
@@ -37,15 +37,18 @@ namespace {
 QString linkKindLabel(const pfd::core::rss::RssItem& it) {
   const bool hasMagnet = !it.magnet.isEmpty();
   const bool hasTorrent = !it.torrent_url.isEmpty();
-  if (hasMagnet && hasTorrent) return QStringLiteral("磁力+种子");
-  if (hasMagnet) return QStringLiteral("磁力");
-  if (hasTorrent) return QStringLiteral("种子");
+  if (hasMagnet && hasTorrent)
+    return QStringLiteral("磁力+种子");
+  if (hasMagnet)
+    return QStringLiteral("磁力");
+  if (hasTorrent)
+    return QStringLiteral("种子");
   return QStringLiteral("无");
 }
 
-const pfd::core::TaskSnapshot* findTaskSnapshotForItem(
-    const pfd::core::rss::RssItem& it,
-    const std::vector<pfd::core::TaskSnapshot>& snaps) {
+const pfd::core::TaskSnapshot*
+findTaskSnapshotForItem(const pfd::core::rss::RssItem& it,
+                        const std::vector<pfd::core::TaskSnapshot>& snaps) {
   if (!it.magnet.isEmpty()) {
     const QString ih = pfd::core::rss::RssDedup::extractInfoHash(it.magnet);
     if (!ih.isEmpty()) {
@@ -164,9 +167,9 @@ void RssItemsPage::setService(pfd::core::rss::RssService* service) {
   refreshTable();
 }
 
-void RssItemsPage::setUiHelpers(std::function<void(const QString&)> appendItemsLog,
-                              std::function<QString()> defaultSaveRoot,
-                              std::function<std::vector<pfd::core::TaskSnapshot>()> taskSnapshots) {
+void RssItemsPage::setUiHelpers(
+    std::function<void(const QString&)> appendItemsLog, std::function<QString()> defaultSaveRoot,
+    std::function<std::vector<pfd::core::TaskSnapshot>()> taskSnapshots) {
   appendItemsLog_ = std::move(appendItemsLog);
   defaultSaveRoot_ = std::move(defaultSaveRoot);
   taskSnapshots_ = std::move(taskSnapshots);
@@ -274,8 +277,10 @@ void RssItemsPage::refreshTable() {
   std::vector<const pfd::core::rss::RssItem*> filtered;
   filtered.reserve(allItems.size());
   for (const auto& it : allItems) {
-    if (it.ignored) continue;
-    if (!filter.isEmpty() && !it.title.toLower().contains(filter)) continue;
+    if (it.ignored)
+      continue;
+    if (!filter.isEmpty() && !it.title.toLower().contains(filter))
+      continue;
     filtered.push_back(&it);
   }
 
@@ -290,16 +295,18 @@ void RssItemsPage::refreshTable() {
 
     QString feedName;
     auto feed = service_->findFeed(it->feed_id);
-    if (feed.has_value()) feedName = feed->title;
+    if (feed.has_value())
+      feedName = feed->title;
 
     auto* titleItem = new QTableWidgetItem(it->title);
     titleItem->setData(Qt::UserRole, it->id);
     itemTable_->setItem(i, 0, titleItem);
     itemTable_->setItem(i, 1, new QTableWidgetItem(feedName));
-    itemTable_->setItem(i, 2, new QTableWidgetItem(
-        it->published_at.isValid()
-            ? it->published_at.toString(QStringLiteral("yyyy-MM-dd HH:mm"))
-            : QString()));
+    itemTable_->setItem(
+        i, 2,
+        new QTableWidgetItem(it->published_at.isValid()
+                                 ? it->published_at.toString(QStringLiteral("yyyy-MM-dd HH:mm"))
+                                 : QString()));
     itemTable_->setItem(i, 3, new QTableWidgetItem(linkKindLabel(*it)));
 
     QString ruleHit;
@@ -307,7 +314,8 @@ void RssItemsPage::refreshTable() {
       const auto matches = service_->evaluateItem(*it);
       int hitCount = 0;
       for (const auto& m : matches) {
-        if (m.matched) ++hitCount;
+        if (m.matched)
+          ++hitCount;
       }
       ruleHit = hitCount > 0 ? QStringLiteral("命中 %1 条").arg(hitCount) : QStringLiteral("-");
     }
@@ -323,9 +331,11 @@ void RssItemsPage::refreshTable() {
         seriesHit = QStringLiteral("E%1").arg(ep->episode);
       }
     }
-    itemTable_->setItem(i, 5, new QTableWidgetItem(seriesHit.isEmpty() ? QStringLiteral("-") : seriesHit));
-    itemTable_->setItem(i, 6, new QTableWidgetItem(
-        it->downloaded ? QStringLiteral("已下载") : QStringLiteral("-")));
+    itemTable_->setItem(
+        i, 5, new QTableWidgetItem(seriesHit.isEmpty() ? QStringLiteral("-") : seriesHit));
+    itemTable_->setItem(
+        i, 6,
+        new QTableWidgetItem(it->downloaded ? QStringLiteral("已下载") : QStringLiteral("-")));
   }
 
   refreshTaskProgressCells();
@@ -392,10 +402,10 @@ void RssItemsPage::buildLayout() {
   auto* splitter = new QSplitter(Qt::Horizontal, this);
   itemTable_ = new QTableWidget(splitter);
   itemTable_->setColumnCount(8);
-  itemTable_->setHorizontalHeaderLabels(
-      {QStringLiteral("标题"), QStringLiteral("来源"), QStringLiteral("发布时间"),
-       QStringLiteral("资源"), QStringLiteral("规则命中"),
-       QStringLiteral("剧集"), QStringLiteral("下载状态"), QStringLiteral("任务进度")});
+  itemTable_->setHorizontalHeaderLabels({QStringLiteral("标题"), QStringLiteral("来源"),
+                                         QStringLiteral("发布时间"), QStringLiteral("资源"),
+                                         QStringLiteral("规则命中"), QStringLiteral("剧集"),
+                                         QStringLiteral("下载状态"), QStringLiteral("任务进度")});
   itemTable_->horizontalHeader()->setStretchLastSection(true);
   itemTable_->horizontalHeader()->setSectionResizeMode(QHeaderView::Interactive);
   itemTable_->setSelectionBehavior(QAbstractItemView::SelectRows);
@@ -426,21 +436,23 @@ void RssItemsPage::bindSignals() {
   connect(itemTable_, &QTableWidget::currentCellChanged, this,
           [this](int, int, int, int) { onSelectionChanged(); });
   if (itemTable_->selectionModel()) {
-    connect(itemTable_->selectionModel(), &QItemSelectionModel::selectionChanged, this,
-            [this]() {
-              updateActionStates();
-              onSelectionChanged();
-            });
+    connect(itemTable_->selectionModel(), &QItemSelectionModel::selectionChanged, this, [this]() {
+      updateActionStates();
+      onSelectionChanged();
+    });
   }
   connect(itemTable_, &QTableWidget::customContextMenuRequested, this,
           &RssItemsPage::showRowContextMenu);
 }
 
 void RssItemsPage::onSelectionChanged() {
-  if (!service_) return;
+  if (!service_)
+    return;
   const auto selectedRows = itemTable_->selectionModel()->selectedRows();
   if (selectedRows.size() > 1) {
-    detailView_->setHtml(QStringLiteral("<p>已选择 <b>%1</b> 条。可使用顶部按钮或右键菜单批量下载、忽略；复制链接按列表顺序取第一条可复制的条目。</p>")
+    detailView_->setHtml(QStringLiteral("<p>已选择 <b>%1</b> "
+                                        "条。可使用顶部按钮或右键菜单批量下载、忽略；复制链接按列表"
+                                        "顺序取第一条可复制的条目。</p>")
                              .arg(selectedRows.size()));
     return;
   }
@@ -453,7 +465,8 @@ void RssItemsPage::onSelectionChanged() {
 
   const QString itemId = itemTable_->item(row, 0)->data(Qt::UserRole).toString();
   for (const auto& it : service_->items()) {
-    if (it.id != itemId) continue;
+    if (it.id != itemId)
+      continue;
 
     service_->markItemRead(itemId);
 
@@ -467,7 +480,8 @@ void RssItemsPage::onSelectionChanged() {
                   .arg(it.published_at.toString(QStringLiteral("yyyy-MM-dd HH:mm:ss")));
     }
     if (!it.magnet.isEmpty()) {
-      html += QStringLiteral("<p><b>磁力链接：</b><br/><code style=\"word-break:break-all;\">%1</code></p>")
+      html += QStringLiteral(
+                  "<p><b>磁力链接：</b><br/><code style=\"word-break:break-all;\">%1</code></p>")
                   .arg(it.magnet.toHtmlEscaped());
     }
     if (!it.torrent_url.isEmpty()) {
@@ -492,7 +506,8 @@ void RssItemsPage::onSelectionChanged() {
     if (!matches.empty()) {
       html += QStringLiteral("<hr/><p><b>规则评估：</b></p>"
                              "<table style=\"border-collapse:collapse;width:100%;\">"
-                             "<tr style=\"background:#f5f8ff;\"><th style=\"text-align:left;padding:4px 8px;\">规则</th>"
+                             "<tr style=\"background:#f5f8ff;\"><th "
+                             "style=\"text-align:left;padding:4px 8px;\">规则</th>"
                              "<th style=\"text-align:left;padding:4px 8px;\">结果</th>"
                              "<th style=\"text-align:left;padding:4px 8px;\">原因</th></tr>");
       for (const auto& m : matches) {
@@ -527,9 +542,11 @@ void RssItemsPage::onSelectionChanged() {
 }
 
 void RssItemsPage::onDownloadClicked() {
-  if (!service_) return;
+  if (!service_)
+    return;
   const QStringList ids = selectedItemIdsOrdered();
-  if (ids.isEmpty()) return;
+  if (ids.isEmpty())
+    return;
 
   int dispatched = 0;
   for (const QString& id : ids) {
@@ -551,15 +568,17 @@ void RssItemsPage::onDownloadClicked() {
 }
 
 void RssItemsPage::onCopyMagnet() {
-  if (!service_) return;
+  if (!service_)
+    return;
   const QStringList ids = selectedItemIdsOrdered();
-  if (ids.isEmpty()) return;
+  if (ids.isEmpty())
+    return;
 
   for (const QString& id : ids) {
     const auto* it = findItem(id);
-    if (!it) continue;
-    const QString toCopy =
-        !it->magnet.isEmpty() ? it->magnet : it->torrent_url;
+    if (!it)
+      continue;
+    const QString toCopy = !it->magnet.isEmpty() ? it->magnet : it->torrent_url;
     if (toCopy.isEmpty()) {
       continue;
     }
@@ -568,7 +587,7 @@ void RssItemsPage::onCopyMagnet() {
     return;
   }
   QMessageBox::information(this, QStringLiteral("复制链接"),
-                             QStringLiteral("所选条目均没有磁力或 Torrent 链接。"));
+                           QStringLiteral("所选条目均没有磁力或 Torrent 链接。"));
 }
 
 QString RssItemsPage::resolveSelectedItemPath(const QString& actionName) const {
@@ -582,7 +601,8 @@ QString RssItemsPage::resolveSelectedItemPath(const QString& actionName) const {
   }
 
   const auto* it = findItem(ids.front());
-  if (!it) return {};
+  if (!it)
+    return {};
 
   if (!it->downloaded) {
     QMessageBox::information(const_cast<RssItemsPage*>(this), actionName,
@@ -612,16 +632,20 @@ QString RssItemsPage::resolveSelectedItemPath(const QString& actionName) const {
 }
 
 void RssItemsPage::onOpenFolder() {
-  if (!service_) return;
+  if (!service_)
+    return;
   const QString path = resolveSelectedItemPath(QStringLiteral("打开文件夹"));
-  if (path.isEmpty()) return;
+  if (path.isEmpty())
+    return;
   pfd::core::ExternalPlayer::openFolder(path);
 }
 
 void RssItemsPage::onPlayClicked() {
-  if (!service_) return;
+  if (!service_)
+    return;
   const QString path = resolveSelectedItemPath(QStringLiteral("播放"));
-  if (path.isEmpty()) return;
+  if (path.isEmpty())
+    return;
 
   const QString cmd = service_->settings().external_player_command.trimmed();
   if (cmd.isEmpty()) {
@@ -649,9 +673,11 @@ void RssItemsPage::onPlayClicked() {
 }
 
 void RssItemsPage::onIgnoreItem() {
-  if (!service_) return;
+  if (!service_)
+    return;
   const QStringList ids = selectedItemIdsOrdered();
-  if (ids.isEmpty()) return;
+  if (ids.isEmpty())
+    return;
 
   service_->markItemsIgnored(ids);
   service_->saveState();

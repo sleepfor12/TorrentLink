@@ -43,9 +43,9 @@ target_link_libraries(torrentlink_tests
   PRIVATE
     GTest::gtest
     Qt6::Core
-    p2p_base
-    p2p_core
-    p2p_lt
+    torrentlink_base
+    torrentlink_core
+    torrentlink_lt
 )
 
 pfd_set_target_warnings(torrentlink_tests)

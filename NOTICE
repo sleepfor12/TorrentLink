@@ -1,6 +1,11 @@
 TorrentLink NOTICE
 ==================
 
+UI Design Reference:
+- This project references qBittorrent in parts of its UI design.
+- All related copyrights and trademarks belong to qBittorrent contributors
+  and their respective owners.
+
 This project depends on the following third-party libraries:
 
 1. libtorrent (Rasterbar)

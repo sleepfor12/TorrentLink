@@ -1,8 +1,8 @@
 #include "ui/input_ime_utils.h"
 
+#include <QtCore/QTimer>
 #include <QtGui/QInputMethodEvent>
 #include <QtWidgets/QLineEdit>
-#include <QtCore/QTimer>
 
 #include <algorithm>
 
@@ -12,7 +12,7 @@ namespace {
 
 /// 通过 InputMethod 事件跟踪 QLineEdit 是否处于预编辑（中文等 IME 组字）阶段。
 class LineEditImeComposeTracker final : public QObject {
- public:
+public:
   explicit LineEditImeComposeTracker(QLineEdit* lineEdit, QObject* parent)
       : QObject(parent), lineEdit_(lineEdit) {
     if (lineEdit_ != nullptr) {
@@ -20,9 +20,11 @@ class LineEditImeComposeTracker final : public QObject {
     }
   }
 
-  [[nodiscard]] bool isComposing() const { return composing_; }
+  [[nodiscard]] bool isComposing() const {
+    return composing_;
+  }
 
- protected:
+protected:
   bool eventFilter(QObject* watched, QEvent* event) override {
     if (watched == lineEdit_ && event->type() == QEvent::InputMethod) {
       const auto* ime = static_cast<QInputMethodEvent*>(event);
@@ -31,7 +33,7 @@ class LineEditImeComposeTracker final : public QObject {
     return QObject::eventFilter(watched, event);
   }
 
- private:
+private:
   QLineEdit* lineEdit_{nullptr};
   bool composing_{false};
 };
@@ -59,8 +61,7 @@ void connectImeAwareLineEditApply(QObject* lifetimeParent, QLineEdit* lineEdit, 
 
   QObject::connect(lineEdit, &QLineEdit::textChanged, lifetimeParent,
                    [timer, tracker, debounceMs, runApply]() {
-                     const int delay =
-                         tracker->isComposing() ? 50 : std::max(0, debounceMs);
+                     const int delay = tracker->isComposing() ? 50 : std::max(0, debounceMs);
                      timer->stop();
                      timer->setInterval(delay);
                      timer->start();

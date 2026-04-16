@@ -1,5 +1,7 @@
 #include "ui/settings_dialog.h"
 
+#include <QtNetwork/QHostAddress>
+#include <QtNetwork/QTcpServer>
 #include <QtWidgets/QCheckBox>
 #include <QtWidgets/QComboBox>
 #include <QtWidgets/QDialogButtonBox>
@@ -16,8 +18,6 @@
 #include <QtWidgets/QSpinBox>
 #include <QtWidgets/QTabWidget>
 #include <QtWidgets/QVBoxLayout>
-#include <QtNetwork/QHostAddress>
-#include <QtNetwork/QTcpServer>
 
 #include <algorithm>
 
@@ -33,120 +33,119 @@ SettingsDialog::SettingsDialog(QWidget* parent) : QDialog(parent) {
   resize(920, 680);
   setMinimumSize(860, 620);
   setObjectName(QStringLiteral("settingsDialog"));
-  setStyleSheet(QStringLiteral(
-      "QDialog#settingsDialog {"
-      "  background: #f5f7fb;"
-      "}"
-      "QTabWidget::pane {"
-      "  border: 1px solid #dfe3eb;"
-      "  border-radius: 10px;"
-      "  background: #ffffff;"
-      "  top: -1px;"
-      "}"
-      "QTabBar::tab {"
-      "  background: #eef1f7;"
-      "  color: #3a4150;"
-      "  border: 1px solid #dfe3eb;"
-      "  border-bottom: none;"
-      "  border-top-left-radius: 8px;"
-      "  border-top-right-radius: 8px;"
-      "  padding: 9px 16px;"
-      "  margin-right: 6px;"
-      "  font-weight: 500;"
-      "}"
-      "QTabBar::tab:selected {"
-      "  background: #ffffff;"
-      "  color: #1f6feb;"
-      "}"
-      "QGroupBox {"
-      "  border: 1px solid #e4e8f0;"
-      "  border-radius: 10px;"
-      "  margin-top: 10px;"
-      "  padding: 12px;"
-      "  background: #ffffff;"
-      "  font-weight: 600;"
-      "}"
-      "QGroupBox::title {"
-      "  subcontrol-origin: margin;"
-      "  left: 12px;"
-      "  padding: 0 4px;"
-      "  color: #2f3542;"
-      "}"
-      "QFormLayout {"
-      "  spacing: 10px;"
-      "}"
-      "QLineEdit, QPlainTextEdit {"
-      "  border: 1px solid #d0d7e2;"
-      "  border-radius: 8px;"
-      "  background: #ffffff;"
-      "  padding: 4px 8px;"
-      "  min-height: 18px;"
-      "}"
-      "QLineEdit:focus, QPlainTextEdit:focus {"
-      "  border: 1px solid #1f6feb;"
-      "}"
-      "QComboBox, QSpinBox, QDoubleSpinBox {"
-      "  color: #1f2937;"
-      "  background: #ffffff;"
-      "}"
-      "QComboBox::drop-down, QSpinBox::up-button, QSpinBox::down-button, "
-      "QDoubleSpinBox::up-button, QDoubleSpinBox::down-button {"
-      "  background: transparent;"
-      "}"
-      "QComboBox QAbstractItemView {"
-      "  border: 1px solid #d0d7e2;"
-      "  background: #ffffff;"
-      "  color: #1f2937;"
-      "  padding: 2px;"
-      "  outline: 0;"
-      "}"
-      "QComboBox QAbstractItemView::item {"
-      "  min-height: 22px;"
-      "  padding: 2px 8px;"
-      "}"
-      "QComboBox QAbstractItemView::item:selected {"
-      "  background: #1f6feb;"
-      "  color: #ffffff;"
-      "}"
-      "QTabBar QToolButton {"
-      "  border: 1px solid #d0d7e2;"
-      "  background: #ffffff;"
-      "  color: #1f2937;"
-      "  border-radius: 6px;"
-      "  padding: 2px;"
-      "  min-width: 18px;"
-      "}"
-      "QPushButton {"
-      "  border: 1px solid #d0d7e2;"
-      "  border-radius: 8px;"
-      "  background: #ffffff;"
-      "  padding: 7px 14px;"
-      "}"
-      "QPushButton:hover {"
-      "  background: #f3f6fb;"
-      "}"
-      "QDialogButtonBox QPushButton {"
-      "  min-width: 92px;"
-      "}"
-      "QDialogButtonBox QPushButton[text=\"确定\"] {"
-      "  background: #1f6feb;"
-      "  color: #ffffff;"
-      "  border-color: #1f6feb;"
-      "}"
-      "QDialogButtonBox QPushButton[text=\"确定\"]:hover {"
-      "  background: #1760cf;"
-      "}"
-      "QLabel {"
-      "  color: #4c5566;"
-      "  qproperty-wordWrap: true;"
-      "}"
-      "QLabel[class=\"sectionHint\"] {"
-      "  color: #6a7280;"
-      "  padding-left: 2px;"
-      "}"
-      "QCheckBox {"
-      "  spacing: 7px;"
-      "}"));
+  setStyleSheet(QStringLiteral("QDialog#settingsDialog {"
+                               "  background: #f5f7fb;"
+                               "}"
+                               "QTabWidget::pane {"
+                               "  border: 1px solid #dfe3eb;"
+                               "  border-radius: 10px;"
+                               "  background: #ffffff;"
+                               "  top: -1px;"
+                               "}"
+                               "QTabBar::tab {"
+                               "  background: #eef1f7;"
+                               "  color: #3a4150;"
+                               "  border: 1px solid #dfe3eb;"
+                               "  border-bottom: none;"
+                               "  border-top-left-radius: 8px;"
+                               "  border-top-right-radius: 8px;"
+                               "  padding: 9px 16px;"
+                               "  margin-right: 6px;"
+                               "  font-weight: 500;"
+                               "}"
+                               "QTabBar::tab:selected {"
+                               "  background: #ffffff;"
+                               "  color: #1f6feb;"
+                               "}"
+                               "QGroupBox {"
+                               "  border: 1px solid #e4e8f0;"
+                               "  border-radius: 10px;"
+                               "  margin-top: 10px;"
+                               "  padding: 12px;"
+                               "  background: #ffffff;"
+                               "  font-weight: 600;"
+                               "}"
+                               "QGroupBox::title {"
+                               "  subcontrol-origin: margin;"
+                               "  left: 12px;"
+                               "  padding: 0 4px;"
+                               "  color: #2f3542;"
+                               "}"
+                               "QFormLayout {"
+                               "  spacing: 10px;"
+                               "}"
+                               "QLineEdit, QPlainTextEdit {"
+                               "  border: 1px solid #d0d7e2;"
+                               "  border-radius: 8px;"
+                               "  background: #ffffff;"
+                               "  padding: 4px 8px;"
+                               "  min-height: 18px;"
+                               "}"
+                               "QLineEdit:focus, QPlainTextEdit:focus {"
+                               "  border: 1px solid #1f6feb;"
+                               "}"
+                               "QComboBox, QSpinBox, QDoubleSpinBox {"
+                               "  color: #1f2937;"
+                               "  background: #ffffff;"
+                               "}"
+                               "QComboBox::drop-down, QSpinBox::up-button, QSpinBox::down-button, "
+                               "QDoubleSpinBox::up-button, QDoubleSpinBox::down-button {"
+                               "  background: transparent;"
+                               "}"
+                               "QComboBox QAbstractItemView {"
+                               "  border: 1px solid #d0d7e2;"
+                               "  background: #ffffff;"
+                               "  color: #1f2937;"
+                               "  padding: 2px;"
+                               "  outline: 0;"
+                               "}"
+                               "QComboBox QAbstractItemView::item {"
+                               "  min-height: 22px;"
+                               "  padding: 2px 8px;"
+                               "}"
+                               "QComboBox QAbstractItemView::item:selected {"
+                               "  background: #1f6feb;"
+                               "  color: #ffffff;"
+                               "}"
+                               "QTabBar QToolButton {"
+                               "  border: 1px solid #d0d7e2;"
+                               "  background: #ffffff;"
+                               "  color: #1f2937;"
+                               "  border-radius: 6px;"
+                               "  padding: 2px;"
+                               "  min-width: 18px;"
+                               "}"
+                               "QPushButton {"
+                               "  border: 1px solid #d0d7e2;"
+                               "  border-radius: 8px;"
+                               "  background: #ffffff;"
+                               "  padding: 7px 14px;"
+                               "}"
+                               "QPushButton:hover {"
+                               "  background: #f3f6fb;"
+                               "}"
+                               "QDialogButtonBox QPushButton {"
+                               "  min-width: 92px;"
+                               "}"
+                               "QDialogButtonBox QPushButton[text=\"确定\"] {"
+                               "  background: #1f6feb;"
+                               "  color: #ffffff;"
+                               "  border-color: #1f6feb;"
+                               "}"
+                               "QDialogButtonBox QPushButton[text=\"确定\"]:hover {"
+                               "  background: #1760cf;"
+                               "}"
+                               "QLabel {"
+                               "  color: #4c5566;"
+                               "  qproperty-wordWrap: true;"
+                               "}"
+                               "QLabel[class=\"sectionHint\"] {"
+                               "  color: #6a7280;"
+                               "  padding-left: 2px;"
+                               "}"
+                               "QCheckBox {"
+                               "  spacing: 7px;"
+                               "}"));
   buildLayout();
   wireSignals();
 }
@@ -189,7 +188,8 @@ pfd::core::AppSettings SettingsDialog::currentSettings() const {
   s.monitor_port = monitorPortSpin_ != nullptr ? monitorPortSpin_->value() : 0;
   s.builtin_tracker_enabled =
       builtinTrackerEnabledCheck_ != nullptr && builtinTrackerEnabledCheck_->isChecked();
-  s.builtin_tracker_port = builtinTrackerPortSpin_ != nullptr ? builtinTrackerPortSpin_->value() : 0;
+  s.builtin_tracker_port =
+      builtinTrackerPortSpin_ != nullptr ? builtinTrackerPortSpin_->value() : 0;
   s.builtin_tracker_port_forwarding = builtinTrackerPortForwardingCheck_ != nullptr &&
                                       builtinTrackerPortForwardingCheck_->isChecked();
   s.encryption_mode = encryptionModeBox_ != nullptr ? encryptionModeBox_->currentData().toString()
@@ -201,13 +201,14 @@ pfd::core::AppSettings SettingsDialog::currentSettings() const {
       proxyTypeBox_ != nullptr ? proxyTypeBox_->currentData().toString() : QStringLiteral("socks5");
   s.proxy_host = proxyHostEdit_ != nullptr ? proxyHostEdit_->text().trimmed() : QString();
   s.proxy_port = proxyPortSpin_ != nullptr ? proxyPortSpin_->value() : 1080;
-  s.proxy_username = proxyUsernameEdit_ != nullptr ? proxyUsernameEdit_->text().trimmed() : QString();
+  s.proxy_username =
+      proxyUsernameEdit_ != nullptr ? proxyUsernameEdit_->text().trimmed() : QString();
   s.proxy_password = proxyPasswordEdit_ != nullptr ? proxyPasswordEdit_->text() : QString();
   s.close_behavior = closeBehaviorBox_ != nullptr ? closeBehaviorBox_->currentData().toString()
                                                   : QStringLiteral("minimize");
   s.start_minimized = startMinimizedCheck_ != nullptr && startMinimizedCheck_->isChecked();
-  s.timed_action =
-      timedActionBox_ != nullptr ? timedActionBox_->currentData().toString() : QStringLiteral("none");
+  s.timed_action = timedActionBox_ != nullptr ? timedActionBox_->currentData().toString()
+                                              : QStringLiteral("none");
   s.timed_action_delay_minutes =
       timedActionDelaySpin_ != nullptr ? timedActionDelaySpin_->value() : 0;
   return s;
@@ -221,7 +222,8 @@ pfd::core::rss::RssSettings SettingsDialog::currentRssSettings() const {
       rssRefreshIntervalSpin_ != nullptr ? rssRefreshIntervalSpin_->value() : 30;
   s.max_auto_downloads_per_refresh =
       rssMaxAutoDownloadsSpin_ != nullptr ? rssMaxAutoDownloadsSpin_->value() : 10;
-  s.history_max_items = rssHistoryMaxItemsSpin_ != nullptr ? rssHistoryMaxItemsSpin_->value() : 5000;
+  s.history_max_items =
+      rssHistoryMaxItemsSpin_ != nullptr ? rssHistoryMaxItemsSpin_->value() : 5000;
   s.history_max_age_days = rssHistoryMaxAgeSpin_ != nullptr ? rssHistoryMaxAgeSpin_->value() : 90;
   s.external_player_command =
       rssPlayerCommandEdit_ != nullptr ? rssPlayerCommandEdit_->text().trimmed() : QString();
@@ -235,14 +237,12 @@ pfd::core::ControllerSettings SettingsDialog::currentControllerSettings() const 
   if (defaultTrackersEdit_ != nullptr) {
     s.default_trackers = defaultTrackersEdit_->toPlainText().split('\n', Qt::SkipEmptyParts);
   }
-  s.magnet_max_inflight =
-      magnetMaxInflightSpin_ != nullptr ? magnetMaxInflightSpin_->value() : 8;
+  s.magnet_max_inflight = magnetMaxInflightSpin_ != nullptr ? magnetMaxInflightSpin_->value() : 8;
   s.bottom_status_enabled =
       bottomStatusEnabledCheck_ != nullptr && bottomStatusEnabledCheck_->isChecked();
   s.bottom_status_refresh_ms =
       bottomStatusRefreshMsSpin_ != nullptr ? bottomStatusRefreshMsSpin_->value() : 1000;
-  s.task_autosave_ms =
-      taskAutoSaveMsSpin_ != nullptr ? taskAutoSaveMsSpin_->value() : 5000;
+  s.task_autosave_ms = taskAutoSaveMsSpin_ != nullptr ? taskAutoSaveMsSpin_->value() : 5000;
   s.restore_start_paused =
       restoreStartPausedCheck_ != nullptr && restoreStartPausedCheck_->isChecked();
   return s;
@@ -446,8 +446,9 @@ void SettingsDialog::setSettings(const pfd::core::AppSettings& s) {
   }
   if (timedActionDelaySpin_ != nullptr) {
     timedActionDelaySpin_->setValue(std::clamp(s.timed_action_delay_minutes, 0, 10080));
-    const QString currentAction =
-        timedActionBox_ != nullptr ? timedActionBox_->currentData().toString() : QStringLiteral("none");
+    const QString currentAction = timedActionBox_ != nullptr
+                                      ? timedActionBox_->currentData().toString()
+                                      : QStringLiteral("none");
     timedActionDelaySpin_->setEnabled(currentAction != QStringLiteral("none"));
   }
 }
@@ -543,8 +544,8 @@ void SettingsDialog::buildLayout() {
   seedForm->addRow(QStringLiteral("目标分享率"), seedTargetRatioSpin_);
   seedForm->addRow(QStringLiteral("做种时长上限"), seedMaxMinutesSpin_);
   downloadLayout->addWidget(seedGroup);
-  auto* seedHint =
-      new QLabel(QStringLiteral("提示：勾选「无限做种」时，分享率和时长上限均不生效。"), downloadTab);
+  auto* seedHint = new QLabel(
+      QStringLiteral("提示：勾选「无限做种」时，分享率和时长上限均不生效。"), downloadTab);
   seedHint->setProperty("class", QStringLiteral("sectionHint"));
   downloadLayout->addWidget(seedHint);
   downloadLayout->addStretch(1);
@@ -789,7 +790,8 @@ void SettingsDialog::buildLayout() {
   rssDlForm->setFieldGrowthPolicy(QFormLayout::ExpandingFieldsGrow);
   rssDlForm->setFormAlignment(Qt::AlignTop);
   rssDlForm->setVerticalSpacing(10);
-  rssGlobalAutoDownloadCheck_ = new QCheckBox(QStringLiteral("启用全局自动下载（总开关）"), rssDlGroup);
+  rssGlobalAutoDownloadCheck_ =
+      new QCheckBox(QStringLiteral("启用全局自动下载（总开关）"), rssDlGroup);
   rssDlForm->addRow(rssGlobalAutoDownloadCheck_);
   rssMaxAutoDownloadsSpin_ = new QSpinBox(rssDlGroup);
   rssMaxAutoDownloadsSpin_->setRange(1, 100);
@@ -836,7 +838,8 @@ void SettingsDialog::buildLayout() {
   rssLayout->addWidget(rssPlayerGroup);
 
   auto* rssHint = new QLabel(
-      QStringLiteral("提示：订阅源、规则、剧集页中的行为仍在各自页面配置，本页为 RSS 全局行为。"), rssTab);
+      QStringLiteral("提示：订阅源、规则、剧集页中的行为仍在各自页面配置，本页为 RSS 全局行为。"),
+      rssTab);
   rssHint->setProperty("class", QStringLiteral("sectionHint"));
   rssLayout->addWidget(rssHint);
   rssLayout->addStretch(1);
@@ -870,7 +873,8 @@ void SettingsDialog::buildLayout() {
   closeBehaviorBox_->addItem(QStringLiteral("最小化到托盘"), QStringLiteral("minimize"));
   closeBehaviorBox_->addItem(QStringLiteral("直接退出"), QStringLiteral("quit"));
   behaviorForm->addRow(QStringLiteral("关闭窗口时"), closeBehaviorBox_);
-  startMinimizedCheck_ = new QCheckBox(QStringLiteral("启动时最小化到托盘（下次启动生效）"), behaviorGroup);
+  startMinimizedCheck_ =
+      new QCheckBox(QStringLiteral("启动时最小化到托盘（下次启动生效）"), behaviorGroup);
   behaviorForm->addRow(QStringLiteral("启动行为"), startMinimizedCheck_);
 
   timedActionBox_ = new QComboBox(behaviorGroup);
@@ -999,27 +1003,39 @@ void SettingsDialog::wireSignals() {
   }
   if (proxyEnabledCheck_ != nullptr) {
     connect(proxyEnabledCheck_, &QCheckBox::toggled, this, [this](bool checked) {
-      if (proxyTypeBox_ != nullptr) proxyTypeBox_->setEnabled(checked);
-      if (proxyHostEdit_ != nullptr) proxyHostEdit_->setEnabled(checked);
-      if (proxyPortSpin_ != nullptr) proxyPortSpin_->setEnabled(checked);
-      if (proxyUsernameEdit_ != nullptr) proxyUsernameEdit_->setEnabled(checked);
-      if (proxyPasswordEdit_ != nullptr) proxyPasswordEdit_->setEnabled(checked);
+      if (proxyTypeBox_ != nullptr)
+        proxyTypeBox_->setEnabled(checked);
+      if (proxyHostEdit_ != nullptr)
+        proxyHostEdit_->setEnabled(checked);
+      if (proxyPortSpin_ != nullptr)
+        proxyPortSpin_->setEnabled(checked);
+      if (proxyUsernameEdit_ != nullptr)
+        proxyUsernameEdit_->setEnabled(checked);
+      if (proxyPasswordEdit_ != nullptr)
+        proxyPasswordEdit_->setEnabled(checked);
     });
     const bool enabled = proxyEnabledCheck_->isChecked();
-    if (proxyTypeBox_ != nullptr) proxyTypeBox_->setEnabled(enabled);
-    if (proxyHostEdit_ != nullptr) proxyHostEdit_->setEnabled(enabled);
-    if (proxyPortSpin_ != nullptr) proxyPortSpin_->setEnabled(enabled);
-    if (proxyUsernameEdit_ != nullptr) proxyUsernameEdit_->setEnabled(enabled);
-    if (proxyPasswordEdit_ != nullptr) proxyPasswordEdit_->setEnabled(enabled);
+    if (proxyTypeBox_ != nullptr)
+      proxyTypeBox_->setEnabled(enabled);
+    if (proxyHostEdit_ != nullptr)
+      proxyHostEdit_->setEnabled(enabled);
+    if (proxyPortSpin_ != nullptr)
+      proxyPortSpin_->setEnabled(enabled);
+    if (proxyUsernameEdit_ != nullptr)
+      proxyUsernameEdit_->setEnabled(enabled);
+    if (proxyPasswordEdit_ != nullptr)
+      proxyPasswordEdit_->setEnabled(enabled);
   }
   if (builtinTrackerEnabledCheck_ != nullptr) {
     connect(builtinTrackerEnabledCheck_, &QCheckBox::toggled, this, [this](bool checked) {
-      if (builtinTrackerPortSpin_ != nullptr) builtinTrackerPortSpin_->setEnabled(checked);
+      if (builtinTrackerPortSpin_ != nullptr)
+        builtinTrackerPortSpin_->setEnabled(checked);
       if (builtinTrackerPortForwardingCheck_ != nullptr)
         builtinTrackerPortForwardingCheck_->setEnabled(checked);
     });
     const bool enabled = builtinTrackerEnabledCheck_->isChecked();
-    if (builtinTrackerPortSpin_ != nullptr) builtinTrackerPortSpin_->setEnabled(enabled);
+    if (builtinTrackerPortSpin_ != nullptr)
+      builtinTrackerPortSpin_->setEnabled(enabled);
     if (builtinTrackerPortForwardingCheck_ != nullptr)
       builtinTrackerPortForwardingCheck_->setEnabled(enabled);
   }

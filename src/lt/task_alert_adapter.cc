@@ -13,14 +13,16 @@ namespace pfd::lt {
 
 namespace {
 QString toHexV1(const libtorrent::info_hash_t& ih) {
-  if (!ih.has_v1()) return {};
+  if (!ih.has_v1())
+    return {};
   std::ostringstream oss;
   oss << ih.v1;
   return QString::fromStdString(oss.str());
 }
 
 QString toHexV2(const libtorrent::info_hash_t& ih) {
-  if (!ih.has_v2()) return {};
+  if (!ih.has_v2())
+    return {};
   std::ostringstream oss;
   oss << ih.v2;
   return QString::fromStdString(oss.str());

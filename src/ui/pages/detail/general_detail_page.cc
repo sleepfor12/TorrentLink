@@ -24,10 +24,10 @@ QLabel* makeValueLabel(QWidget* parent) {
 
 QGroupBox* makeGroup(const QString& title, QWidget* parent) {
   auto* g = new QGroupBox(title, parent);
-  g->setStyleSheet(QStringLiteral(
-      "QGroupBox{font-weight:700;font-size:12px;color:#374151;"
-      "border:1px solid #e5e7eb;border-radius:4px;margin-top:8px;padding-top:14px;}"
-      "QGroupBox::title{subcontrol-origin:margin;left:8px;padding:0 4px;}"));
+  g->setStyleSheet(
+      QStringLiteral("QGroupBox{font-weight:700;font-size:12px;color:#374151;"
+                     "border:1px solid #e5e7eb;border-radius:4px;margin-top:8px;padding-top:14px;}"
+                     "QGroupBox::title{subcontrol-origin:margin;left:8px;padding:0 4px;}"));
   return g;
 }
 
@@ -40,7 +40,9 @@ void addRow(QFormLayout* form, const QString& label, QLabel* value) {
 
 }  // namespace
 
-GeneralDetailPage::GeneralDetailPage(QWidget* parent) : QWidget(parent) { buildLayout(); }
+GeneralDetailPage::GeneralDetailPage(QWidget* parent) : QWidget(parent) {
+  buildLayout();
+}
 
 void GeneralDetailPage::buildLayout() {
   auto* root = new QVBoxLayout(this);
@@ -196,14 +198,14 @@ void GeneralDetailPage::setSnapshot(const pfd::core::TaskSnapshot& s) {
   eta_->setText(s.downloadRate > 0 ? pfd::base::formatDuration(left / s.downloadRate) : kDash);
 
   if (s.downloadedBytes > 0) {
-    shareRatio_->setText(pfd::base::formatRatio(
-        static_cast<double>(s.uploadedBytes) / static_cast<double>(s.downloadedBytes)));
+    shareRatio_->setText(pfd::base::formatRatio(static_cast<double>(s.uploadedBytes) /
+                                                static_cast<double>(s.downloadedBytes)));
   } else {
     shareRatio_->setText(kDash);
   }
 
-  popularity_->setText(
-      s.availability > 0.0 ? QStringLiteral("%1").arg(s.availability, 0, 'f', 2) : kDash);
+  popularity_->setText(s.availability > 0.0 ? QStringLiteral("%1").arg(s.availability, 0, 'f', 2)
+                                            : kDash);
 
   activeTime_->setText(s.activeTimeSec > 0 ? pfd::base::formatDuration(s.activeTimeSec) : kDash);
   dlLimit_->setText(s.dlLimitBps > 0 ? pfd::base::formatRate(s.dlLimitBps) : QStringLiteral("∞"));
@@ -211,11 +213,10 @@ void GeneralDetailPage::setSnapshot(const pfd::core::TaskSnapshot& s) {
   wasted_->setText(s.wastedBytes > 0 ? pfd::base::formatBytes(s.wastedBytes) : kDash);
   nextAnnounce_->setText(s.nextAnnounceSec >= 0 ? pfd::base::formatDuration(s.nextAnnounceSec)
                                                 : kDash);
-  lastSeenComplete_->setText(
-      pfd::base::isValidMs(s.lastSeenCompleteMs)
-          ? QDateTime::fromMSecsSinceEpoch(s.lastSeenCompleteMs)
-                .toString(QStringLiteral("yyyy-MM-dd HH:mm:ss"))
-          : kDash);
+  lastSeenComplete_->setText(pfd::base::isValidMs(s.lastSeenCompleteMs)
+                                 ? QDateTime::fromMSecsSinceEpoch(s.lastSeenCompleteMs)
+                                       .toString(QStringLiteral("yyyy-MM-dd HH:mm:ss"))
+                                 : kDash);
 
   // Info
   totalSize_->setText(pfd::base::formatBytes(s.totalBytes));
@@ -229,23 +230,21 @@ void GeneralDetailPage::setSnapshot(const pfd::core::TaskSnapshot& s) {
   infoHashV2_->setText(s.infoHashV2.isEmpty() ? kDash : s.infoHashV2);
 
   if (s.pieces > 0 && s.pieceLength > 0) {
-    pieces_->setText(QStringLiteral("%1 x %2")
-                         .arg(s.pieces)
-                         .arg(pfd::base::formatBytes(s.pieceLength)));
+    pieces_->setText(
+        QStringLiteral("%1 x %2").arg(s.pieces).arg(pfd::base::formatBytes(s.pieceLength)));
   } else {
     pieces_->setText(kDash);
   }
   createdBy_->setText(s.createdBy.isEmpty() ? kDash : s.createdBy);
-  completedOn_->setText(
-      pfd::base::isValidMs(s.completedOnMs)
-          ? QDateTime::fromMSecsSinceEpoch(s.completedOnMs)
-                .toString(QStringLiteral("yyyy-MM-dd HH:mm:ss"))
-          : kDash);
+  completedOn_->setText(pfd::base::isValidMs(s.completedOnMs)
+                            ? QDateTime::fromMSecsSinceEpoch(s.completedOnMs)
+                                  .toString(QStringLiteral("yyyy-MM-dd HH:mm:ss"))
+                            : kDash);
   createdOn_->setText(pfd::base::isValidMs(s.createdOnMs)
                           ? QDateTime::fromMSecsSinceEpoch(s.createdOnMs)
                                 .toString(QStringLiteral("yyyy-MM-dd HH:mm:ss"))
                           : kDash);
-  isPrivate_->setText(s.isPrivate < 0 ? kDash
+  isPrivate_->setText(s.isPrivate < 0   ? kDash
                       : s.isPrivate > 0 ? QStringLiteral("是")
                                         : QStringLiteral("否"));
 }
@@ -253,11 +252,12 @@ void GeneralDetailPage::setSnapshot(const pfd::core::TaskSnapshot& s) {
 void GeneralDetailPage::clear() {
   progressBar_->setValue(0);
   progressLabel_->setText(QStringLiteral("0.0%"));
-  for (auto* l : {activeTime_, eta_, connections_, downloaded_, uploaded_, seeds_, dlSpeed_,
-                  ulSpeed_, peers_, dlLimit_, ulLimit_, wasted_, shareRatio_, nextAnnounce_,
-                  lastSeenComplete_, popularity_, totalSize_, pieces_, createdBy_, addedOn_,
-                  completedOn_, createdOn_, isPrivate_, infoHashV1_, infoHashV2_, savePath_,
-                  comment_}) {
+  for (auto* l : {activeTime_,  eta_,       connections_, downloaded_,   uploaded_,
+                  seeds_,       dlSpeed_,   ulSpeed_,     peers_,        dlLimit_,
+                  ulLimit_,     wasted_,    shareRatio_,  nextAnnounce_, lastSeenComplete_,
+                  popularity_,  totalSize_, pieces_,      createdBy_,    addedOn_,
+                  completedOn_, createdOn_, isPrivate_,   infoHashV1_,   infoHashV2_,
+                  savePath_,    comment_}) {
     l->setText(kDash);
   }
 }

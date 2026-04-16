@@ -3,8 +3,9 @@
 #include <QtCore/QDir>
 #include <QtCore/QFileInfo>
 #include <QtCore/QSet>
-#include <QtCore/Qt>
+#include <QtCore/QSignalBlocker>
 #include <QtCore/QUuid>
+#include <QtCore/Qt>
 #include <QtGui/QBrush>
 #include <QtGui/QColor>
 #include <QtWidgets/QAbstractItemView>
@@ -19,7 +20,6 @@
 #include <QtWidgets/QTableWidget>
 #include <QtWidgets/QTableWidgetItem>
 #include <QtWidgets/QVBoxLayout>
-#include <QtCore/QSignalBlocker>
 
 #include <utility>
 
@@ -121,7 +121,8 @@ void TransferPage::buildLayout() {
   filterAllBtn_->setChecked(true);
 
   auto* tagTitle = new QLabel(QStringLiteral("标签"), sideBar);
-  tagTitle->setStyleSheet(QStringLiteral("font-size:14px;font-weight:700;color:#1f2d3d;margin-top:8px;"));
+  tagTitle->setStyleSheet(
+      QStringLiteral("font-size:14px;font-weight:700;color:#1f2d3d;margin-top:8px;"));
   sideLayout->addWidget(tagTitle);
   tagFilterLayout_ = new QVBoxLayout();
   tagFilterLayout_->setSpacing(4);
@@ -255,7 +256,8 @@ void TransferPage::bindSignals() {
   connect(filterErrorDetailBtn_, &QPushButton::clicked, this,
           [activateOnly, this]() { activateOnly(filterErrorDetailBtn_); });
 
-  connect(nameSearchEdit_, &QLineEdit::textChanged, this, [this](const QString&) { emit filterChanged(); });
+  connect(nameSearchEdit_, &QLineEdit::textChanged, this,
+          [this](const QString&) { emit filterChanged(); });
 
   connect(sortKeyBox_, &QComboBox::currentIndexChanged, this, [this](int) { emit sortChanged(); });
   connect(sortOrderBox_, &QComboBox::currentIndexChanged, this,
@@ -264,14 +266,13 @@ void TransferPage::bindSignals() {
   if (taskTable_ != nullptr) {
     connect(taskTable_, &QTableWidget::customContextMenuRequested, this,
             [this](const QPoint& pos) { emit taskContextMenuRequested(pos); });
-    connect(taskTable_, &QTableWidget::currentCellChanged, this,
-            [this](int row, int, int, int) {
-              if (row >= 0 && row < static_cast<int>(displayedSnapshots_.size())) {
-                lastFocusedTaskId_ = displayedSnapshots_[static_cast<std::size_t>(row)].taskId;
-                isMemoryMode_ = false;
-              }
-              updateDetailForSelection();
-            });
+    connect(taskTable_, &QTableWidget::currentCellChanged, this, [this](int row, int, int, int) {
+      if (row >= 0 && row < static_cast<int>(displayedSnapshots_.size())) {
+        lastFocusedTaskId_ = displayedSnapshots_[static_cast<std::size_t>(row)].taskId;
+        isMemoryMode_ = false;
+      }
+      updateDetailForSelection();
+    });
   }
 }
 
@@ -297,13 +298,16 @@ void TransferPage::setSnapshots(const std::vector<pfd::core::TaskSnapshot>& snap
 
   updateStats(snapshots);
   const auto filter = currentFilter();
-  const QString nameFilter = nameSearchEdit_ != nullptr ? nameSearchEdit_->text().trimmed() : QString();
+  const QString nameFilter =
+      nameSearchEdit_ != nullptr ? nameSearchEdit_->text().trimmed() : QString();
 
   std::vector<pfd::core::TaskSnapshot> visible;
   visible.reserve(snapshots.size());
   for (const auto& s : snapshots) {
-    if (!matchFilter(s, filter)) continue;
-    if (!nameFilter.isEmpty() && !s.name.contains(nameFilter, Qt::CaseInsensitive)) continue;
+    if (!matchFilter(s, filter))
+      continue;
+    if (!nameFilter.isEmpty() && !s.name.contains(nameFilter, Qt::CaseInsensitive))
+      continue;
     if (!activeTagFilter_.isEmpty() && !s.tags.contains(activeTagFilter_, Qt::CaseInsensitive))
       continue;
     visible.push_back(s);
@@ -359,21 +363,24 @@ void TransferPage::setSnapshots(const std::vector<pfd::core::TaskSnapshot>& snap
   QList<int> restoreRows;
 
   const auto rowColorForStatus = [](pfd::base::TaskStatus status) -> QColor {
-    if (status == pfd::base::TaskStatus::kDownloading) return {40, 167, 69};
-    if (status == pfd::base::TaskStatus::kPaused) return {128, 128, 128};
-    if (status == pfd::base::TaskStatus::kFinished ||
-        status == pfd::base::TaskStatus::kSeeding ||
+    if (status == pfd::base::TaskStatus::kDownloading)
+      return {40, 167, 69};
+    if (status == pfd::base::TaskStatus::kPaused)
+      return {128, 128, 128};
+    if (status == pfd::base::TaskStatus::kFinished || status == pfd::base::TaskStatus::kSeeding ||
         status == pfd::base::TaskStatus::kError)
       return {220, 53, 69};
     return {31, 41, 55};
   };
 
   const auto statusColorForStatus = [](pfd::base::TaskStatus status) -> QColor {
-    if (status == pfd::base::TaskStatus::kError) return {220, 53, 69};
-    if (status == pfd::base::TaskStatus::kDownloading) return {40, 167, 69};
-    if (status == pfd::base::TaskStatus::kPaused) return {128, 128, 128};
-    if (status == pfd::base::TaskStatus::kFinished ||
-        status == pfd::base::TaskStatus::kSeeding)
+    if (status == pfd::base::TaskStatus::kError)
+      return {220, 53, 69};
+    if (status == pfd::base::TaskStatus::kDownloading)
+      return {40, 167, 69};
+    if (status == pfd::base::TaskStatus::kPaused)
+      return {128, 128, 128};
+    if (status == pfd::base::TaskStatus::kFinished || status == pfd::base::TaskStatus::kSeeding)
       return {220, 53, 69};
     return {31, 41, 55};
   };
@@ -435,15 +442,13 @@ void TransferPage::setSnapshots(const std::vector<pfd::core::TaskSnapshot>& snap
     ensureItem(row, 3, pfd::base::formatBytes(s.downloadedBytes), rowColor);
     ensureItem(row, 4, pfd::base::formatRate(s.downloadRate), rowColor);
     ensureItem(row, 5, pfd::base::formatRate(s.uploadRate), rowColor);
-    ensureItem(row, 6,
-               pfd::base::formatBytes(s.selectedBytes > 0 ? s.selectedBytes : s.totalBytes),
+    ensureItem(row, 6, pfd::base::formatBytes(s.selectedBytes > 0 ? s.selectedBytes : s.totalBytes),
                rowColor);
     ensureItem(row, 7, QString::number(s.seeders), rowColor);
     ensureItem(row, 8, QString::number(s.users), rowColor);
     ensureItem(row, 9, estimateEtaText(s), rowColor);
     ensureItem(row, 10, ratioText(s), rowColor);
-    ensureItem(row, 11,
-               s.category.isEmpty() ? QStringLiteral("Default") : s.category, rowColor);
+    ensureItem(row, 11, s.category.isEmpty() ? QStringLiteral("Default") : s.category, rowColor);
     ensureItem(row, 12, s.tags.isEmpty() ? QStringLiteral("--") : s.tags, rowColor);
     ensureItem(row, 13,
                s.availability > 0.0 ? QStringLiteral("%1").arg(s.availability, 0, 'f', 2)
@@ -466,10 +471,11 @@ void TransferPage::setSnapshots(const std::vector<pfd::core::TaskSnapshot>& snap
     if (!restoreRows.isEmpty() && taskTable_->selectionModel() != nullptr) {
       taskTable_->clearSelection();
       for (int r : restoreRows) {
-        if (r < 0 || r >= taskTable_->rowCount()) continue;
+        if (r < 0 || r >= taskTable_->rowCount())
+          continue;
         const QModelIndex idx = taskTable_->model()->index(r, 0);
-        taskTable_->selectionModel()->select(
-            idx, QItemSelectionModel::Select | QItemSelectionModel::Rows);
+        taskTable_->selectionModel()->select(idx, QItemSelectionModel::Select |
+                                                      QItemSelectionModel::Rows);
       }
       if (targetRow >= 0 && targetRow < taskTable_->rowCount()) {
         const QModelIndex curIdx = taskTable_->model()->index(targetRow, 0);
@@ -485,18 +491,19 @@ void TransferPage::setSnapshots(const std::vector<pfd::core::TaskSnapshot>& snap
   taskTable_->setUpdatesEnabled(true);
 
   updateDetailForSelection();
-
 }
 
 void TransferPage::addSpeedSample(qint64 downloadRate, qint64 uploadRate) {
-  if (detailPanel_ == nullptr) return;
+  if (detailPanel_ == nullptr)
+    return;
   detailPanel_->addSpeedSample(downloadRate, uploadRate);
 }
 
 void TransferPage::setContentHandlers(ContentTreePage::QueryFilesFn queryFn,
                                       ContentTreePage::SetPriorityFn priorityFn,
                                       ContentTreePage::RenameFn renameFn) {
-  if (detailPanel_ == nullptr) return;
+  if (detailPanel_ == nullptr)
+    return;
   detailPanel_->setContentHandlers(std::move(queryFn), std::move(priorityFn), std::move(renameFn));
 }
 
@@ -506,26 +513,31 @@ void TransferPage::setTrackerHandlers(TrackerDetailPage::QueryTrackersFn queryFn
                                       TrackerDetailPage::RemoveTrackerFn removeFn,
                                       TrackerDetailPage::ReannounceTrackerFn reannounceFn,
                                       TrackerDetailPage::ReannounceAllFn reannounceAllFn) {
-  if (detailPanel_ == nullptr) return;
+  if (detailPanel_ == nullptr)
+    return;
   detailPanel_->setTrackerHandlers(std::move(queryFn), std::move(addFn), std::move(editFn),
                                    std::move(removeFn), std::move(reannounceFn),
                                    std::move(reannounceAllFn));
 }
 
 void TransferPage::setPeerHandlers(PeerListPage::QueryPeersFn queryFn) {
-  if (detailPanel_ == nullptr) return;
+  if (detailPanel_ == nullptr)
+    return;
   detailPanel_->setPeerHandlers(std::move(queryFn));
 }
 
 void TransferPage::setHttpSourceHandlers(HttpSourcePage::QueryWebSeedsFn queryFn) {
-  if (detailPanel_ == nullptr) return;
+  if (detailPanel_ == nullptr)
+    return;
   detailPanel_->setHttpSourceHandlers(std::move(queryFn));
 }
 
 void TransferPage::enterMemoryModeFromCurrentSelection() {
-  if (taskTable_ == nullptr) return;
+  if (taskTable_ == nullptr)
+    return;
   const int row = taskTable_->currentRow();
-  if (row < 0 || row >= static_cast<int>(displayedSnapshots_.size())) return;
+  if (row < 0 || row >= static_cast<int>(displayedSnapshots_.size()))
+    return;
   memoryTaskId_ = displayedSnapshots_[static_cast<std::size_t>(row)].taskId;
   lastFocusedTaskId_ = memoryTaskId_;
   isMemoryMode_ = true;
@@ -717,7 +729,8 @@ void TransferPage::updateStats(const std::vector<pfd::core::TaskSnapshot>& snaps
 
   QSet<QString> allTags;
   for (const auto& s : snapshots) {
-    if (s.tags.isEmpty()) continue;
+    if (s.tags.isEmpty())
+      continue;
     const auto parts = s.tags.split(QLatin1Char(','), Qt::SkipEmptyParts);
     for (const auto& t : parts) {
       allTags.insert(t.trimmed());
@@ -741,7 +754,8 @@ void TransferPage::updateStats(const std::vector<pfd::core::TaskSnapshot>& snaps
     tagFilterButtons_.push_back(allBtn);
     connect(allBtn, &QPushButton::clicked, this, [this]() {
       activeTagFilter_.clear();
-      for (auto* b : tagFilterButtons_) b->setChecked(b == tagFilterButtons_.first());
+      for (auto* b : tagFilterButtons_)
+        b->setChecked(b == tagFilterButtons_.first());
       emit filterChanged();
     });
 
@@ -803,7 +817,8 @@ bool TransferPage::matchFilter(const pfd::core::TaskSnapshot& snapshot, TaskFilt
 }
 
 void TransferPage::updateDetailForSelection() {
-  if (detailPanel_ == nullptr) return;
+  if (detailPanel_ == nullptr)
+    return;
   const int row = taskTable_ != nullptr ? taskTable_->currentRow() : -1;
   if (row >= 0 && row < static_cast<int>(displayedSnapshots_.size())) {
     detailPanel_->setSnapshot(displayedSnapshots_[static_cast<std::size_t>(row)]);
@@ -822,9 +837,11 @@ void TransferPage::updateDetailForSelection() {
 }
 
 int TransferPage::indexOfTask(const pfd::base::TaskId& id) const {
-  if (id.isNull()) return -1;
+  if (id.isNull())
+    return -1;
   for (int i = 0; i < static_cast<int>(displayedSnapshots_.size()); ++i) {
-    if (displayedSnapshots_[static_cast<std::size_t>(i)].taskId == id) return i;
+    if (displayedSnapshots_[static_cast<std::size_t>(i)].taskId == id)
+      return i;
   }
   return -1;
 }

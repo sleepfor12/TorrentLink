@@ -16,8 +16,7 @@ bool containsNullByte(const QString& s) {
 
 bool hasPathTraversal(const QString& path) {
   auto containsTraversalSegment = [](const QString& p) {
-    const auto parts = p.split(QRegularExpression(QStringLiteral(R"([\\/]+)")),
-                               Qt::SkipEmptyParts);
+    const auto parts = p.split(QRegularExpression(QStringLiteral(R"([\\/]+)")), Qt::SkipEmptyParts);
     for (const auto& segment : parts) {
       if (segment == QStringLiteral("..")) {
         return true;

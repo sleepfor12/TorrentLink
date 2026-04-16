@@ -10,7 +10,9 @@
 
 namespace pfd::ui::rss {
 
-RssModulePage::RssModulePage(QWidget* parent) : QWidget(parent) { buildLayout(); }
+RssModulePage::RssModulePage(QWidget* parent) : QWidget(parent) {
+  buildLayout();
+}
 
 void RssModulePage::setService(pfd::core::rss::RssService* service) {
   feedsPage_->setService(service);
@@ -19,9 +21,9 @@ void RssModulePage::setService(pfd::core::rss::RssService* service) {
   seriesPage_->setService(service);
 }
 
-void RssModulePage::setItemsPageUiHelpers(std::function<void(const QString&)> appendItemsLog,
-                                          std::function<QString()> defaultSaveRoot,
-                                          std::function<std::vector<pfd::core::TaskSnapshot>()> taskSnapshots) {
+void RssModulePage::setItemsPageUiHelpers(
+    std::function<void(const QString&)> appendItemsLog, std::function<QString()> defaultSaveRoot,
+    std::function<std::vector<pfd::core::TaskSnapshot>()> taskSnapshots) {
   if (itemsPage_) {
     itemsPage_->setUiHelpers(std::move(appendItemsLog), std::move(defaultSaveRoot),
                              std::move(taskSnapshots));

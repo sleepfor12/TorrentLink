@@ -11,7 +11,8 @@ void SavePathPolicy::setDefaultDownloadDir(const QString& dir) {
 
 QString SavePathPolicy::resolve(const QString& input) const {
   QString p = input.trimmed();
-  if (p.isEmpty()) p = default_dir_;
+  if (p.isEmpty())
+    p = default_dir_;
   if (p.isEmpty()) {
     p = QDir(QStandardPaths::writableLocation(QStandardPaths::DownloadLocation))
             .filePath(QStringLiteral("p2p"));
@@ -21,8 +22,7 @@ QString SavePathPolicy::resolve(const QString& input) const {
   return p;
 }
 
-QString SavePathPolicy::applyLayout(const QString& basePath,
-                                    const QString& torrentName,
+QString SavePathPolicy::applyLayout(const QString& basePath, const QString& torrentName,
                                     ContentLayout layout) const {
   switch (layout) {
     case ContentLayout::kCreateSubfolder:
@@ -36,7 +36,8 @@ QString SavePathPolicy::applyLayout(const QString& basePath,
 
 void SavePathPolicy::ensureExists(const QString& path) {
   QDir dir;
-  if (!dir.exists(path)) dir.mkpath(path);
+  if (!dir.exists(path))
+    dir.mkpath(path);
 }
 
 }  // namespace pfd::core

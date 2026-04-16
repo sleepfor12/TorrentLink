@@ -1,8 +1,8 @@
 #include "base/system_info.h"
 
+#include <QtCore/QByteArray>
 #include <QtCore/QCoreApplication>
 #include <QtCore/QSysInfo>
-#include <QtCore/QByteArray>
 
 namespace pfd::base {
 

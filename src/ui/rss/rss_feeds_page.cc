@@ -36,7 +36,8 @@ void RssFeedsPage::setService(pfd::core::rss::RssService* service) {
 
 void RssFeedsPage::refreshTable() {
   feedTable_->setRowCount(0);
-  if (!service_) return;
+  if (!service_)
+    return;
 
   const auto& feeds = service_->feeds();
   feedTable_->setRowCount(static_cast<int>(feeds.size()));
@@ -44,14 +45,16 @@ void RssFeedsPage::refreshTable() {
     const auto& f = feeds[static_cast<std::size_t>(i)];
     feedTable_->setItem(i, 0, new QTableWidgetItem(f.title.isEmpty() ? f.url : f.title));
     feedTable_->setItem(i, 1, new QTableWidgetItem(f.url));
-    feedTable_->setItem(i, 2, new QTableWidgetItem(f.enabled ? QStringLiteral("启用")
-                                                             : QStringLiteral("暂停")));
-    feedTable_->setItem(i, 3, new QTableWidgetItem(
-        f.last_refreshed_at.isValid()
-            ? f.last_refreshed_at.toString(QStringLiteral("yyyy-MM-dd HH:mm"))
-            : QStringLiteral("从未")));
-    feedTable_->setItem(i, 4, new QTableWidgetItem(
-        f.auto_download_enabled ? QStringLiteral("已开启") : QStringLiteral("关闭")));
+    feedTable_->setItem(
+        i, 2, new QTableWidgetItem(f.enabled ? QStringLiteral("启用") : QStringLiteral("暂停")));
+    feedTable_->setItem(
+        i, 3,
+        new QTableWidgetItem(f.last_refreshed_at.isValid()
+                                 ? f.last_refreshed_at.toString(QStringLiteral("yyyy-MM-dd HH:mm"))
+                                 : QStringLiteral("从未")));
+    feedTable_->setItem(i, 4,
+                        new QTableWidgetItem(f.auto_download_enabled ? QStringLiteral("已开启")
+                                                                     : QStringLiteral("关闭")));
     feedTable_->setItem(i, 5, new QTableWidgetItem(f.last_error));
     feedTable_->item(i, 0)->setData(Qt::UserRole, f.id);
   }
@@ -82,9 +85,9 @@ void RssFeedsPage::buildLayout() {
 
   feedTable_ = new QTableWidget(this);
   feedTable_->setColumnCount(6);
-  feedTable_->setHorizontalHeaderLabels(
-      {QStringLiteral("名称"), QStringLiteral("URL"), QStringLiteral("状态"),
-       QStringLiteral("上次刷新"), QStringLiteral("自动下载"), QStringLiteral("错误")});
+  feedTable_->setHorizontalHeaderLabels({QStringLiteral("名称"), QStringLiteral("URL"),
+                                         QStringLiteral("状态"), QStringLiteral("上次刷新"),
+                                         QStringLiteral("自动下载"), QStringLiteral("错误")});
   feedTable_->horizontalHeader()->setStretchLastSection(true);
   feedTable_->horizontalHeader()->setSectionResizeMode(QHeaderView::Interactive);
   feedTable_->setSelectionBehavior(QAbstractItemView::SelectRows);
@@ -94,9 +97,10 @@ void RssFeedsPage::buildLayout() {
   feedTable_->setRowCount(0);
   root->addWidget(feedTable_, 1);
 
-  auto* hint = new QLabel(
-      QStringLiteral("提示：自动下载默认关闭，需在设置页、订阅源和规则页三处均手动开启后才会生效。表格支持多选，右键可刷新、编辑、复制链接等。"),
-      this);
+  auto* hint =
+      new QLabel(QStringLiteral("提示：自动下载默认关闭，需在设置页、订阅源和规则页三处均手动开启后"
+                                "才会生效。表格支持多选，右键可刷新、编辑、复制链接等。"),
+                 this);
   hint->setStyleSheet(QStringLiteral("color:#6b7280;font-size:12px;"));
   root->addWidget(hint);
 }
@@ -120,7 +124,8 @@ QStringList RssFeedsPage::selectedFeedIds() const {
   out.reserve(rows.size());
   for (const QModelIndex& idx : rows) {
     QTableWidgetItem* it = feedTable_->item(idx.row(), 0);
-    if (it == nullptr) continue;
+    if (it == nullptr)
+      continue;
     const QString id = it->data(Qt::UserRole).toString();
     if (!id.isEmpty()) {
       out.push_back(id);
@@ -130,7 +135,8 @@ QStringList RssFeedsPage::selectedFeedIds() const {
 }
 
 void RssFeedsPage::removeFeedsByIds(const QStringList& ids) {
-  if (!service_ || ids.isEmpty()) return;
+  if (!service_ || ids.isEmpty())
+    return;
   for (const QString& id : ids) {
     service_->removeFeed(id);
   }
@@ -139,9 +145,11 @@ void RssFeedsPage::removeFeedsByIds(const QStringList& ids) {
 }
 
 void RssFeedsPage::editFeedById(const QString& feedId) {
-  if (!service_) return;
+  if (!service_)
+    return;
   const auto f = service_->findFeed(feedId);
-  if (!f.has_value()) return;
+  if (!f.has_value())
+    return;
 
   QDialog dlg(this);
   dlg.setWindowTitle(QStringLiteral("编辑订阅"));
@@ -156,7 +164,8 @@ void RssFeedsPage::editFeedById(const QString& feedId) {
   QObject::connect(box, &QDialogButtonBox::accepted, &dlg, &QDialog::accept);
   QObject::connect(box, &QDialogButtonBox::rejected, &dlg, &QDialog::reject);
 
-  if (dlg.exec() != QDialog::Accepted) return;
+  if (dlg.exec() != QDialog::Accepted)
+    return;
 
   const QString newUrl = urlEdit->text().trimmed();
   if (newUrl.isEmpty()) {
@@ -176,7 +185,8 @@ void RssFeedsPage::editFeedById(const QString& feedId) {
 }
 
 void RssFeedsPage::showFeedContextMenu(const QPoint& pos) {
-  if (!service_ || feedTable_ == nullptr) return;
+  if (!service_ || feedTable_ == nullptr)
+    return;
 
   QModelIndexList rows = feedTable_->selectionModel()->selectedRows();
   if (rows.isEmpty()) {
@@ -186,7 +196,8 @@ void RssFeedsPage::showFeedContextMenu(const QPoint& pos) {
       rows = feedTable_->selectionModel()->selectedRows();
     }
   }
-  if (rows.isEmpty()) return;
+  if (rows.isEmpty())
+    return;
 
   const QPoint globalPos = feedTable_->viewport()->mapToGlobal(pos);
   QMenu menu(this);
@@ -194,11 +205,14 @@ void RssFeedsPage::showFeedContextMenu(const QPoint& pos) {
   if (rows.size() == 1) {
     const int row = rows.front().row();
     QTableWidgetItem* nameItem = feedTable_->item(row, 0);
-    if (nameItem == nullptr) return;
+    if (nameItem == nullptr)
+      return;
     const QString feedId = nameItem->data(Qt::UserRole).toString();
-    if (feedId.isEmpty()) return;
+    if (feedId.isEmpty())
+      return;
     const auto f = service_->findFeed(feedId);
-    if (!f.has_value()) return;
+    if (!f.has_value())
+      return;
 
     menu.addAction(QStringLiteral("刷新此订阅"), this, [this, feedId]() {
       service_->refreshFeed(feedId);
@@ -222,7 +236,8 @@ void RssFeedsPage::showFeedContextMenu(const QPoint& pos) {
       }
     });
     menu.addSeparator();
-    menu.addAction(QStringLiteral("编辑名称与地址…"), this, [this, feedId]() { editFeedById(feedId); });
+    menu.addAction(QStringLiteral("编辑名称与地址…"), this,
+                   [this, feedId]() { editFeedById(feedId); });
     menu.addAction(f->enabled ? QStringLiteral("暂停此订阅") : QStringLiteral("启用此订阅"), this,
                    [this, feed = *f]() mutable {
                      feed.enabled = !feed.enabled;
@@ -254,17 +269,19 @@ void RssFeedsPage::showFeedContextMenu(const QPoint& pos) {
                          "之后再次刷新订阅时，若 RSS 仍包含相同条目，会重新出现在列表中。\n\n"
                          "确定继续？"),
           QMessageBox::Yes | QMessageBox::No, QMessageBox::No);
-      if (r != QMessageBox::Yes) return;
+      if (r != QMessageBox::Yes)
+        return;
       service_->clearItemsForFeed(feedId);
       service_->saveState();
       refreshTable();
     });
     menu.addAction(QStringLiteral("删除此订阅…"), this, [this, feedId]() {
-      const auto r = QMessageBox::question(
-          this, QStringLiteral("删除订阅"),
-          QStringLiteral("确定删除该订阅及其条目吗？此操作不可撤销。"),
-          QMessageBox::Yes | QMessageBox::No, QMessageBox::No);
-      if (r != QMessageBox::Yes) return;
+      const auto r =
+          QMessageBox::question(this, QStringLiteral("删除订阅"),
+                                QStringLiteral("确定删除该订阅及其条目吗？此操作不可撤销。"),
+                                QMessageBox::Yes | QMessageBox::No, QMessageBox::No);
+      if (r != QMessageBox::Yes)
+        return;
       removeFeedsByIds({feedId});
     });
   } else {
@@ -285,7 +302,8 @@ void RssFeedsPage::showFeedContextMenu(const QPoint& pos) {
                          "确定继续？")
               .arg(ids.size()),
           QMessageBox::Yes | QMessageBox::No, QMessageBox::No);
-      if (r != QMessageBox::Yes) return;
+      if (r != QMessageBox::Yes)
+        return;
       service_->clearItemsForFeeds(ids);
       service_->saveState();
       refreshTable();
@@ -295,7 +313,8 @@ void RssFeedsPage::showFeedContextMenu(const QPoint& pos) {
           this, QStringLiteral("删除订阅"),
           QStringLiteral("确定删除选中的 %1 个订阅及其条目吗？此操作不可撤销。").arg(ids.size()),
           QMessageBox::Yes | QMessageBox::No, QMessageBox::No);
-      if (r != QMessageBox::Yes) return;
+      if (r != QMessageBox::Yes)
+        return;
       removeFeedsByIds(ids);
     });
   }
@@ -304,7 +323,8 @@ void RssFeedsPage::showFeedContextMenu(const QPoint& pos) {
 }
 
 void RssFeedsPage::onAddFeed() {
-  if (!service_) return;
+  if (!service_)
+    return;
   const QString url = feedUrlEdit_->text().trimmed();
   if (url.isEmpty()) {
     QMessageBox::warning(this, QStringLiteral("添加订阅"), QStringLiteral("请输入订阅地址。"));
@@ -322,20 +342,24 @@ void RssFeedsPage::onAddFeed() {
 }
 
 void RssFeedsPage::onRefreshAll() {
-  if (!service_) return;
+  if (!service_)
+    return;
   service_->refreshAllFeeds();
   service_->saveState();
   refreshTable();
 }
 
 void RssFeedsPage::onRemoveSelected() {
-  if (!service_) return;
+  if (!service_)
+    return;
   QStringList ids = selectedFeedIds();
   if (ids.isEmpty()) {
     const int row = feedTable_->currentRow();
-    if (row < 0) return;
+    if (row < 0)
+      return;
     const QString feedId = feedTable_->item(row, 0)->data(Qt::UserRole).toString();
-    if (feedId.isEmpty()) return;
+    if (feedId.isEmpty())
+      return;
     ids.append(feedId);
   }
 
@@ -344,17 +368,20 @@ void RssFeedsPage::onRemoveSelected() {
       ids.size() > 1 ? QStringLiteral("确定删除选中的 %1 个订阅及其条目吗？").arg(ids.size())
                      : QStringLiteral("确定删除该订阅及其条目吗？"),
       QMessageBox::Yes | QMessageBox::No, QMessageBox::No);
-  if (r != QMessageBox::Yes) return;
+  if (r != QMessageBox::Yes)
+    return;
 
   removeFeedsByIds(ids);
 }
 
 void RssFeedsPage::onImportOpml() {
-  if (!service_) return;
-  const QString path = QFileDialog::getOpenFileName(
-      this, QStringLiteral("导入 OPML"),
-      QString(), QStringLiteral("OPML 文件 (*.opml *.xml);;所有文件 (*)"));
-  if (path.isEmpty()) return;
+  if (!service_)
+    return;
+  const QString path =
+      QFileDialog::getOpenFileName(this, QStringLiteral("导入 OPML"), QString(),
+                                   QStringLiteral("OPML 文件 (*.opml *.xml);;所有文件 (*)"));
+  if (path.isEmpty())
+    return;
 
   const auto result = pfd::core::rss::RssOpml::importFromFile(path);
   if (!result.ok()) {
@@ -366,7 +393,10 @@ void RssFeedsPage::onImportOpml() {
   for (const auto& feed : result.feeds) {
     bool exists = false;
     for (const auto& existing : service_->feeds()) {
-      if (existing.url == feed.url) { exists = true; break; }
+      if (existing.url == feed.url) {
+        exists = true;
+        break;
+      }
     }
     if (!exists) {
       service_->upsertFeed(feed);
@@ -377,32 +407,32 @@ void RssFeedsPage::onImportOpml() {
   refreshTable();
 
   QMessageBox::information(this, QStringLiteral("导入 OPML"),
-      QStringLiteral("导入完成：新增 %1 个订阅，跳过 %2 个已有，%3 个无效。")
-          .arg(added)
-          .arg(static_cast<int>(result.feeds.size()) - added)
-          .arg(result.skipped));
+                           QStringLiteral("导入完成：新增 %1 个订阅，跳过 %2 个已有，%3 个无效。")
+                               .arg(added)
+                               .arg(static_cast<int>(result.feeds.size()) - added)
+                               .arg(result.skipped));
 }
 
 void RssFeedsPage::onExportOpml() {
-  if (!service_) return;
+  if (!service_)
+    return;
   if (service_->feeds().empty()) {
     QMessageBox::information(this, QStringLiteral("导出 OPML"),
                              QStringLiteral("暂无订阅源可导出。"));
     return;
   }
 
-  const QString path = QFileDialog::getSaveFileName(
-      this, QStringLiteral("导出 OPML"),
-      QStringLiteral("feeds.opml"),
-      QStringLiteral("OPML 文件 (*.opml);;所有文件 (*)"));
-  if (path.isEmpty()) return;
+  const QString path =
+      QFileDialog::getSaveFileName(this, QStringLiteral("导出 OPML"), QStringLiteral("feeds.opml"),
+                                   QStringLiteral("OPML 文件 (*.opml);;所有文件 (*)"));
+  if (path.isEmpty())
+    return;
 
   if (pfd::core::rss::RssOpml::exportToFile(path, service_->feeds())) {
     QMessageBox::information(this, QStringLiteral("导出 OPML"),
-        QStringLiteral("已导出 %1 个订阅源。").arg(service_->feeds().size()));
+                             QStringLiteral("已导出 %1 个订阅源。").arg(service_->feeds().size()));
   } else {
-    QMessageBox::warning(this, QStringLiteral("导出 OPML"),
-                         QStringLiteral("写入文件失败。"));
+    QMessageBox::warning(this, QStringLiteral("导出 OPML"), QStringLiteral("写入文件失败。"));
   }
 }
 

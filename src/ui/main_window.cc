@@ -1,14 +1,14 @@
 #include "ui/main_window.h"
 
-#include <QtGui/QCloseEvent>
 #include <QtCore/QTimer>
+#include <QtGui/QCloseEvent>
 #include <QtWidgets/QApplication>
 #include <QtWidgets/QComboBox>
 #include <QtWidgets/QHeaderView>
-#include <QtWidgets/QPushButton>
-#include <QtWidgets/QTabWidget>
 #include <QtWidgets/QMessageBox>
+#include <QtWidgets/QPushButton>
 #include <QtWidgets/QSystemTrayIcon>
+#include <QtWidgets/QTabWidget>
 #include <QtWidgets/QTableWidget>
 
 #include "core/config_service.h"
@@ -36,9 +36,9 @@ void MainWindow::setRssService(pfd::core::rss::RssService* service) {
   }
 }
 
-void MainWindow::setRssItemsUiHelpers(std::function<void(const QString&)> appendItemsLog,
-                                      std::function<QString()> defaultSaveRoot,
-                                      std::function<std::vector<pfd::core::TaskSnapshot>()> taskSnapshots) {
+void MainWindow::setRssItemsUiHelpers(
+    std::function<void(const QString&)> appendItemsLog, std::function<QString()> defaultSaveRoot,
+    std::function<std::vector<pfd::core::TaskSnapshot>()> taskSnapshots) {
   if (rssModulePage_) {
     rssModulePage_->setItemsPageUiHelpers(std::move(appendItemsLog), std::move(defaultSaveRoot),
                                           std::move(taskSnapshots));

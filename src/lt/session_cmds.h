@@ -237,10 +237,10 @@ using Cmd = std::variant<
     QueuePositionDownCmd, QueuePositionTopCmd, QueuePositionBottomCmd, ApplyRuntimeSettingsCmd,
     SetDefaultPerTorrentConnectionsLimitCmd, SetTaskConnectionsLimitCmd, QueryTaskCopyPayloadCmd,
     QuerySessionStatsCmd, QueryTaskFilesCmd, QueryTaskTrackersCmd, QueryTaskPeersCmd,
-    QueryTaskWebSeedsCmd, SetTaskFilePriorityCmd,
-    RenameTaskFileOrFolderCmd, AddTaskTrackerCmd, EditTaskTrackerCmd, RemoveTaskTrackerCmd,
-    ForceReannounceTrackerCmd, ForceReannounceAllTrackersCmd, SaveAllResumeDataCmd,
-    PrepareMagnetMetadataCmd, CancelPreparedMagnetCmd, FinalizePreparedMagnetCmd, ShutdownCmd>;
+    QueryTaskWebSeedsCmd, SetTaskFilePriorityCmd, RenameTaskFileOrFolderCmd, AddTaskTrackerCmd,
+    EditTaskTrackerCmd, RemoveTaskTrackerCmd, ForceReannounceTrackerCmd,
+    ForceReannounceAllTrackersCmd, SaveAllResumeDataCmd, PrepareMagnetMetadataCmd,
+    CancelPreparedMagnetCmd, FinalizePreparedMagnetCmd, ShutdownCmd>;
 
 }  // namespace pfd::lt::session_cmds
 

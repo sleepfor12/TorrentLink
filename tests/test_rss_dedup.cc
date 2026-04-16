@@ -1,6 +1,6 @@
-#include <gtest/gtest.h>
-
 #include <QtCore/QDateTime>
+
+#include <gtest/gtest.h>
 
 #include "core/rss/rss_dedup.h"
 
@@ -10,8 +10,8 @@ using pfd::core::rss::HistoryPolicy;
 using pfd::core::rss::RssDedup;
 using pfd::core::rss::RssItem;
 
-RssItem makeItem(const QString& id, const QString& guid = {},
-                 const QString& link = {}, const QString& magnet = {}) {
+RssItem makeItem(const QString& id, const QString& guid = {}, const QString& link = {},
+                 const QString& magnet = {}) {
   RssItem it;
   it.id = id;
   it.guid = guid;
@@ -32,8 +32,7 @@ TEST(RssDedup, DedupById) {
 
 TEST(RssDedup, DedupByGuid) {
   RssDedup dedup;
-  std::vector<RssItem> existing = {
-      makeItem(QStringLiteral("a"), QStringLiteral("guid-1"))};
+  std::vector<RssItem> existing = {makeItem(QStringLiteral("a"), QStringLiteral("guid-1"))};
   dedup.buildIndex(existing);
 
   auto newItem = makeItem(QStringLiteral("different-id"), QStringLiteral("guid-1"));
@@ -51,29 +50,28 @@ TEST(RssDedup, DedupByLink) {
 
 TEST(RssDedup, DedupByInfoHash) {
   RssDedup dedup;
-  const QString magnet = QStringLiteral(
-      "magnet:?xt=urn:btih:da39a3ee5e6b4b0d3255bfef95601890afd80709&dn=test");
+  const QString magnet =
+      QStringLiteral("magnet:?xt=urn:btih:da39a3ee5e6b4b0d3255bfef95601890afd80709&dn=test");
   auto existing = makeItem(QStringLiteral("a"), {}, {}, magnet);
   dedup.buildIndex({existing});
 
-  auto newItem = makeItem(QStringLiteral("new-id"), {}, {},
+  auto newItem = makeItem(
+      QStringLiteral("new-id"), {}, {},
       QStringLiteral("magnet:?xt=urn:btih:DA39A3EE5E6B4B0D3255BFEF95601890AFD80709&dn=other"));
   EXPECT_TRUE(dedup.isDuplicate(newItem));
 }
 
 TEST(RssDedup, ExtractInfoHash) {
-  EXPECT_EQ(RssDedup::extractInfoHash(
-      QStringLiteral("magnet:?xt=urn:btih:da39a3ee5e6b4b0d3255bfef95601890afd80709&dn=test")),
-      QStringLiteral("da39a3ee5e6b4b0d3255bfef95601890afd80709"));
+  EXPECT_EQ(RssDedup::extractInfoHash(QStringLiteral(
+                "magnet:?xt=urn:btih:da39a3ee5e6b4b0d3255bfef95601890afd80709&dn=test")),
+            QStringLiteral("da39a3ee5e6b4b0d3255bfef95601890afd80709"));
   EXPECT_TRUE(RssDedup::extractInfoHash(QStringLiteral("magnet:?dn=test")).isEmpty());
 }
 
 TEST(RssDedup, FilterDuplicates) {
   std::vector<RssItem> existing = {makeItem(QStringLiteral("a"))};
-  std::vector<RssItem> incoming = {
-      makeItem(QStringLiteral("a")),
-      makeItem(QStringLiteral("b")),
-      makeItem(QStringLiteral("c"))};
+  std::vector<RssItem> incoming = {makeItem(QStringLiteral("a")), makeItem(QStringLiteral("b")),
+                                   makeItem(QStringLiteral("c"))};
   auto unique = RssDedup::filterDuplicates(existing, incoming);
   EXPECT_EQ(unique.size(), 2u);
   EXPECT_TRUE(incoming.empty());
@@ -81,10 +79,8 @@ TEST(RssDedup, FilterDuplicates) {
 
 TEST(RssDedup, FilterDuplicatesInternal) {
   std::vector<RssItem> existing;
-  std::vector<RssItem> incoming = {
-      makeItem(QStringLiteral("a")),
-      makeItem(QStringLiteral("a")),
-      makeItem(QStringLiteral("b"))};
+  std::vector<RssItem> incoming = {makeItem(QStringLiteral("a")), makeItem(QStringLiteral("a")),
+                                   makeItem(QStringLiteral("b"))};
   auto unique = RssDedup::filterDuplicates(existing, incoming);
   EXPECT_EQ(unique.size(), 2u);
 }

@@ -55,10 +55,13 @@ public:
 
   void setSnapshots(const std::vector<pfd::core::TaskSnapshot>& snapshots);
   void addSpeedSample(qint64 downloadRate, qint64 uploadRate);
-  void setContentHandlers(ContentTreePage::QueryFilesFn queryFn, ContentTreePage::SetPriorityFn priorityFn,
+  void setContentHandlers(ContentTreePage::QueryFilesFn queryFn,
+                          ContentTreePage::SetPriorityFn priorityFn,
                           ContentTreePage::RenameFn renameFn);
-  void setTrackerHandlers(TrackerDetailPage::QueryTrackersFn queryFn, TrackerDetailPage::AddTrackerFn addFn,
-                          TrackerDetailPage::EditTrackerFn editFn, TrackerDetailPage::RemoveTrackerFn removeFn,
+  void setTrackerHandlers(TrackerDetailPage::QueryTrackersFn queryFn,
+                          TrackerDetailPage::AddTrackerFn addFn,
+                          TrackerDetailPage::EditTrackerFn editFn,
+                          TrackerDetailPage::RemoveTrackerFn removeFn,
                           TrackerDetailPage::ReannounceTrackerFn reannounceFn,
                           TrackerDetailPage::ReannounceAllFn reannounceAllFn);
   void setPeerHandlers(PeerListPage::QueryPeersFn queryFn);

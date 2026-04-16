@@ -1,8 +1,8 @@
-#include <gtest/gtest.h>
-
 #include <QtCore/QDir>
 #include <QtCore/QStandardPaths>
 #include <QtCore/QTemporaryDir>
+
+#include <gtest/gtest.h>
 
 #include "core/save_path_policy.h"
 

@@ -1,6 +1,7 @@
 #include "ui/pages/detail/tracker_detail_page.h"
 
 #include <QtCore/QPoint>
+#include <QtCore/QSet>
 #include <QtCore/QTimer>
 #include <QtGui/QClipboard>
 #include <QtGui/QHideEvent>
@@ -10,11 +11,9 @@
 #include <QtWidgets/QInputDialog>
 #include <QtWidgets/QMenu>
 #include <QtWidgets/QTreeWidget>
-#include <QtWidgets/QTreeWidgetItemIterator>
 #include <QtWidgets/QTreeWidgetItem>
+#include <QtWidgets/QTreeWidgetItemIterator>
 #include <QtWidgets/QVBoxLayout>
-
-#include <QtCore/QSet>
 
 #include "base/format.h"
 #include "base/input_sanitizer.h"
@@ -31,10 +30,13 @@ constexpr int kRoleMinAnnounce = Qt::UserRole + 4;
 QByteArray gTrackerHeaderState;
 }  // namespace
 
-TrackerDetailPage::TrackerDetailPage(QWidget* parent) : QWidget(parent) { buildLayout(); }
+TrackerDetailPage::TrackerDetailPage(QWidget* parent) : QWidget(parent) {
+  buildLayout();
+}
 
-void TrackerDetailPage::setHandlers(QueryTrackersFn queryFn, AddTrackerFn addFn, EditTrackerFn editFn,
-                                    RemoveTrackerFn removeFn, ReannounceTrackerFn reannounceFn,
+void TrackerDetailPage::setHandlers(QueryTrackersFn queryFn, AddTrackerFn addFn,
+                                    EditTrackerFn editFn, RemoveTrackerFn removeFn,
+                                    ReannounceTrackerFn reannounceFn,
                                     ReannounceAllFn reannounceAllFn) {
   queryFn_ = std::move(queryFn);
   addFn_ = std::move(addFn);
@@ -51,7 +53,8 @@ void TrackerDetailPage::setSnapshot(const pfd::core::TaskSnapshot& snap) {
 
 void TrackerDetailPage::clear() {
   taskId_ = {};
-  if (tree_) tree_->clear();
+  if (tree_)
+    tree_->clear();
 }
 
 void TrackerDetailPage::showEvent(QShowEvent* event) {
@@ -101,7 +104,8 @@ void TrackerDetailPage::buildLayout() {
   refreshTimer_ = new QTimer(this);
   refreshTimer_->setInterval(1000);
   connect(refreshTimer_, &QTimer::timeout, this, [this]() {
-    if (!isVisible() || taskId_.isNull()) return;
+    if (!isVisible() || taskId_.isNull())
+      return;
     decrementAnnounceCountdowns();
     ++refreshTick_;
     if (refreshTick_ >= 3) {
@@ -131,7 +135,8 @@ QString TrackerDetailPage::countText(int n) {
 }
 
 QString TrackerDetailPage::announceText(int seconds) {
-  if (seconds < 0) return QStringLiteral("N/A");
+  if (seconds < 0)
+    return QStringLiteral("N/A");
   return pfd::base::formatDuration(seconds);
 }
 
@@ -151,7 +156,8 @@ static QColor statusColor(pfd::lt::SessionWorker::TrackerStatus s) {
 }
 
 void TrackerDetailPage::reload() {
-  if (!tree_) return;
+  if (!tree_)
+    return;
   QSet<QString> expandedUrls;
   QString selectedUrl;
   int selectedType = -1;
@@ -170,7 +176,8 @@ void TrackerDetailPage::reload() {
     }
   }
   tree_->clear();
-  if (taskId_.isNull() || !queryFn_) return;
+  if (taskId_.isNull() || !queryFn_)
+    return;
   const auto data = queryFn_(taskId_);
   LOG_DEBUG(QStringLiteral("[ui.tracker] reload taskId=%1 fixed=%2 trackers=%3")
                 .arg(taskId_.toString())
@@ -178,8 +185,9 @@ void TrackerDetailPage::reload() {
                 .arg(data.trackers.size()));
 
   QTreeWidgetItem* toSelect = nullptr;
-  const auto appendRow = [this, &expandedUrls, &selectedUrl, &selectedType, &selectedEndpointText, &toSelect]
-                         (const pfd::lt::SessionWorker::TrackerRowSnapshot& r, int type) {
+  const auto appendRow = [this, &expandedUrls, &selectedUrl, &selectedType, &selectedEndpointText,
+                          &toSelect](const pfd::lt::SessionWorker::TrackerRowSnapshot& r,
+                                     int type) {
     auto* item = new QTreeWidgetItem(tree_);
     item->setText(0, r.url);
     item->setText(1, type == kTracker ? QString::number(r.tier) : QStringLiteral("0"));
@@ -228,23 +236,29 @@ void TrackerDetailPage::reload() {
     return item;
   };
 
-  for (const auto& row : data.fixedRows) appendRow(row, kFixed);
-  for (const auto& row : data.trackers) appendRow(row, kTracker);
+  for (const auto& row : data.fixedRows)
+    appendRow(row, kFixed);
+  for (const auto& row : data.trackers)
+    appendRow(row, kTracker);
   if (toSelect != nullptr) {
     tree_->setCurrentItem(toSelect);
   }
 }
 
 void TrackerDetailPage::decrementAnnounceCountdowns() {
-  if (!tree_) return;
+  if (!tree_)
+    return;
   for (QTreeWidgetItemIterator it(tree_); *it != nullptr; ++it) {
     auto* item = *it;
     const int type = item->data(0, kRoleType).toInt();
-    if (type != kFixed && type != kTracker) continue;
+    if (type != kFixed && type != kTracker)
+      continue;
     int nextSec = item->data(7, kRoleNextAnnounce).toInt();
     int minSec = item->data(8, kRoleMinAnnounce).toInt();
-    if (nextSec > 0) --nextSec;
-    if (minSec > 0) --minSec;
+    if (nextSec > 0)
+      --nextSec;
+    if (minSec > 0)
+      --minSec;
     item->setData(7, kRoleNextAnnounce, nextSec);
     item->setData(8, kRoleMinAnnounce, minSec);
     item->setText(7, announceText(nextSec));
@@ -253,7 +267,8 @@ void TrackerDetailPage::decrementAnnounceCountdowns() {
 }
 
 void TrackerDetailPage::showContextMenu(const QPoint& pos) {
-  if (!tree_ || taskId_.isNull()) return;
+  if (!tree_ || taskId_.isNull())
+    return;
   QTreeWidgetItem* item = tree_->itemAt(pos);
   const int t = item ? item->data(0, kRoleType).toInt() : -1;
   const QString url = item ? item->data(0, kRoleUrl).toString() : QString();
@@ -274,23 +289,32 @@ void TrackerDetailPage::showContextMenu(const QPoint& pos) {
   }
   reannounceAllAct = menu.addAction(QStringLiteral("强制向所有 Tracker 重新汇报"));
   QAction* chosen = menu.exec(tree_->viewport()->mapToGlobal(pos));
-  if (!chosen) return;
-  if (chosen == addAct) return actionAddTracker();
-  if (chosen == editAct) return actionEditTracker(url);
-  if (chosen == copyAct) return actionCopyTracker(url);
-  if (chosen == removeAct) return actionRemoveTracker(url);
-  if (chosen == reannounceAct) return actionReannounceTracker(url);
-  if (chosen == reannounceAllAct) return actionReannounceAll();
+  if (!chosen)
+    return;
+  if (chosen == addAct)
+    return actionAddTracker();
+  if (chosen == editAct)
+    return actionEditTracker(url);
+  if (chosen == copyAct)
+    return actionCopyTracker(url);
+  if (chosen == removeAct)
+    return actionRemoveTracker(url);
+  if (chosen == reannounceAct)
+    return actionReannounceTracker(url);
+  if (chosen == reannounceAllAct)
+    return actionReannounceAll();
 }
 
 void TrackerDetailPage::actionAddTracker() {
-  if (!addFn_) return;
+  if (!addFn_)
+    return;
   bool ok = false;
   const QString url =
       QInputDialog::getText(this, QStringLiteral("添加 Tracker"), QStringLiteral("Tracker URL"),
                             QLineEdit::Normal, QString(), &ok)
           .trimmed();
-  if (!ok || url.isEmpty()) return;
+  if (!ok || url.isEmpty())
+    return;
   const auto err = pfd::base::validateTrackerUrl(url);
   if (err.hasError()) {
     LOG_WARN(QStringLiteral("[ui.tracker] add tracker rejected taskId=%1 reason=%2")
@@ -298,18 +322,21 @@ void TrackerDetailPage::actionAddTracker() {
     return;
   }
   addFn_(taskId_, url);
-  LOG_INFO(QStringLiteral("[ui.tracker] add tracker taskId=%1 url=%2").arg(taskId_.toString(), url));
+  LOG_INFO(
+      QStringLiteral("[ui.tracker] add tracker taskId=%1 url=%2").arg(taskId_.toString(), url));
   reload();
 }
 
 void TrackerDetailPage::actionEditTracker(const QString& url) {
-  if (!editFn_ || url.trimmed().isEmpty()) return;
+  if (!editFn_ || url.trimmed().isEmpty())
+    return;
   bool ok = false;
   const QString newUrl =
       QInputDialog::getText(this, QStringLiteral("编辑 Tracker URL"), QStringLiteral("Tracker URL"),
                             QLineEdit::Normal, url, &ok)
           .trimmed();
-  if (!ok || newUrl.isEmpty() || newUrl == url) return;
+  if (!ok || newUrl.isEmpty() || newUrl == url)
+    return;
   const auto err = pfd::base::validateTrackerUrl(newUrl);
   if (err.hasError()) {
     LOG_WARN(QStringLiteral("[ui.tracker] edit tracker rejected taskId=%1 old=%2 reason=%3")
@@ -323,29 +350,35 @@ void TrackerDetailPage::actionEditTracker(const QString& url) {
 }
 
 void TrackerDetailPage::actionRemoveTracker(const QString& url) {
-  if (!removeFn_ || url.trimmed().isEmpty()) return;
+  if (!removeFn_ || url.trimmed().isEmpty())
+    return;
   removeFn_(taskId_, url);
-  LOG_INFO(QStringLiteral("[ui.tracker] remove tracker taskId=%1 url=%2")
-               .arg(taskId_.toString(), url));
+  LOG_INFO(
+      QStringLiteral("[ui.tracker] remove tracker taskId=%1 url=%2").arg(taskId_.toString(), url));
   reload();
 }
 
 void TrackerDetailPage::actionCopyTracker(const QString& url) {
-  if (url.trimmed().isEmpty()) return;
-  if (auto* cb = QApplication::clipboard(); cb) cb->setText(url);
+  if (url.trimmed().isEmpty())
+    return;
+  if (auto* cb = QApplication::clipboard(); cb)
+    cb->setText(url);
 }
 
 void TrackerDetailPage::actionReannounceTracker(const QString& url) {
-  if (!reannounceFn_ || url.trimmed().isEmpty()) return;
+  if (!reannounceFn_ || url.trimmed().isEmpty())
+    return;
   reannounceFn_(taskId_, url);
   LOG_INFO(QStringLiteral("[ui.tracker] reannounce tracker taskId=%1 url=%2")
                .arg(taskId_.toString(), url));
 }
 
 void TrackerDetailPage::actionReannounceAll() {
-  if (!reannounceAllFn_) return;
+  if (!reannounceAllFn_)
+    return;
   reannounceAllFn_(taskId_);
-  LOG_INFO(QStringLiteral("[ui.tracker] reannounce all trackers taskId=%1").arg(taskId_.toString()));
+  LOG_INFO(
+      QStringLiteral("[ui.tracker] reannounce all trackers taskId=%1").arg(taskId_.toString()));
 }
 
 }  // namespace pfd::ui

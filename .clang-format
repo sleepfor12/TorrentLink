@@ -1,5 +1,3 @@
-# P2P 下载器项目代码风格（C++17 / Qt）
-# 使用: clang-format -i <files>；CI 用 scripts/format_check.sh 检查
 ---
 Language: Cpp
 BasedOnStyle: LLVM

@@ -37,8 +37,8 @@ RssFeed feedFromJson(const QJsonObject& o) {
   f.url = o[QStringLiteral("url")].toString();
   f.enabled = o[QStringLiteral("enabled")].toBool(true);
   f.auto_download_enabled = o[QStringLiteral("auto_download_enabled")].toBool(false);
-  f.last_refreshed_at = QDateTime::fromString(
-      o[QStringLiteral("last_refreshed_at")].toString(), Qt::ISODate);
+  f.last_refreshed_at =
+      QDateTime::fromString(o[QStringLiteral("last_refreshed_at")].toString(), Qt::ISODate);
   f.last_error = o[QStringLiteral("last_error")].toString();
   return f;
 }
@@ -72,8 +72,8 @@ RssItem itemFromJson(const QJsonObject& o) {
   it.link = o[QStringLiteral("link")].toString();
   it.guid = o[QStringLiteral("guid")].toString();
   it.summary = o[QStringLiteral("summary")].toString();
-  it.published_at = QDateTime::fromString(
-      o[QStringLiteral("published_at")].toString(), Qt::ISODate);
+  it.published_at =
+      QDateTime::fromString(o[QStringLiteral("published_at")].toString(), Qt::ISODate);
   it.magnet = o[QStringLiteral("magnet")].toString();
   it.torrent_url = o[QStringLiteral("torrent_url")].toString();
   it.read = o[QStringLiteral("read")].toBool(false);
@@ -157,7 +157,8 @@ SeriesSubscription seriesFromJson(const QJsonObject& o) {
 template <typename T, typename ToJson>
 bool saveEnvelope(const QString& path, const std::vector<T>& vec, ToJson toJson) {
   QJsonArray arr;
-  for (const auto& v : vec) arr.push_back(toJson(v));
+  for (const auto& v : vec)
+    arr.push_back(toJson(v));
   const QByteArray payload = QJsonDocument(arr).toJson(QJsonDocument::Compact);
   QJsonObject envelope;
   envelope[QStringLiteral("version")] = kRssJsonVersion;
@@ -171,7 +172,8 @@ bool saveEnvelope(const QString& path, const std::vector<T>& vec, ToJson toJson)
 template <typename T, typename FromJson>
 std::vector<T> loadEnvelope(const QString& path, FromJson fromJson) {
   const auto result = pfd::base::readWholeFileWithRecovery(path);
-  if (result.error.hasError() || result.data.isEmpty()) return {};
+  if (result.error.hasError() || result.data.isEmpty())
+    return {};
 
   const auto doc = QJsonDocument::fromJson(result.data);
   QJsonArray arr;
@@ -193,7 +195,8 @@ std::vector<T> loadEnvelope(const QString& path, FromJson fromJson) {
   std::vector<T> out;
   out.reserve(static_cast<std::size_t>(arr.size()));
   for (const auto& v : arr) {
-    if (v.isObject()) out.push_back(fromJson(v.toObject()));
+    if (v.isObject())
+      out.push_back(fromJson(v.toObject()));
   }
   return out;
 }
@@ -204,26 +207,45 @@ RssRepository::RssRepository(QString data_dir) : data_dir_(std::move(data_dir)) 
   QDir().mkpath(data_dir_);
 }
 
-std::vector<RssFeed> RssRepository::loadFeeds() const { return loadEnvelope<RssFeed>(feedsPath(), feedFromJson); }
-std::vector<RssItem> RssRepository::loadItems() const { return loadEnvelope<RssItem>(itemsPath(), itemFromJson); }
-std::vector<RssRule> RssRepository::loadRules() const { return loadEnvelope<RssRule>(rulesPath(), ruleFromJson); }
-std::vector<SeriesSubscription> RssRepository::loadSeries() const { return loadEnvelope<SeriesSubscription>(seriesPath(), seriesFromJson); }
+std::vector<RssFeed> RssRepository::loadFeeds() const {
+  return loadEnvelope<RssFeed>(feedsPath(), feedFromJson);
+}
+std::vector<RssItem> RssRepository::loadItems() const {
+  return loadEnvelope<RssItem>(itemsPath(), itemFromJson);
+}
+std::vector<RssRule> RssRepository::loadRules() const {
+  return loadEnvelope<RssRule>(rulesPath(), ruleFromJson);
+}
+std::vector<SeriesSubscription> RssRepository::loadSeries() const {
+  return loadEnvelope<SeriesSubscription>(seriesPath(), seriesFromJson);
+}
 
-bool RssRepository::saveFeeds(const std::vector<RssFeed>& feeds) const { return saveEnvelope(feedsPath(), feeds, feedToJson); }
-bool RssRepository::saveItems(const std::vector<RssItem>& items) const { return saveEnvelope(itemsPath(), items, itemToJson); }
-bool RssRepository::saveRules(const std::vector<RssRule>& rules) const { return saveEnvelope(rulesPath(), rules, ruleToJson); }
-bool RssRepository::saveSeries(const std::vector<SeriesSubscription>& series) const { return saveEnvelope(seriesPath(), series, seriesToJson); }
+bool RssRepository::saveFeeds(const std::vector<RssFeed>& feeds) const {
+  return saveEnvelope(feedsPath(), feeds, feedToJson);
+}
+bool RssRepository::saveItems(const std::vector<RssItem>& items) const {
+  return saveEnvelope(itemsPath(), items, itemToJson);
+}
+bool RssRepository::saveRules(const std::vector<RssRule>& rules) const {
+  return saveEnvelope(rulesPath(), rules, ruleToJson);
+}
+bool RssRepository::saveSeries(const std::vector<SeriesSubscription>& series) const {
+  return saveEnvelope(seriesPath(), series, seriesToJson);
+}
 
 RssSettings RssRepository::loadSettings() const {
   const auto result = pfd::base::readWholeFileWithRecovery(settingsPath());
-  if (result.error.hasError() || result.data.isEmpty()) return {};
+  if (result.error.hasError() || result.data.isEmpty())
+    return {};
   const auto doc = QJsonDocument::fromJson(result.data);
-  if (!doc.isObject()) return {};
+  if (!doc.isObject())
+    return {};
   const auto o = doc.object();
   RssSettings s;
   s.global_auto_download = o[QStringLiteral("global_auto_download")].toBool(false);
   s.refresh_interval_minutes = o[QStringLiteral("refresh_interval_minutes")].toInt(30);
-  s.max_auto_downloads_per_refresh = o[QStringLiteral("max_auto_downloads_per_refresh")].toInt(kAutoDownloadMaxPerRefresh);
+  s.max_auto_downloads_per_refresh =
+      o[QStringLiteral("max_auto_downloads_per_refresh")].toInt(kAutoDownloadMaxPerRefresh);
   s.history_max_items = o[QStringLiteral("history_max_items")].toInt(5000);
   s.history_max_age_days = o[QStringLiteral("history_max_age_days")].toInt(90);
   s.refresh_interval_minutes = std::clamp(s.refresh_interval_minutes, 5, 1440);
@@ -242,15 +264,25 @@ bool RssRepository::saveSettings(const RssSettings& s) const {
   o[QStringLiteral("history_max_items")] = s.history_max_items;
   o[QStringLiteral("history_max_age_days")] = s.history_max_age_days;
   o[QStringLiteral("external_player_command")] = s.external_player_command.trimmed();
-  return pfd::base::writeWholeFileWithBackup(
-             settingsPath(), QJsonDocument(o).toJson(QJsonDocument::Indented))
+  return pfd::base::writeWholeFileWithBackup(settingsPath(),
+                                             QJsonDocument(o).toJson(QJsonDocument::Indented))
       .isOk();
 }
 
-QString RssRepository::feedsPath() const { return QDir(data_dir_).filePath(QStringLiteral("rss_feeds.json")); }
-QString RssRepository::itemsPath() const { return QDir(data_dir_).filePath(QStringLiteral("rss_items.json")); }
-QString RssRepository::rulesPath() const { return QDir(data_dir_).filePath(QStringLiteral("rss_rules.json")); }
-QString RssRepository::seriesPath() const { return QDir(data_dir_).filePath(QStringLiteral("rss_series.json")); }
-QString RssRepository::settingsPath() const { return QDir(data_dir_).filePath(QStringLiteral("rss_settings.json")); }
+QString RssRepository::feedsPath() const {
+  return QDir(data_dir_).filePath(QStringLiteral("rss_feeds.json"));
+}
+QString RssRepository::itemsPath() const {
+  return QDir(data_dir_).filePath(QStringLiteral("rss_items.json"));
+}
+QString RssRepository::rulesPath() const {
+  return QDir(data_dir_).filePath(QStringLiteral("rss_rules.json"));
+}
+QString RssRepository::seriesPath() const {
+  return QDir(data_dir_).filePath(QStringLiteral("rss_series.json"));
+}
+QString RssRepository::settingsPath() const {
+  return QDir(data_dir_).filePath(QStringLiteral("rss_settings.json"));
+}
 
 }  // namespace pfd::core::rss

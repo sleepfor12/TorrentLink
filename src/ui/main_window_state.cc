@@ -14,9 +14,11 @@ void MainWindow::updateBottomStatus(int dhtNodes, qint64 downloadRate, qint64 up
 }
 
 void MainWindow::refreshRssItemsTaskProgress() {
-  if (rssModulePage_ == nullptr) return;
+  if (rssModulePage_ == nullptr)
+    return;
   const qint64 now = QDateTime::currentMSecsSinceEpoch();
-  if (now - lastRssProgressRefreshMs_ < 1000) return;
+  if (now - lastRssProgressRefreshMs_ < 1000)
+    return;
   lastRssProgressRefreshMs_ = now;
   rssModulePage_->refreshItemsTaskProgress();
 }

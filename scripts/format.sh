@@ -8,12 +8,21 @@ if ! command -v clang-format >/dev/null 2>&1; then
   exit 1
 fi
 
-files="$(git ls-files '*.h' '*.hpp' '*.hh' '*.c' '*.cc' '*.cpp' '*.cxx')"
-if [[ -z "${files}" ]]; then
+if ! command -v git >/dev/null 2>&1; then
+  echo "git not found" >&2
+  exit 1
+fi
+
+mapfile -d '' files < <(git ls-files -z '*.h' '*.hpp' '*.hh' '*.c' '*.cc' '*.cpp' '*.cxx')
+if [[ "${#files[@]}" -eq 0 ]]; then
+  echo "No C/C++ source files found."
   exit 0
 fi
 
-while IFS= read -r f; do
+echo "Formatting ${#files[@]} files..."
+for f in "${files[@]}"; do
   [[ -f "$f" ]] && clang-format -i "$f"
-done <<< "${files}"
+done
+
+echo "clang-format completed."
 

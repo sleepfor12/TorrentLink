@@ -9,7 +9,9 @@
 
 namespace pfd::ui {
 
-PeerListPage::PeerListPage(QWidget* parent) : QWidget(parent) { buildLayout(); }
+PeerListPage::PeerListPage(QWidget* parent) : QWidget(parent) {
+  buildLayout();
+}
 
 void PeerListPage::buildLayout() {
   auto* root = new QVBoxLayout(this);
@@ -33,7 +35,9 @@ void PeerListPage::buildLayout() {
   connect(refreshTimer_, &QTimer::timeout, this, &PeerListPage::reload);
 }
 
-void PeerListPage::setQueryFn(QueryPeersFn fn) { queryFn_ = std::move(fn); }
+void PeerListPage::setQueryFn(QueryPeersFn fn) {
+  queryFn_ = std::move(fn);
+}
 
 void PeerListPage::setSnapshot(const pfd::core::TaskSnapshot& snap) {
   taskId_ = snap.taskId;
@@ -59,7 +63,8 @@ void PeerListPage::hideEvent(QHideEvent* event) {
 }
 
 void PeerListPage::reload() {
-  if (!queryFn_ || taskId_.isNull()) return;
+  if (!queryFn_ || taskId_.isNull())
+    return;
   const auto peers = queryFn_(taskId_);
   table_->setRowCount(static_cast<int>(peers.size()));
   for (int i = 0; i < static_cast<int>(peers.size()); ++i) {

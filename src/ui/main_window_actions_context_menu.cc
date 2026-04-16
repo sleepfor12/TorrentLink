@@ -219,7 +219,8 @@ void MainWindow::showTaskContextMenu(const QPoint& pos) {
       for (const auto& s : selected) {
         onMoveTask_(s.id, path);
       }
-      appendLog(QStringLiteral("已提交移动位置请求：%1 项任务 -> %2").arg(selected.size()).arg(path));
+      appendLog(
+          QStringLiteral("已提交移动位置请求：%1 项任务 -> %2").arg(selected.size()).arg(path));
     }
     return;
   }
@@ -269,9 +270,8 @@ void MainWindow::showTaskContextMenu(const QPoint& pos) {
       if (onDefaultTrackersChanged_) {
         onDefaultTrackersChanged_(defaultCheck->isChecked(), trackers);
       }
-      appendLog(QStringLiteral("已更新 Tracker：%1（%2 条）")
-                    .arg(anchorSnap.name)
-                    .arg(trackers.size()));
+      appendLog(
+          QStringLiteral("已更新 Tracker：%1（%2 条）").arg(anchorSnap.name).arg(trackers.size()));
     }
     return;
   }
@@ -303,9 +303,8 @@ void MainWindow::showTaskContextMenu(const QPoint& pos) {
                                        20000, 10, &ok);
     if (ok && onSetTaskConnectionsLimit_) {
       onSetTaskConnectionsLimit_(anchorId, v);
-      appendLog(QStringLiteral("已从 Torrent 选项更新连接数上限：%1 -> %2")
-                    .arg(anchorSnap.name)
-                    .arg(v));
+      appendLog(
+          QStringLiteral("已从 Torrent 选项更新连接数上限：%1 -> %2").arg(anchorSnap.name).arg(v));
     }
     return;
   }
@@ -413,7 +412,8 @@ void MainWindow::showTaskContextMenu(const QPoint& pos) {
       for (const auto& s : selected) {
         onCategoryChanged_(s.id, c.trimmed());
       }
-      appendLog(QStringLiteral("已更新分类：%1 项任务 -> %2").arg(selected.size()).arg(c.trimmed()));
+      appendLog(
+          QStringLiteral("已更新分类：%1 项任务 -> %2").arg(selected.size()).arg(c.trimmed()));
     }
     return;
   }
@@ -435,7 +435,8 @@ void MainWindow::showTaskContextMenu(const QPoint& pos) {
       for (const auto& s : selected) {
         onTagsChanged_(s.id, QStringList{t.trimmed()});
       }
-      appendLog(QStringLiteral("已更新标签：%1 项任务 -> %2").arg(selected.size()).arg(t.trimmed()));
+      appendLog(
+          QStringLiteral("已更新标签：%1 项任务 -> %2").arg(selected.size()).arg(t.trimmed()));
     }
     return;
   }

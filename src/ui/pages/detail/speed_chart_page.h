@@ -1,9 +1,8 @@
 #ifndef PFD_UI_PAGES_DETAIL_SPEED_CHART_PAGE_H
 #define PFD_UI_PAGES_DETAIL_SPEED_CHART_PAGE_H
 
-#include <QtWidgets/QWidget>
-
 #include <QtCore/QtGlobal>
+#include <QtWidgets/QWidget>
 
 class QQuickWidget;
 

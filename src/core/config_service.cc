@@ -46,8 +46,8 @@ SaveResult ConfigService::saveAppSettings(const AppSettings& settings) {
   QSettings probe(AppSettings::settingsFilePath(), QSettings::IniFormat);
   probe.sync();
   if (probe.status() != QSettings::NoError) {
-    const QString msg =
-        QStringLiteral("save app settings failed status=%1").arg(settingsStatusToString(probe.status()));
+    const QString msg = QStringLiteral("save app settings failed status=%1")
+                            .arg(settingsStatusToString(probe.status()));
     LOG_ERROR(QStringLiteral("[config] %1").arg(msg));
     return SaveResult{false, msg};
   }
@@ -105,7 +105,8 @@ SaveResult ConfigService::saveControllerSettings(const ControllerSettings& in) {
   QDir().mkpath(QFileInfo(settingsPath).absolutePath());
   QSettings settings(settingsPath, QSettings::IniFormat);
   settings.setValue(QStringLiteral("trackers/auto_apply"), in.auto_apply_default_trackers);
-  settings.setValue(QStringLiteral("trackers/default_list"), normalizeTrackers(in.default_trackers));
+  settings.setValue(QStringLiteral("trackers/default_list"),
+                    normalizeTrackers(in.default_trackers));
   settings.setValue(QStringLiteral("ui/magnet/max_inflight"), in.magnet_max_inflight);
   settings.setValue(QStringLiteral("ui/status/enabled"), in.bottom_status_enabled);
   settings.setValue(QStringLiteral("ui/status/refresh_ms"), in.bottom_status_refresh_ms);

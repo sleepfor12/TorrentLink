@@ -61,8 +61,10 @@ public:
   /// @return 是否已向下载回调投递请求（无资源或未注册回调时为 false）。
   [[nodiscard]] bool downloadItem(const QString& item_id);
 
-  /// 由 AppController 在 RSS 磁力/种子流程成功或失败后调用；成功时标记条目已下载并可选推进剧集订阅。
-  /// @param resolved_save_override 非空时写入条目的 download_save_path（如用户在添加对话框中确认的目录）。
+  /// 由 AppController 在 RSS
+  /// 磁力/种子流程成功或失败后调用；成功时标记条目已下载并可选推进剧集订阅。
+  /// @param resolved_save_override 非空时写入条目的
+  /// download_save_path（如用户在添加对话框中确认的目录）。
   void applyRssDownloadSettlement(const RssDownloadSettlement& settlement, bool success,
                                   const QString& resolved_save_override = {});
 

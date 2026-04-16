@@ -11,11 +11,9 @@ class RssSeriesTracker {
 public:
   [[nodiscard]] static std::optional<EpisodeInfo> parseTitle(const QString& title);
 
-  [[nodiscard]] static bool matchesSeries(const EpisodeInfo& ep,
-                                          const SeriesSubscription& sub);
+  [[nodiscard]] static bool matchesSeries(const EpisodeInfo& ep, const SeriesSubscription& sub);
 
-  [[nodiscard]] static bool isNewerEpisode(const EpisodeInfo& ep,
-                                           const SeriesSubscription& sub);
+  [[nodiscard]] static bool isNewerEpisode(const EpisodeInfo& ep, const SeriesSubscription& sub);
 };
 
 }  // namespace pfd::core::rss

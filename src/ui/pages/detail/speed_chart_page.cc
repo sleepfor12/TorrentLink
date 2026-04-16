@@ -6,7 +6,9 @@
 
 #include "ui/pages/detail/speed_chart_model.h"
 
-void ensureDetailQmlResourceLoaded() { Q_INIT_RESOURCE(detail_qml); }
+void ensureDetailQmlResourceLoaded() {
+  Q_INIT_RESOURCE(detail_qml);
+}
 
 namespace pfd::ui {
 
@@ -33,6 +35,8 @@ void SpeedChartPage::addSample(qint64 downloadRate, qint64 uploadRate) {
   model_->addSample(downloadRate, uploadRate);
 }
 
-void SpeedChartPage::clear() { model_->clear(); }
+void SpeedChartPage::clear() {
+  model_->clear();
+}
 
 }  // namespace pfd::ui

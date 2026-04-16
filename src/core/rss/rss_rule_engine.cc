@@ -61,8 +61,8 @@ RuleMatchResult RssRuleEngine::evaluate(const RssRule& rule, const RssItem& item
   return result;
 }
 
-std::vector<RuleMatchResult> RssRuleEngine::evaluateAll(
-    const std::vector<RssRule>& rules, const RssItem& item) {
+std::vector<RuleMatchResult> RssRuleEngine::evaluateAll(const std::vector<RssRule>& rules,
+                                                        const RssItem& item) {
   std::vector<RuleMatchResult> results;
   results.reserve(rules.size());
   for (const auto& rule : rules) {
@@ -71,12 +71,14 @@ std::vector<RuleMatchResult> RssRuleEngine::evaluateAll(
   return results;
 }
 
-std::optional<RuleMatchResult> RssRuleEngine::findFirstEnabledMatch(
-    const std::vector<RssRule>& rules, const RssItem& item) {
+std::optional<RuleMatchResult>
+RssRuleEngine::findFirstEnabledMatch(const std::vector<RssRule>& rules, const RssItem& item) {
   for (const auto& rule : rules) {
-    if (!rule.enabled) continue;
+    if (!rule.enabled)
+      continue;
     auto result = evaluate(rule, item);
-    if (result.matched) return result;
+    if (result.matched)
+      return result;
   }
   return std::nullopt;
 }

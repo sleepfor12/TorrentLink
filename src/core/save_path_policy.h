@@ -17,8 +17,7 @@ public:
 
   [[nodiscard]] QString resolve(const QString& input) const;
 
-  [[nodiscard]] QString applyLayout(const QString& basePath,
-                                    const QString& torrentName,
+  [[nodiscard]] QString applyLayout(const QString& basePath, const QString& torrentName,
                                     ContentLayout layout) const;
 
   static void ensureExists(const QString& path);

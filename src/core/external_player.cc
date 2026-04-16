@@ -3,8 +3,8 @@
 #include <QtCore/QDir>
 #include <QtCore/QFileInfo>
 #include <QtCore/QProcess>
-#include <QtGui/QDesktopServices>
 #include <QtCore/QUrl>
+#include <QtGui/QDesktopServices>
 
 #include "base/process_utils.h"
 #include "core/logger.h"
@@ -38,8 +38,8 @@ ExternalPlayer::Result ExternalPlayer::openWithCommand(const QString& command,
   }
   const bool ok = QProcess::startDetached(detached.program, detached.arguments);
   if (!ok) {
-    LOG_WARN(QStringLiteral("[player] Failed to launch \"%1\" with \"%2\"")
-                 .arg(command, file_path));
+    LOG_WARN(
+        QStringLiteral("[player] Failed to launch \"%1\" with \"%2\"").arg(command, file_path));
     return Result::LaunchFailed;
   }
   LOG_INFO(QStringLiteral("[player] Launched \"%1\" \"%2\"").arg(command, file_path));
@@ -49,7 +49,8 @@ ExternalPlayer::Result ExternalPlayer::openWithCommand(const QString& command,
 ExternalPlayer::Result ExternalPlayer::openFolder(const QString& path) {
   QString dirPath = path;
   QFileInfo fi(path);
-  if (fi.isFile()) dirPath = fi.absolutePath();
+  if (fi.isFile())
+    dirPath = fi.absolutePath();
 
   if (!QDir(dirPath).exists()) {
     LOG_WARN(QStringLiteral("[player] Directory not found: %1").arg(dirPath));

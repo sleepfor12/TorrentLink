@@ -18,11 +18,11 @@
 #include <QtWidgets/QTreeWidget>
 #include <QtWidgets/QVBoxLayout>
 
-#include "ui/input_ime_utils.h"
-
 #include <libtorrent/error_code.hpp>
 #include <libtorrent/info_hash.hpp>
 #include <libtorrent/torrent_info.hpp>
+
+#include "ui/input_ime_utils.h"
 
 namespace pfd::ui {
 

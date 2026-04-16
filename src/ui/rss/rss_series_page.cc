@@ -31,7 +31,8 @@ void RssSeriesPage::setService(pfd::core::rss::RssService* service) {
 
 void RssSeriesPage::refreshTable() {
   seriesTable_->setRowCount(0);
-  if (!service_) return;
+  if (!service_)
+    return;
 
   const auto& subs = service_->series();
   seriesTable_->setRowCount(static_cast<int>(subs.size()));
@@ -41,17 +42,23 @@ void RssSeriesPage::refreshTable() {
     auto* nameItem = new QTableWidgetItem(s.name);
     nameItem->setData(Qt::UserRole, s.id);
     seriesTable_->setItem(i, 0, nameItem);
-    seriesTable_->setItem(i, 1, new QTableWidgetItem(
-        s.enabled ? QStringLiteral("启用") : QStringLiteral("暂停")));
-    seriesTable_->setItem(i, 2, new QTableWidgetItem(
-        s.auto_download_enabled ? QStringLiteral("是") : QStringLiteral("否")));
-    seriesTable_->setItem(i, 3, new QTableWidgetItem(
-        s.season >= 0 ? QStringLiteral("S%1").arg(s.season, 2, 10, QLatin1Char('0'))
-                      : QStringLiteral("全部")));
-    seriesTable_->setItem(i, 4, new QTableWidgetItem(
-        s.last_episode_num > 0 ? QStringLiteral("E%1").arg(s.last_episode_num, 2, 10, QLatin1Char('0'))
-                               : QStringLiteral("-")));
-    seriesTable_->setItem(i, 5, new QTableWidgetItem(s.quality_keywords.join(QStringLiteral(", "))));
+    seriesTable_->setItem(
+        i, 1, new QTableWidgetItem(s.enabled ? QStringLiteral("启用") : QStringLiteral("暂停")));
+    seriesTable_->setItem(i, 2,
+                          new QTableWidgetItem(s.auto_download_enabled ? QStringLiteral("是")
+                                                                       : QStringLiteral("否")));
+    seriesTable_->setItem(
+        i, 3,
+        new QTableWidgetItem(s.season >= 0
+                                 ? QStringLiteral("S%1").arg(s.season, 2, 10, QLatin1Char('0'))
+                                 : QStringLiteral("全部")));
+    seriesTable_->setItem(i, 4,
+                          new QTableWidgetItem(s.last_episode_num > 0 ? QStringLiteral("E%1").arg(
+                                                                            s.last_episode_num, 2,
+                                                                            10, QLatin1Char('0'))
+                                                                      : QStringLiteral("-")));
+    seriesTable_->setItem(i, 5,
+                          new QTableWidgetItem(s.quality_keywords.join(QStringLiteral(", "))));
     seriesTable_->setItem(i, 6, new QTableWidgetItem(s.aliases.join(QStringLiteral(", "))));
   }
 }
@@ -62,7 +69,8 @@ void RssSeriesPage::buildLayout() {
   root->setSpacing(10);
 
   auto* hint = new QLabel(
-      QStringLiteral("管理剧集订阅。系统自动从 RSS 条目中提取集数信息，匹配订阅后按规则自动下载新集。"),
+      QStringLiteral(
+          "管理剧集订阅。系统自动从 RSS 条目中提取集数信息，匹配订阅后按规则自动下载新集。"),
       this);
   hint->setStyleSheet(QStringLiteral("color:#6b7280;font-size:12px;"));
   hint->setWordWrap(true);
@@ -86,10 +94,10 @@ void RssSeriesPage::buildLayout() {
 
   seriesTable_ = new QTableWidget(splitter);
   seriesTable_->setColumnCount(7);
-  seriesTable_->setHorizontalHeaderLabels(
-      {QStringLiteral("名称"), QStringLiteral("状态"), QStringLiteral("自动下载"),
-       QStringLiteral("季"), QStringLiteral("最新集"), QStringLiteral("画质偏好"),
-       QStringLiteral("别名")});
+  seriesTable_->setHorizontalHeaderLabels({QStringLiteral("名称"), QStringLiteral("状态"),
+                                           QStringLiteral("自动下载"), QStringLiteral("季"),
+                                           QStringLiteral("最新集"), QStringLiteral("画质偏好"),
+                                           QStringLiteral("别名")});
   seriesTable_->horizontalHeader()->setStretchLastSection(true);
   seriesTable_->horizontalHeader()->setSectionResizeMode(QHeaderView::Interactive);
   seriesTable_->setSelectionBehavior(QAbstractItemView::SelectRows);
@@ -106,7 +114,8 @@ void RssSeriesPage::buildLayout() {
   form->addRow(QStringLiteral("名称："), nameEdit_);
 
   aliasesEdit_ = new QLineEdit(formContainer_);
-  aliasesEdit_->setPlaceholderText(QStringLiteral("逗号分隔，例如：进击的巨人, Attack on Titan, Shingeki"));
+  aliasesEdit_->setPlaceholderText(
+      QStringLiteral("逗号分隔，例如：进击的巨人, Attack on Titan, Shingeki"));
   form->addRow(QStringLiteral("别名："), aliasesEdit_);
 
   qualityEdit_ = new QLineEdit(formContainer_);
@@ -156,13 +165,15 @@ void RssSeriesPage::bindSignals() {
 
   connect(browseSavePathBtn_, &QPushButton::clicked, this, [this]() {
     const QString cur = savePathEdit_->text().trimmed();
-    const QString dir = QFileDialog::getExistingDirectory(
-        this, QStringLiteral("选择保存路径"), cur);
-    if (!dir.isEmpty()) savePathEdit_->setText(dir);
+    const QString dir =
+        QFileDialog::getExistingDirectory(this, QStringLiteral("选择保存路径"), cur);
+    if (!dir.isEmpty())
+      savePathEdit_->setText(dir);
   });
 
   connect(saveFormBtn_, &QPushButton::clicked, this, [this]() {
-    if (!service_) return;
+    if (!service_)
+      return;
     const QString name = nameEdit_->text().trimmed();
     if (name.isEmpty()) {
       QMessageBox::warning(this, QStringLiteral("剧集订阅"), QStringLiteral("请填写名称。"));
@@ -175,12 +186,14 @@ void RssSeriesPage::bindSignals() {
     const QString aliases = aliasesEdit_->text().trimmed();
     if (!aliases.isEmpty()) {
       sub.aliases = aliases.split(QStringLiteral(","), Qt::SkipEmptyParts);
-      for (auto& a : sub.aliases) a = a.trimmed();
+      for (auto& a : sub.aliases)
+        a = a.trimmed();
     }
     const QString quality = qualityEdit_->text().trimmed();
     if (!quality.isEmpty()) {
       sub.quality_keywords = quality.split(QStringLiteral(","), Qt::SkipEmptyParts);
-      for (auto& q : sub.quality_keywords) q = q.trimmed();
+      for (auto& q : sub.quality_keywords)
+        q = q.trimmed();
     }
     sub.season = seasonSpin_->value();
     sub.last_episode_num = lastEpSpin_->value();
@@ -223,12 +236,15 @@ void RssSeriesPage::onAddSeries() {
 }
 
 void RssSeriesPage::onEditSelected() {
-  if (!service_) return;
+  if (!service_)
+    return;
   const int row = seriesTable_->currentRow();
-  if (row < 0) return;
+  if (row < 0)
+    return;
   const QString sid = seriesTable_->item(row, 0)->data(Qt::UserRole).toString();
   for (const auto& s : service_->series()) {
-    if (s.id != sid) continue;
+    if (s.id != sid)
+      continue;
     editingSeriesId_ = s.id;
     nameEdit_->setText(s.name);
     aliasesEdit_->setText(s.aliases.join(QStringLiteral(", ")));
@@ -243,9 +259,11 @@ void RssSeriesPage::onEditSelected() {
 }
 
 void RssSeriesPage::onRemoveSelected() {
-  if (!service_) return;
+  if (!service_)
+    return;
   const int row = seriesTable_->currentRow();
-  if (row < 0) return;
+  if (row < 0)
+    return;
   const QString sid = seriesTable_->item(row, 0)->data(Qt::UserRole).toString();
   service_->removeSeries(sid);
   service_->saveState();
@@ -253,12 +271,15 @@ void RssSeriesPage::onRemoveSelected() {
 }
 
 void RssSeriesPage::onToggleEnabled() {
-  if (!service_) return;
+  if (!service_)
+    return;
   const int row = seriesTable_->currentRow();
-  if (row < 0) return;
+  if (row < 0)
+    return;
   const QString sid = seriesTable_->item(row, 0)->data(Qt::UserRole).toString();
   for (auto s : service_->series()) {
-    if (s.id != sid) continue;
+    if (s.id != sid)
+      continue;
     s.enabled = !s.enabled;
     service_->upsertSeries(s);
     service_->saveState();

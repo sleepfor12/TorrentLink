@@ -28,14 +28,15 @@ libtorrent::download_priority_t toLtPriority(SessionWorker::FilePriorityLevel le
   }
 }
 
-std::vector<libtorrent::announce_entry> mergedTrackers(const std::vector<libtorrent::announce_entry>& oldList,
-                                                       const QStringList& urls) {
+std::vector<libtorrent::announce_entry>
+mergedTrackers(const std::vector<libtorrent::announce_entry>& oldList, const QStringList& urls) {
   std::vector<libtorrent::announce_entry> out;
   out.reserve(urls.size());
   int tier = 0;
   for (const auto& u : urls) {
     const QString t = u.trimmed();
-    if (t.isEmpty()) continue;
+    if (t.isEmpty())
+      continue;
     libtorrent::announce_entry ae(t.toStdString());
     ae.tier = tier++;
     const auto it = std::find_if(oldList.begin(), oldList.end(), [&](const auto& old) {
@@ -319,7 +320,8 @@ bool handleOne(libtorrent::session&, Context& ctx, const session_cmds::AddTaskTr
   const auto old = h.trackers();
   QStringList urls;
   urls.reserve(static_cast<int>(old.size()) + 1);
-  for (const auto& ae : old) urls.push_back(QString::fromStdString(ae.url));
+  for (const auto& ae : old)
+    urls.push_back(QString::fromStdString(ae.url));
   urls.push_back(c.url);
   h.replace_trackers(mergedTrackers(old, urls));
   LOG_INFO(QStringLiteral("[lt.worker] AddTaskTracker applied taskId=%1 url=%2")
@@ -330,7 +332,8 @@ bool handleOne(libtorrent::session&, Context& ctx, const session_cmds::AddTaskTr
 bool handleOne(libtorrent::session&, Context& ctx, const session_cmds::EditTaskTrackerCmd& c) {
   const auto it = ctx.handlesByTaskId.find(session_ids::taskIdKey(c.taskId));
   if (it == ctx.handlesByTaskId.end() || !it->second.is_valid()) {
-    LOG_WARN(QStringLiteral("[lt.worker] EditTaskTracker ignored, handle not found taskId=%1 old=%2 new=%3")
+    LOG_WARN(QStringLiteral(
+                 "[lt.worker] EditTaskTracker ignored, handle not found taskId=%1 old=%2 new=%3")
                  .arg(c.taskId.toString(), c.oldUrl, c.newUrl));
     return true;
   }
@@ -340,8 +343,10 @@ bool handleOne(libtorrent::session&, Context& ctx, const session_cmds::EditTaskT
   urls.reserve(static_cast<int>(old.size()));
   for (const auto& ae : old) {
     const QString u = QString::fromStdString(ae.url);
-    if (u.trimmed() == c.oldUrl.trimmed()) urls.push_back(c.newUrl.trimmed());
-    else urls.push_back(u);
+    if (u.trimmed() == c.oldUrl.trimmed())
+      urls.push_back(c.newUrl.trimmed());
+    else
+      urls.push_back(u);
   }
   h.replace_trackers(mergedTrackers(old, urls));
   LOG_INFO(QStringLiteral("[lt.worker] EditTaskTracker applied taskId=%1 old=%2 new=%3")
@@ -352,8 +357,9 @@ bool handleOne(libtorrent::session&, Context& ctx, const session_cmds::EditTaskT
 bool handleOne(libtorrent::session&, Context& ctx, const session_cmds::RemoveTaskTrackerCmd& c) {
   const auto it = ctx.handlesByTaskId.find(session_ids::taskIdKey(c.taskId));
   if (it == ctx.handlesByTaskId.end() || !it->second.is_valid()) {
-    LOG_WARN(QStringLiteral("[lt.worker] RemoveTaskTracker ignored, handle not found taskId=%1 url=%2")
-                 .arg(c.taskId.toString(), c.url));
+    LOG_WARN(
+        QStringLiteral("[lt.worker] RemoveTaskTracker ignored, handle not found taskId=%1 url=%2")
+            .arg(c.taskId.toString(), c.url));
     return true;
   }
   auto h = it->second;
@@ -362,7 +368,8 @@ bool handleOne(libtorrent::session&, Context& ctx, const session_cmds::RemoveTas
   urls.reserve(static_cast<int>(old.size()));
   for (const auto& ae : old) {
     const QString u = QString::fromStdString(ae.url);
-    if (u.trimmed() != c.url.trimmed()) urls.push_back(u);
+    if (u.trimmed() != c.url.trimmed())
+      urls.push_back(u);
   }
   h.replace_trackers(mergedTrackers(old, urls));
   LOG_INFO(QStringLiteral("[lt.worker] RemoveTaskTracker applied taskId=%1 url=%2")
@@ -370,9 +377,11 @@ bool handleOne(libtorrent::session&, Context& ctx, const session_cmds::RemoveTas
   return true;
 }
 
-bool handleOne(libtorrent::session&, Context& ctx, const session_cmds::ForceReannounceTrackerCmd& c) {
+bool handleOne(libtorrent::session&, Context& ctx,
+               const session_cmds::ForceReannounceTrackerCmd& c) {
   const auto it = ctx.handlesByTaskId.find(session_ids::taskIdKey(c.taskId));
-  if (it == ctx.handlesByTaskId.end() || !it->second.is_valid()) return true;
+  if (it == ctx.handlesByTaskId.end() || !it->second.is_valid())
+    return true;
   auto h = it->second;
   const auto trackers = h.trackers();
   for (int i = 0; i < static_cast<int>(trackers.size()); ++i) {
@@ -385,15 +394,17 @@ bool handleOne(libtorrent::session&, Context& ctx, const session_cmds::ForceRean
     }
   }
   h.force_reannounce();
-  LOG_WARN(QStringLiteral("[lt.worker] Tracker not found for reannounce, fallback all taskId=%1 url=%2")
-               .arg(c.taskId.toString(), c.url));
+  LOG_WARN(
+      QStringLiteral("[lt.worker] Tracker not found for reannounce, fallback all taskId=%1 url=%2")
+          .arg(c.taskId.toString(), c.url));
   return true;
 }
 
 bool handleOne(libtorrent::session&, Context& ctx,
                const session_cmds::ForceReannounceAllTrackersCmd& c) {
   const auto it = ctx.handlesByTaskId.find(session_ids::taskIdKey(c.taskId));
-  if (it == ctx.handlesByTaskId.end() || !it->second.is_valid()) return true;
+  if (it == ctx.handlesByTaskId.end() || !it->second.is_valid())
+    return true;
   it->second.force_reannounce();
   LOG_INFO(QStringLiteral("[lt.worker] Force reannounce all trackers taskId=%1")
                .arg(c.taskId.toString()));
@@ -404,8 +415,9 @@ bool handleOne(libtorrent::session&, Context& ctx,
                const session_cmds::RenameTaskFileOrFolderCmd& c) {
   const auto it = ctx.handlesByTaskId.find(session_ids::taskIdKey(c.taskId));
   if (it == ctx.handlesByTaskId.end() || !it->second.is_valid()) {
-    LOG_WARN(QStringLiteral("[lt.worker] RenameTaskFileOrFolder ignored, handle not found taskId=%1")
-                 .arg(c.taskId.toString()));
+    LOG_WARN(
+        QStringLiteral("[lt.worker] RenameTaskFileOrFolder ignored, handle not found taskId=%1")
+            .arg(c.taskId.toString()));
     return true;
   }
   auto h = it->second;
@@ -418,13 +430,16 @@ bool handleOne(libtorrent::session&, Context& ctx,
   const QString src = c.logicalPath.trimmed();
   const QString targetName = c.newName.trimmed();
   if (src.isEmpty() || targetName.isEmpty()) {
-    LOG_WARN(QStringLiteral("[lt.worker] RenameTaskFileOrFolder ignored, invalid args taskId=%1 path=%2 newName=%3")
-                 .arg(c.taskId.toString(), c.logicalPath, c.newName));
+    LOG_WARN(
+        QStringLiteral(
+            "[lt.worker] RenameTaskFileOrFolder ignored, invalid args taskId=%1 path=%2 newName=%3")
+            .arg(c.taskId.toString(), c.logicalPath, c.newName));
     return true;
   }
   const int slash = src.lastIndexOf('/');
   const QString parent = slash >= 0 ? src.left(slash) : QString();
-  const QString renamedRoot = parent.isEmpty() ? targetName : (parent + QStringLiteral("/") + targetName);
+  const QString renamedRoot =
+      parent.isEmpty() ? targetName : (parent + QStringLiteral("/") + targetName);
   const auto& fs = ti->files();
   for (int i = 0; i < fs.num_files(); ++i) {
     const auto idx = libtorrent::file_index_t{i};

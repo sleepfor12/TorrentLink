@@ -28,8 +28,8 @@ void RssSettingsPage::buildLayout() {
   root->setContentsMargins(16, 16, 16, 16);
   root->setSpacing(16);
 
-  auto* hint = new QLabel(
-      QStringLiteral("配置 RSS 模块的全局行为。修改后点击「保存」生效。"), this);
+  auto* hint =
+      new QLabel(QStringLiteral("配置 RSS 模块的全局行为。修改后点击「保存」生效。"), this);
   hint->setStyleSheet(QStringLiteral("color:#6b7280;font-size:12px;"));
   hint->setWordWrap(true);
   root->addWidget(hint);
@@ -89,8 +89,9 @@ void RssSettingsPage::buildLayout() {
   pathForm->setSpacing(8);
 
   auto* pathHint = new QLabel(
-      QStringLiteral("RSS 规则和剧集订阅中保存路径留空时，将使用全局的『默认下载目录』。\n"
-                     "可在主菜单 - 首选项 - 下载 中修改，或在规则/剧集表单中用『浏览』指定独立路径。"),
+      QStringLiteral(
+          "RSS 规则和剧集订阅中保存路径留空时，将使用全局的『默认下载目录』。\n"
+          "可在主菜单 - 首选项 - 下载 中修改，或在规则/剧集表单中用『浏览』指定独立路径。"),
       pathGroup);
   pathHint->setWordWrap(true);
   pathHint->setStyleSheet(QStringLiteral("color:#6b7280;font-size:12px;"));
@@ -121,7 +122,8 @@ void RssSettingsPage::buildLayout() {
 }
 
 void RssSettingsPage::loadFromService() {
-  if (!service_) return;
+  if (!service_)
+    return;
   const auto s = service_->settings();
   globalAutoDownloadCheck_->setChecked(s.global_auto_download);
   refreshIntervalSpin_->setValue(s.refresh_interval_minutes);
@@ -132,7 +134,8 @@ void RssSettingsPage::loadFromService() {
 }
 
 void RssSettingsPage::onSave() {
-  if (!service_) return;
+  if (!service_)
+    return;
 
   pfd::core::rss::RssSettings s;
   s.global_auto_download = globalAutoDownloadCheck_->isChecked();

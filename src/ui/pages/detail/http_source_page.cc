@@ -7,7 +7,9 @@
 
 namespace pfd::ui {
 
-HttpSourcePage::HttpSourcePage(QWidget* parent) : QWidget(parent) { buildLayout(); }
+HttpSourcePage::HttpSourcePage(QWidget* parent) : QWidget(parent) {
+  buildLayout();
+}
 
 void HttpSourcePage::buildLayout() {
   auto* root = new QVBoxLayout(this);
@@ -29,7 +31,9 @@ void HttpSourcePage::buildLayout() {
   connect(refreshTimer_, &QTimer::timeout, this, &HttpSourcePage::reload);
 }
 
-void HttpSourcePage::setQueryFn(QueryWebSeedsFn fn) { queryFn_ = std::move(fn); }
+void HttpSourcePage::setQueryFn(QueryWebSeedsFn fn) {
+  queryFn_ = std::move(fn);
+}
 
 void HttpSourcePage::setSnapshot(const pfd::core::TaskSnapshot& snap) {
   taskId_ = snap.taskId;
@@ -55,7 +59,8 @@ void HttpSourcePage::hideEvent(QHideEvent* event) {
 }
 
 void HttpSourcePage::reload() {
-  if (!queryFn_ || taskId_.isNull()) return;
+  if (!queryFn_ || taskId_.isNull())
+    return;
   const auto seeds = queryFn_(taskId_);
   table_->setRowCount(static_cast<int>(seeds.size()));
   for (int i = 0; i < static_cast<int>(seeds.size()); ++i) {

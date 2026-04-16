@@ -15,14 +15,15 @@ public:
     std::vector<RssFeed> feeds;
     int skipped{0};
     QString error;
-    [[nodiscard]] bool ok() const { return error.isEmpty(); }
+    [[nodiscard]] bool ok() const {
+      return error.isEmpty();
+    }
   };
 
   [[nodiscard]] static ImportResult importFromFile(const QString& path);
   [[nodiscard]] static ImportResult importFromString(const QString& xml);
 
-  [[nodiscard]] static bool exportToFile(const QString& path,
-                                         const std::vector<RssFeed>& feeds);
+  [[nodiscard]] static bool exportToFile(const QString& path, const std::vector<RssFeed>& feeds);
   [[nodiscard]] static QString exportToString(const std::vector<RssFeed>& feeds);
 };
 

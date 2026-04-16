@@ -43,7 +43,9 @@ void SystemTray::buildTrayMenu() {
   trayIcon_->setContextMenu(trayMenu_);
 }
 
-void SystemTray::show() { trayIcon_->show(); }
+void SystemTray::show() {
+  trayIcon_->show();
+}
 
 void SystemTray::showNotification(const QString& title, const QString& message) {
   if (trayIcon_ != nullptr && trayIcon_->isVisible()) {

@@ -24,10 +24,13 @@ public:
 
   void setSnapshot(const pfd::core::TaskSnapshot& snap);
   void addSpeedSample(qint64 dlRate, qint64 ulRate);
-  void setContentHandlers(ContentTreePage::QueryFilesFn queryFn, ContentTreePage::SetPriorityFn priorityFn,
+  void setContentHandlers(ContentTreePage::QueryFilesFn queryFn,
+                          ContentTreePage::SetPriorityFn priorityFn,
                           ContentTreePage::RenameFn renameFn);
-  void setTrackerHandlers(TrackerDetailPage::QueryTrackersFn queryFn, TrackerDetailPage::AddTrackerFn addFn,
-                          TrackerDetailPage::EditTrackerFn editFn, TrackerDetailPage::RemoveTrackerFn removeFn,
+  void setTrackerHandlers(TrackerDetailPage::QueryTrackersFn queryFn,
+                          TrackerDetailPage::AddTrackerFn addFn,
+                          TrackerDetailPage::EditTrackerFn editFn,
+                          TrackerDetailPage::RemoveTrackerFn removeFn,
                           TrackerDetailPage::ReannounceTrackerFn reannounceFn,
                           TrackerDetailPage::ReannounceAllFn reannounceAllFn);
   void setPeerHandlers(PeerListPage::QueryPeersFn queryFn);

@@ -1,10 +1,10 @@
 #include "ui/pages/detail/content_tree_page.h"
 
-#include <QtCore/QFileInfo>
 #include <QtCore/QDir>
+#include <QtCore/QFileInfo>
 #include <QtCore/QSet>
-#include <QtWidgets/QHeaderView>
 #include <QtWidgets/QHBoxLayout>
+#include <QtWidgets/QHeaderView>
 #include <QtWidgets/QInputDialog>
 #include <QtWidgets/QLineEdit>
 #include <QtWidgets/QMenu>
@@ -18,8 +18,8 @@
 #include <algorithm>
 
 #include "base/format.h"
-#include "core/logger.h"
 #include "core/external_player.h"
+#include "core/logger.h"
 #include "ui/input_ime_utils.h"
 
 namespace pfd::ui {
@@ -52,9 +52,12 @@ QString priorityText(pfd::lt::SessionWorker::FilePriorityLevel p) {
 }
 }  // namespace
 
-ContentTreePage::ContentTreePage(QWidget* parent) : QWidget(parent) { buildLayout(); }
+ContentTreePage::ContentTreePage(QWidget* parent) : QWidget(parent) {
+  buildLayout();
+}
 
-void ContentTreePage::setHandlers(QueryFilesFn queryFn, SetPriorityFn priorityFn, RenameFn renameFn) {
+void ContentTreePage::setHandlers(QueryFilesFn queryFn, SetPriorityFn priorityFn,
+                                  RenameFn renameFn) {
   queryFilesFn_ = std::move(queryFn);
   setPriorityFn_ = std::move(priorityFn);
   renameFn_ = std::move(renameFn);
@@ -71,7 +74,8 @@ void ContentTreePage::setSnapshot(const pfd::core::TaskSnapshot& snap) {
 void ContentTreePage::clear() {
   taskId_ = {};
   savePath_.clear();
-  if (tree_ != nullptr) tree_->clear();
+  if (tree_ != nullptr)
+    tree_->clear();
 }
 
 void ContentTreePage::buildLayout() {
@@ -103,25 +107,31 @@ void ContentTreePage::buildLayout() {
 
   connectImeAwareLineEditApply(this, searchEdit_, 120, [this]() { applySearchFilter(); });
   connect(selectAllBtn_, &QPushButton::clicked, this, [this]() {
-    if (tree_ == nullptr) return;
+    if (tree_ == nullptr)
+      return;
     tree_->clearSelection();
     for (QTreeWidgetItemIterator it(tree_); *it != nullptr; ++it) {
       QTreeWidgetItem* item = *it;
-      if (item->isHidden()) continue;
-      if (!item->data(0, kIsDirRole).toBool()) item->setSelected(true);
+      if (item->isHidden())
+        continue;
+      if (!item->data(0, kIsDirRole).toBool())
+        item->setSelected(true);
     }
   });
   connect(selectNoneBtn_, &QPushButton::clicked, this, [this]() {
-    if (tree_ != nullptr) tree_->clearSelection();
+    if (tree_ != nullptr)
+      tree_->clearSelection();
   });
   connect(tree_, &QTreeWidget::customContextMenuRequested, this,
           [this](const QPoint& pos) { showContextMenu(pos); });
 }
 
 void ContentTreePage::reloadTree() {
-  if (tree_ == nullptr) return;
+  if (tree_ == nullptr)
+    return;
   tree_->clear();
-  if (taskId_.isNull() || !queryFilesFn_) return;
+  if (taskId_.isNull() || !queryFilesFn_)
+    return;
 
   const auto files = queryFilesFn_(taskId_);
   LOG_DEBUG(QStringLiteral("[ui.content] reload taskId=%1 file_count=%2")
@@ -142,7 +152,10 @@ void ContentTreePage::reloadTree() {
         const bool isLeaf = (i == parts.size() - 1);
         node->setData(0, kIsDirRole, !isLeaf);
         node->setData(0, kFileIndexRole, isLeaf ? f.fileIndex : -1);
-        if (parent != nullptr) parent->addChild(node); else tree_->addTopLevelItem(node);
+        if (parent != nullptr)
+          parent->addChild(node);
+        else
+          tree_->addTopLevelItem(node);
         nodes.insert(acc, node);
       }
       parent = node;
@@ -162,7 +175,8 @@ void ContentTreePage::reloadTree() {
 
   for (QTreeWidgetItemIterator it(tree_); *it != nullptr; ++it) {
     QTreeWidgetItem* item = *it;
-    if (!item->data(0, kIsDirRole).toBool()) continue;
+    if (!item->data(0, kIsDirRole).toBool())
+      continue;
     qint64 size = 0;
     qint64 downloaded = 0;
     double minAvail = -1.0;
@@ -172,19 +186,23 @@ void ContentTreePage::reloadTree() {
       size += c->data(1, Qt::UserRole).toLongLong();
       downloaded += c->data(2, Qt::UserRole).toLongLong();
       const double av = c->data(4, Qt::UserRole).toDouble();
-      if (av >= 0.0 && (minAvail < 0.0 || av < minAvail)) minAvail = av;
+      if (av >= 0.0 && (minAvail < 0.0 || av < minAvail))
+        minAvail = av;
       ps.insert(c->data(0, kPriorityRole).toInt());
     }
     item->setData(1, Qt::UserRole, size);
     item->setData(2, Qt::UserRole, downloaded);
     item->setData(4, Qt::UserRole, minAvail);
     item->setText(1, pfd::base::formatBytes(size));
-    const double p = size > 0 ? std::clamp(static_cast<double>(downloaded) / static_cast<double>(size), 0.0, 1.0) : 0.0;
+    const double p =
+        size > 0 ? std::clamp(static_cast<double>(downloaded) / static_cast<double>(size), 0.0, 1.0)
+                 : 0.0;
     item->setText(2, QStringLiteral("%1%").arg(p * 100.0, 0, 'f', 1));
     item->setText(4, minAvail >= 0.0 ? QString::number(minAvail, 'f', 2) : QStringLiteral("--"));
     if (ps.size() == 1) {
       item->setData(0, kPriorityRole, *ps.begin());
-      item->setText(3, priorityText(static_cast<pfd::lt::SessionWorker::FilePriorityLevel>(*ps.begin())));
+      item->setText(
+          3, priorityText(static_cast<pfd::lt::SessionWorker::FilePriorityLevel>(*ps.begin())));
     } else {
       item->setData(0, kPriorityRole, -1);
       item->setText(3, QStringLiteral("混合"));
@@ -195,12 +213,14 @@ void ContentTreePage::reloadTree() {
 }
 
 void ContentTreePage::applySearchFilter() {
-  if (tree_ == nullptr) return;
+  if (tree_ == nullptr)
+    return;
   const QString key = searchEdit_ != nullptr ? searchEdit_->text().trimmed().toLower() : QString();
   for (QTreeWidgetItemIterator it(tree_); *it != nullptr; ++it) {
     (*it)->setHidden(false);
   }
-  if (key.isEmpty()) return;
+  if (key.isEmpty())
+    return;
   int visibleCount = 0;
   for (QTreeWidgetItemIterator it(tree_); *it != nullptr; ++it) {
     QTreeWidgetItem* item = *it;
@@ -209,7 +229,8 @@ void ContentTreePage::applySearchFilter() {
       visible = !item->child(i)->isHidden();
     }
     item->setHidden(!visible);
-    if (visible) ++visibleCount;
+    if (visible)
+      ++visibleCount;
     if (visible) {
       QTreeWidgetItem* p = item->parent();
       while (p != nullptr) {
@@ -218,26 +239,31 @@ void ContentTreePage::applySearchFilter() {
       }
     }
   }
-  LOG_DEBUG(QStringLiteral("[ui.content] search key=%1 visible_items=%2").arg(key).arg(visibleCount));
+  LOG_DEBUG(
+      QStringLiteral("[ui.content] search key=%1 visible_items=%2").arg(key).arg(visibleCount));
 }
 
 void ContentTreePage::showContextMenu(const QPoint& pos) {
-  if (tree_ == nullptr || taskId_.isNull()) return;
+  if (tree_ == nullptr || taskId_.isNull())
+    return;
   QTreeWidgetItem* item = tree_->itemAt(pos);
-  if (item == nullptr) return;
+  if (item == nullptr)
+    return;
   auto items = tree_->selectedItems();
-  if (items.isEmpty()) items.push_back(item);
+  if (items.isEmpty())
+    items.push_back(item);
 
   QMenu menu(this);
   const bool isDir = item->data(0, kIsDirRole).toBool();
   const QString logical = logicalPathForItem(item);
   const bool hasOpenPath = !savePath_.trimmed().isEmpty() && !logical.trimmed().isEmpty();
-  auto* openFolderAct = menu.addAction(isDir ? QStringLiteral("打开文件夹")
-                                             : QStringLiteral("打开文件所在文件夹"));
+  auto* openFolderAct =
+      menu.addAction(isDir ? QStringLiteral("打开文件夹") : QStringLiteral("打开文件所在文件夹"));
   auto* openContainingAct = menu.addAction(QStringLiteral("打开包含文件夹"));
   auto* renameAct = menu.addAction(QStringLiteral("重命名"));
   QMenu* priorityMenu = menu.addMenu(QStringLiteral("设置优先级"));
-  auto addPriority = [priorityMenu](const QString& text, pfd::lt::SessionWorker::FilePriorityLevel lv) {
+  auto addPriority = [priorityMenu](const QString& text,
+                                    pfd::lt::SessionWorker::FilePriorityLevel lv) {
     QAction* a = priorityMenu->addAction(text);
     a->setData(static_cast<int>(lv));
   };
@@ -253,7 +279,8 @@ void ContentTreePage::showContextMenu(const QPoint& pos) {
   renameAct->setEnabled(items.size() == 1);
 
   QAction* chosen = menu.exec(tree_->viewport()->mapToGlobal(pos));
-  if (chosen == nullptr) return;
+  if (chosen == nullptr)
+    return;
   if (chosen == openFolderAct || chosen == openContainingAct) {
     const QString full = QDir(savePath_).filePath(logical);
     QString openPath = full;
@@ -263,9 +290,11 @@ void ContentTreePage::showContextMenu(const QPoint& pos) {
     if (pfd::core::ExternalPlayer::openFolder(openPath) != pfd::core::ExternalPlayer::Result::Ok) {
       LOG_WARN(QStringLiteral("[ui.content] open path failed taskId=%1 path=%2")
                    .arg(taskId_.toString(), openPath));
-      QMessageBox::warning(this, QStringLiteral("提示"), QStringLiteral("目标路径不存在：%1").arg(openPath));
+      QMessageBox::warning(this, QStringLiteral("提示"),
+                           QStringLiteral("目标路径不存在：%1").arg(openPath));
     } else {
-      LOG_INFO(QStringLiteral("[ui.content] open path taskId=%1 path=%2").arg(taskId_.toString(), openPath));
+      LOG_INFO(QStringLiteral("[ui.content] open path taskId=%1 path=%2")
+                   .arg(taskId_.toString(), openPath));
     }
     return;
   }
@@ -273,8 +302,8 @@ void ContentTreePage::showContextMenu(const QPoint& pos) {
     const QString logical = logicalPathForItem(item);
     const QString oldName = QFileInfo(logical).fileName();
     bool ok = false;
-    const QString newName = QInputDialog::getText(this, QStringLiteral("重命名"),
-                                                  QStringLiteral("新名称"), QLineEdit::Normal, oldName, &ok);
+    const QString newName = QInputDialog::getText(
+        this, QStringLiteral("重命名"), QStringLiteral("新名称"), QLineEdit::Normal, oldName, &ok);
     if (ok && !newName.trimmed().isEmpty() && renameFn_) {
       LOG_INFO(QStringLiteral("[ui.content] rename request taskId=%1 path=%2 new=%3")
                    .arg(taskId_.toString(), logical, newName.trimmed()));
@@ -285,12 +314,14 @@ void ContentTreePage::showContextMenu(const QPoint& pos) {
     return;
   }
   if (chosen->parentWidget() == priorityMenu) {
-    applyPriorityToSelection(static_cast<pfd::lt::SessionWorker::FilePriorityLevel>(chosen->data().toInt()));
+    applyPriorityToSelection(
+        static_cast<pfd::lt::SessionWorker::FilePriorityLevel>(chosen->data().toInt()));
   }
 }
 
 void ContentTreePage::applyPriorityToSelection(pfd::lt::SessionWorker::FilePriorityLevel level) {
-  if (!setPriorityFn_ || tree_ == nullptr) return;
+  if (!setPriorityFn_ || tree_ == nullptr)
+    return;
   std::vector<int> all;
   for (QTreeWidgetItem* item : tree_->selectedItems()) {
     auto v = collectFileIndices(item);
@@ -298,7 +329,8 @@ void ContentTreePage::applyPriorityToSelection(pfd::lt::SessionWorker::FilePrior
   }
   std::sort(all.begin(), all.end());
   all.erase(std::unique(all.begin(), all.end()), all.end());
-  if (all.empty()) return;
+  if (all.empty())
+    return;
   LOG_INFO(QStringLiteral("[ui.content] set priority taskId=%1 level=%2 files=%3")
                .arg(taskId_.toString())
                .arg(static_cast<int>(level))
@@ -309,7 +341,8 @@ void ContentTreePage::applyPriorityToSelection(pfd::lt::SessionWorker::FilePrior
 
 std::vector<int> ContentTreePage::collectFileIndices(QTreeWidgetItem* item) const {
   std::vector<int> out;
-  if (item == nullptr) return out;
+  if (item == nullptr)
+    return out;
   const int idx = item->data(0, kFileIndexRole).toInt();
   if (idx >= 0) {
     out.push_back(idx);
@@ -323,25 +356,28 @@ std::vector<int> ContentTreePage::collectFileIndices(QTreeWidgetItem* item) cons
 }
 
 QString ContentTreePage::logicalPathForItem(QTreeWidgetItem* item) const {
-  if (item == nullptr) return {};
+  if (item == nullptr)
+    return {};
   return item->data(0, kPathRole).toString();
 }
 
 void ContentTreePage::applyRenameLocally(QTreeWidgetItem* item, const QString& newName) {
-  if (item == nullptr) return;
+  if (item == nullptr)
+    return;
   const QString oldPath = logicalPathForItem(item);
-  if (oldPath.isEmpty()) return;
+  if (oldPath.isEmpty())
+    return;
   const int slash = oldPath.lastIndexOf('/');
   const QString parent = slash >= 0 ? oldPath.left(slash) : QString();
-  const QString newPath =
-      parent.isEmpty() ? newName : (parent + QStringLiteral("/") + newName);
+  const QString newPath = parent.isEmpty() ? newName : (parent + QStringLiteral("/") + newName);
   item->setText(0, newName);
   rewritePathRecursive(item, oldPath, newPath);
 }
 
 void ContentTreePage::rewritePathRecursive(QTreeWidgetItem* item, const QString& oldPrefix,
                                            const QString& newPrefix) {
-  if (item == nullptr) return;
+  if (item == nullptr)
+    return;
   const QString curr = logicalPathForItem(item);
   if (curr == oldPrefix || curr.startsWith(oldPrefix + QStringLiteral("/"))) {
     QString next = curr;

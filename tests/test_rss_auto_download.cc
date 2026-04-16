@@ -1,7 +1,7 @@
-#include <gtest/gtest.h>
-
 #include <QtCore/QDir>
 #include <QtCore/QUuid>
+
+#include <gtest/gtest.h>
 
 #include "core/rss/rss_service.h"
 
@@ -33,9 +33,7 @@ TEST(RssAutoDownload, ThrottleLimitsDownloads) {
   svc.upsertRule(rule);
 
   int downloads = 0;
-  svc.setDownloadRequestCallback([&](const pfd::core::rss::AutoDownloadRequest&) {
-    ++downloads;
-  });
+  svc.setDownloadRequestCallback([&](const pfd::core::rss::AutoDownloadRequest&) { ++downloads; });
 
   EXPECT_EQ(downloads, 0);
 }
@@ -67,9 +65,8 @@ TEST(RssAutoDownload, CallbackReceivesMetadata) {
   svc.loadState();
 
   pfd::core::rss::AutoDownloadRequest captured;
-  svc.setDownloadRequestCallback([&](const pfd::core::rss::AutoDownloadRequest& req) {
-    captured = req;
-  });
+  svc.setDownloadRequestCallback(
+      [&](const pfd::core::rss::AutoDownloadRequest& req) { captured = req; });
 
   EXPECT_TRUE(svc.downloadItem(QStringLiteral("i1")));
   EXPECT_EQ(captured.magnet, QStringLiteral("magnet:?xt=urn:btih:abc"));

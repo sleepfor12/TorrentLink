@@ -98,7 +98,8 @@ struct AutoDownloadRequest {
   /// 拉取 HTTP .torrent 时作为 Referer（通常为订阅源 feed URL）。
   QString referer_url;
   RssDownloadSettlement rss_settlement;
-  /// 为 true 时由 AppController 在元数据就绪后直接加入会话，不弹出「添加任务」对话框（RSS 手动/自动下载）。
+  /// 为 true 时由 AppController 在元数据就绪后直接加入会话，不弹出「添加任务」对话框（RSS
+  /// 手动/自动下载）。
   bool add_without_interactive_confirm{false};
 };
 

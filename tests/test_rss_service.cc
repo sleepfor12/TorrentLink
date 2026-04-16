@@ -1,7 +1,7 @@
-#include <gtest/gtest.h>
-
 #include <QtCore/QDir>
 #include <QtCore/QUuid>
+
+#include <gtest/gtest.h>
 
 #include "core/rss/rss_repository.h"
 #include "core/rss/rss_service.h"
@@ -175,7 +175,8 @@ TEST(RssService, DownloadItemFillsRefererAndRuleSavePath) {
   svc.loadState();
 
   pfd::core::rss::AutoDownloadRequest captured;
-  svc.setDownloadRequestCallback([&](const pfd::core::rss::AutoDownloadRequest& req) { captured = req; });
+  svc.setDownloadRequestCallback(
+      [&](const pfd::core::rss::AutoDownloadRequest& req) { captured = req; });
 
   EXPECT_TRUE(svc.downloadItem(item.id));
   EXPECT_EQ(captured.referer_url, feed.url);

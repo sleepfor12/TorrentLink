@@ -1,10 +1,10 @@
-#include <gtest/gtest.h>
-
 #include <QtCore/QDir>
 #include <QtCore/QJsonArray>
 #include <QtCore/QJsonDocument>
 #include <QtCore/QJsonObject>
 #include <QtCore/QUuid>
+
+#include <gtest/gtest.h>
 
 #include "base/io.h"
 #include "core/rss/rss_repository.h"

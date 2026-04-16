@@ -4,8 +4,18 @@ name: CI
 on:
   push:
     branches: [master, main]
+    paths-ignore:
+      - '**/*.md'
+      - '**/*.txt'
+      - 'NOTICE'
+      - 'READEME_zh'
   pull_request:
     branches: [master, main]
+    paths-ignore:
+      - '**/*.md'
+      - '**/*.txt'
+      - 'NOTICE'
+      - 'READEME_zh'
 
 jobs:
   format:

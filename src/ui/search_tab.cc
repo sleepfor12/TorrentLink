@@ -61,12 +61,17 @@ void SearchTab::buildLayout() {
   connect(resultList_, &QListWidget::currentRowChanged, this, &SearchTab::onResultSelected);
 }
 
-void SearchTab::setQuerySnapshotsFn(QuerySnapshotsFn fn) { querySnapshotsFn_ = std::move(fn); }
-void SearchTab::setQueryRssItemsFn(QueryRssItemsFn fn) { queryRssItemsFn_ = std::move(fn); }
+void SearchTab::setQuerySnapshotsFn(QuerySnapshotsFn fn) {
+  querySnapshotsFn_ = std::move(fn);
+}
+void SearchTab::setQueryRssItemsFn(QueryRssItemsFn fn) {
+  queryRssItemsFn_ = std::move(fn);
+}
 
 void SearchTab::performSearch() {
   const QString keyword = queryEdit_->text().trimmed();
-  if (keyword.isEmpty()) return;
+  if (keyword.isEmpty())
+    return;
 
   results_.clear();
   resultList_->clear();
@@ -75,39 +80,40 @@ void SearchTab::performSearch() {
   const int scope = scopeBox_->currentIndex();
 
   if (scope == 0) {
-    if (!querySnapshotsFn_) return;
+    if (!querySnapshotsFn_)
+      return;
     const auto snapshots = querySnapshotsFn_();
     for (const auto& s : snapshots) {
       if (s.name.contains(keyword, Qt::CaseInsensitive)) {
         ResultEntry entry;
         entry.title = s.name;
-        entry.detail = QStringLiteral(
-            "<b>%1</b><br>"
-            "状态: %2<br>"
-            "大小: %3<br>"
-            "路径: %4<br>"
-            "InfoHash v1: %5<br>"
-            "InfoHash v2: %6")
-            .arg(s.name.toHtmlEscaped(),
-                 s.status == pfd::base::TaskStatus::kFinished ? QStringLiteral("已完成")
-                 : s.status == pfd::base::TaskStatus::kDownloading ? QStringLiteral("下载中")
-                 : s.status == pfd::base::TaskStatus::kPaused ? QStringLiteral("已暂停")
-                 : QStringLiteral("其他"),
-                 pfd::base::formatBytes(s.totalBytes),
-                 s.savePath.toHtmlEscaped(),
-                 s.infoHashV1.isEmpty() ? QStringLiteral("--") : s.infoHashV1,
-                 s.infoHashV2.isEmpty() ? QStringLiteral("--") : s.infoHashV2);
+        entry.detail =
+            QStringLiteral("<b>%1</b><br>"
+                           "状态: %2<br>"
+                           "大小: %3<br>"
+                           "路径: %4<br>"
+                           "InfoHash v1: %5<br>"
+                           "InfoHash v2: %6")
+                .arg(s.name.toHtmlEscaped(),
+                     s.status == pfd::base::TaskStatus::kFinished      ? QStringLiteral("已完成")
+                     : s.status == pfd::base::TaskStatus::kDownloading ? QStringLiteral("下载中")
+                     : s.status == pfd::base::TaskStatus::kPaused      ? QStringLiteral("已暂停")
+                                                                       : QStringLiteral("其他"),
+                     pfd::base::formatBytes(s.totalBytes), s.savePath.toHtmlEscaped(),
+                     s.infoHashV1.isEmpty() ? QStringLiteral("--") : s.infoHashV1,
+                     s.infoHashV2.isEmpty() ? QStringLiteral("--") : s.infoHashV2);
         results_.push_back(std::move(entry));
       }
     }
   } else if (scope == 1) {
-    if (!queryRssItemsFn_) return;
+    if (!queryRssItemsFn_)
+      return;
     const auto items = queryRssItemsFn_(keyword);
     for (const auto& [title, link] : items) {
       ResultEntry entry;
       entry.title = title;
-      entry.detail = QStringLiteral("<b>%1</b><br>链接: %2")
-                         .arg(title.toHtmlEscaped(), link.toHtmlEscaped());
+      entry.detail =
+          QStringLiteral("<b>%1</b><br>链接: %2").arg(title.toHtmlEscaped(), link.toHtmlEscaped());
       results_.push_back(std::move(entry));
     }
   } else {

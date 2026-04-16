@@ -31,7 +31,8 @@ void RssRulesPage::setService(pfd::core::rss::RssService* service) {
 
 void RssRulesPage::refreshTable() {
   ruleTable_->setRowCount(0);
-  if (!service_) return;
+  if (!service_)
+    return;
 
   const auto& rules = service_->rules();
   ruleTable_->setRowCount(static_cast<int>(rules.size()));
@@ -41,19 +42,20 @@ void RssRulesPage::refreshTable() {
     auto* nameItem = new QTableWidgetItem(r.name);
     nameItem->setData(Qt::UserRole, r.id);
     ruleTable_->setItem(i, 0, nameItem);
-    ruleTable_->setItem(i, 1, new QTableWidgetItem(
-        r.enabled ? QStringLiteral("已启用") : QStringLiteral("已禁用")));
+    ruleTable_->setItem(
+        i, 1,
+        new QTableWidgetItem(r.enabled ? QStringLiteral("已启用") : QStringLiteral("已禁用")));
 
     QString scope = r.feed_ids.isEmpty() ? QStringLiteral("全部订阅源")
                                          : QStringLiteral("%1 个源").arg(r.feed_ids.size());
     ruleTable_->setItem(i, 2, new QTableWidgetItem(scope));
     ruleTable_->setItem(i, 3, new QTableWidgetItem(r.include_keywords.join(QStringLiteral(", "))));
     ruleTable_->setItem(i, 4, new QTableWidgetItem(r.exclude_keywords.join(QStringLiteral(", "))));
-    ruleTable_->setItem(i, 5, new QTableWidgetItem(
-        r.use_regex ? QStringLiteral("正则") : QStringLiteral("关键词")));
-    ruleTable_->setItem(i, 6, new QTableWidgetItem(r.save_path.isEmpty()
-                                                       ? QStringLiteral("默认")
-                                                       : r.save_path));
+    ruleTable_->setItem(
+        i, 5,
+        new QTableWidgetItem(r.use_regex ? QStringLiteral("正则") : QStringLiteral("关键词")));
+    ruleTable_->setItem(
+        i, 6, new QTableWidgetItem(r.save_path.isEmpty() ? QStringLiteral("默认") : r.save_path));
   }
   updateSwitchStatus();
 }
@@ -65,9 +67,9 @@ void RssRulesPage::buildLayout() {
 
   // ─── 三层开关状态 ───
   globalSwitch_ = new QLabel(this);
-  globalSwitch_->setStyleSheet(QStringLiteral(
-      "QLabel{background:#f5f8ff;border:1px solid #d9e5ff;border-radius:8px;"
-      "padding:8px 14px;color:#41516d;font-size:13px;}"));
+  globalSwitch_->setStyleSheet(
+      QStringLiteral("QLabel{background:#f5f8ff;border:1px solid #d9e5ff;border-radius:8px;"
+                     "padding:8px 14px;color:#41516d;font-size:13px;}"));
   root->addWidget(globalSwitch_);
 
   // ─── 工具栏 ───
@@ -91,10 +93,10 @@ void RssRulesPage::buildLayout() {
   // 表格
   ruleTable_ = new QTableWidget(splitter);
   ruleTable_->setColumnCount(7);
-  ruleTable_->setHorizontalHeaderLabels(
-      {QStringLiteral("名称"), QStringLiteral("状态"), QStringLiteral("订阅源范围"),
-       QStringLiteral("包含"), QStringLiteral("排除"), QStringLiteral("匹配模式"),
-       QStringLiteral("保存路径")});
+  ruleTable_->setHorizontalHeaderLabels({QStringLiteral("名称"), QStringLiteral("状态"),
+                                         QStringLiteral("订阅源范围"), QStringLiteral("包含"),
+                                         QStringLiteral("排除"), QStringLiteral("匹配模式"),
+                                         QStringLiteral("保存路径")});
   ruleTable_->horizontalHeader()->setStretchLastSection(true);
   ruleTable_->horizontalHeader()->setSectionResizeMode(QHeaderView::Interactive);
   ruleTable_->setSelectionBehavior(QAbstractItemView::SelectRows);
@@ -112,7 +114,8 @@ void RssRulesPage::buildLayout() {
   form->addRow(QStringLiteral("名称："), nameEdit_);
 
   feedIdsEdit_ = new QLineEdit(formContainer_);
-  feedIdsEdit_->setPlaceholderText(QStringLiteral("留空 = 全部订阅源；多个用逗号分隔（填订阅源 ID）"));
+  feedIdsEdit_->setPlaceholderText(
+      QStringLiteral("留空 = 全部订阅源；多个用逗号分隔（填订阅源 ID）"));
   form->addRow(QStringLiteral("订阅源："), feedIdsEdit_);
 
   includeEdit_ = new QLineEdit(formContainer_);
@@ -161,13 +164,15 @@ void RssRulesPage::bindSignals() {
   connect(toggleBtn_, &QPushButton::clicked, this, &RssRulesPage::onToggleEnabled);
   connect(browseSavePathBtn_, &QPushButton::clicked, this, [this]() {
     const QString cur = savePathEdit_->text().trimmed();
-    const QString dir = QFileDialog::getExistingDirectory(
-        this, QStringLiteral("选择保存路径"), cur);
-    if (!dir.isEmpty()) savePathEdit_->setText(dir);
+    const QString dir =
+        QFileDialog::getExistingDirectory(this, QStringLiteral("选择保存路径"), cur);
+    if (!dir.isEmpty())
+      savePathEdit_->setText(dir);
   });
 
   connect(saveFormBtn_, &QPushButton::clicked, this, [this]() {
-    if (!service_) return;
+    if (!service_)
+      return;
     const QString name = nameEdit_->text().trimmed();
     if (name.isEmpty()) {
       QMessageBox::warning(this, QStringLiteral("规则"), QStringLiteral("请填写规则名称。"));
@@ -180,17 +185,20 @@ void RssRulesPage::bindSignals() {
     const QString feedIds = feedIdsEdit_->text().trimmed();
     if (!feedIds.isEmpty()) {
       rule.feed_ids = feedIds.split(QStringLiteral(","), Qt::SkipEmptyParts);
-      for (auto& fid : rule.feed_ids) fid = fid.trimmed();
+      for (auto& fid : rule.feed_ids)
+        fid = fid.trimmed();
     }
     const QString inc = includeEdit_->text().trimmed();
     if (!inc.isEmpty()) {
       rule.include_keywords = inc.split(QStringLiteral(","), Qt::SkipEmptyParts);
-      for (auto& k : rule.include_keywords) k = k.trimmed();
+      for (auto& k : rule.include_keywords)
+        k = k.trimmed();
     }
     const QString exc = excludeEdit_->text().trimmed();
     if (!exc.isEmpty()) {
       rule.exclude_keywords = exc.split(QStringLiteral(","), Qt::SkipEmptyParts);
-      for (auto& k : rule.exclude_keywords) k = k.trimmed();
+      for (auto& k : rule.exclude_keywords)
+        k = k.trimmed();
     }
     rule.use_regex = regexCheck_->isChecked();
     rule.save_path = savePathEdit_->text().trimmed();
@@ -198,10 +206,9 @@ void RssRulesPage::bindSignals() {
     rule.tags_csv = tagsEdit_->text().trimmed();
 
     if (!editingRuleId_.isEmpty()) {
-      auto existing = std::find_if(service_->rules().begin(), service_->rules().end(),
-                                   [&](const pfd::core::rss::RssRule& r) {
-                                     return r.id == editingRuleId_;
-                                   });
+      auto existing =
+          std::find_if(service_->rules().begin(), service_->rules().end(),
+                       [&](const pfd::core::rss::RssRule& r) { return r.id == editingRuleId_; });
       if (existing != service_->rules().end()) {
         rule.enabled = existing->enabled;
       }
@@ -239,13 +246,16 @@ void RssRulesPage::onAddRule() {
 }
 
 void RssRulesPage::onEditSelected() {
-  if (!service_) return;
+  if (!service_)
+    return;
   const int row = ruleTable_->currentRow();
-  if (row < 0) return;
+  if (row < 0)
+    return;
 
   const QString ruleId = ruleTable_->item(row, 0)->data(Qt::UserRole).toString();
   for (const auto& r : service_->rules()) {
-    if (r.id != ruleId) continue;
+    if (r.id != ruleId)
+      continue;
     editingRuleId_ = r.id;
     nameEdit_->setText(r.name);
     feedIdsEdit_->setText(r.feed_ids.join(QStringLiteral(", ")));
@@ -261,9 +271,11 @@ void RssRulesPage::onEditSelected() {
 }
 
 void RssRulesPage::onRemoveSelected() {
-  if (!service_) return;
+  if (!service_)
+    return;
   const int row = ruleTable_->currentRow();
-  if (row < 0) return;
+  if (row < 0)
+    return;
   const QString ruleId = ruleTable_->item(row, 0)->data(Qt::UserRole).toString();
   service_->removeRule(ruleId);
   service_->saveState();
@@ -271,12 +283,15 @@ void RssRulesPage::onRemoveSelected() {
 }
 
 void RssRulesPage::onToggleEnabled() {
-  if (!service_) return;
+  if (!service_)
+    return;
   const int row = ruleTable_->currentRow();
-  if (row < 0) return;
+  if (row < 0)
+    return;
   const QString ruleId = ruleTable_->item(row, 0)->data(Qt::UserRole).toString();
   for (auto r : service_->rules()) {
-    if (r.id != ruleId) continue;
+    if (r.id != ruleId)
+      continue;
     r.enabled = !r.enabled;
     service_->upsertRule(r);
     service_->saveState();
@@ -301,11 +316,13 @@ void RssRulesPage::updateSwitchStatus() {
   const bool global = service_->autoDownloadEnabled();
   int feedsEnabled = 0;
   for (const auto& f : service_->feeds()) {
-    if (f.auto_download_enabled) ++feedsEnabled;
+    if (f.auto_download_enabled)
+      ++feedsEnabled;
   }
   int rulesEnabled = 0;
   for (const auto& r : service_->rules()) {
-    if (r.enabled) ++rulesEnabled;
+    if (r.enabled)
+      ++rulesEnabled;
   }
 
   QString text = QStringLiteral("自动下载链路：全局%1  ·  %2 个订阅源已开启  ·  %3 条规则已启用")

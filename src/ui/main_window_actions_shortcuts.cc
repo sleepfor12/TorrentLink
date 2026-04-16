@@ -73,27 +73,25 @@ void MainWindow::bindSignals() {
     connect(helpAction_, &QAction::triggered, this, [this]() {
       QMessageBox::information(
           this, QStringLiteral("使用说明"),
-          QStringLiteral(
-              "<h3>P2P 文件下载系统 — 使用说明</h3>"
-              "<ul>"
-              "<li>通过 <b>文件</b> 菜单添加 Torrent 文件或磁力链接</li>"
-              "<li>在 <b>传输</b> 页查看和管理下载任务</li>"
-              "<li>右键任务可暂停、删除、修改 Tracker 等</li>"
-              "<li>使用 <b>RSS 订阅</b> 页自动追踪新内容</li>"
-              "<li>使用 <b>搜索</b> 页在本地历史和 RSS 条目中检索</li>"
-              "<li>关闭窗口后程序将最小化到系统托盘</li>"
-              "</ul>"));
+          QStringLiteral("<h3>P2P 文件下载系统 — 使用说明</h3>"
+                         "<ul>"
+                         "<li>通过 <b>文件</b> 菜单添加 Torrent 文件或磁力链接</li>"
+                         "<li>在 <b>传输</b> 页查看和管理下载任务</li>"
+                         "<li>右键任务可暂停、删除、修改 Tracker 等</li>"
+                         "<li>使用 <b>RSS 订阅</b> 页自动追踪新内容</li>"
+                         "<li>使用 <b>搜索</b> 页在本地历史和 RSS 条目中检索</li>"
+                         "<li>关闭窗口后程序将最小化到系统托盘</li>"
+                         "</ul>"));
     });
   }
   if (aboutAction_ != nullptr) {
     connect(aboutAction_, &QAction::triggered, this, [this]() {
       QMessageBox::about(
           this, QStringLiteral("关于"),
-          QStringLiteral(
-              "<h3>P2P 文件下载系统</h3>"
-              "<p>版本: 1.0.0</p>"
-              "<p>基于 <b>libtorrent-rasterbar 2.x</b> 和 <b>Qt %1</b> 构建。</p>"
-              "<p>许可证: MIT</p>")
+          QStringLiteral("<h3>P2P 文件下载系统</h3>"
+                         "<p>版本: 1.0.0</p>"
+                         "<p>基于 <b>libtorrent-rasterbar 2.x</b> 和 <b>Qt %1</b> 构建。</p>"
+                         "<p>许可证: MIT</p>")
               .arg(QString::fromLatin1(qVersion())));
     });
   }
@@ -103,10 +101,8 @@ void MainWindow::bindSignals() {
     if (taskTable_ != nullptr) {
       taskTable_->selectAll();
       if (taskTable_->rowCount() > 0 && taskTable_->selectionModel() != nullptr) {
-        const QModelIndex lastIdx =
-            taskTable_->model()->index(taskTable_->rowCount() - 1, 0);
-        taskTable_->selectionModel()->setCurrentIndex(
-            lastIdx, QItemSelectionModel::NoUpdate);
+        const QModelIndex lastIdx = taskTable_->model()->index(taskTable_->rowCount() - 1, 0);
+        taskTable_->selectionModel()->setCurrentIndex(lastIdx, QItemSelectionModel::NoUpdate);
       }
       appendLog(QStringLiteral("已全选所有任务（Ctrl+A）。"));
     }
@@ -345,8 +341,7 @@ void MainWindow::setOnForceReannounceTracker(
   syncTrackerHandlers();
 }
 
-void MainWindow::setOnForceReannounceAllTrackers(
-    std::function<void(const pfd::base::TaskId&)> cb) {
+void MainWindow::setOnForceReannounceAllTrackers(std::function<void(const pfd::base::TaskId&)> cb) {
   onForceReannounceAllTrackers_ = std::move(cb);
   syncTrackerHandlers();
 }
@@ -377,16 +372,18 @@ void MainWindow::setSearchDataSources(SearchTab::QuerySnapshotsFn snapshotsFn,
 }
 
 void MainWindow::syncContentHandlers() {
-  if (transferPage_ == nullptr) return;
+  if (transferPage_ == nullptr)
+    return;
   transferPage_->setContentHandlers(onQueryTaskFiles_, onSetTaskFilePriority_,
                                     onRenameTaskFileOrFolder_);
 }
 
 void MainWindow::syncTrackerHandlers() {
-  if (transferPage_ == nullptr) return;
-  transferPage_->setTrackerHandlers(onQueryTaskTrackerSnapshot_, onAddTaskTracker_, onEditTaskTracker_,
-                                    onRemoveTaskTracker_, onForceReannounceTracker_,
-                                    onForceReannounceAllTrackers_);
+  if (transferPage_ == nullptr)
+    return;
+  transferPage_->setTrackerHandlers(onQueryTaskTrackerSnapshot_, onAddTaskTracker_,
+                                    onEditTaskTracker_, onRemoveTaskTracker_,
+                                    onForceReannounceTracker_, onForceReannounceAllTrackers_);
 }
 
 void MainWindow::appendLog(const QString& msg) {
