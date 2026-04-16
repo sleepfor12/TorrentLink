@@ -1,4 +1,4 @@
-add_library(p2p_base STATIC
+add_library(torrentlink_base STATIC
   clock.h
   clock.cc
   ring_buffer.h
@@ -31,16 +31,16 @@ add_library(p2p_base STATIC
   debounce.cc
 )
 
-target_include_directories(p2p_base
+target_include_directories(torrentlink_base
   PUBLIC
     ${PROJECT_SOURCE_DIR}/src
 )
 
-target_link_libraries(p2p_base
+target_link_libraries(torrentlink_base
   PUBLIC
     Qt6::Core
 )
 
-target_compile_features(p2p_base PUBLIC cxx_std_17)
-pfd_set_target_warnings(p2p_base)
+target_compile_features(torrentlink_base PUBLIC cxx_std_17)
+pfd_set_target_warnings(torrentlink_base)
 

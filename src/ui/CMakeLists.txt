@@ -1,4 +1,4 @@
-add_library(p2p_ui STATIC
+add_library(torrentlink_ui STATIC
   input_ime_utils.h
   input_ime_utils.cc
   main_window.h
@@ -55,7 +55,7 @@ add_library(p2p_ui STATIC
   widgets/bottom_status_bar.cc
 )
 
-target_link_libraries(p2p_ui
+target_link_libraries(torrentlink_ui
   PUBLIC
     Qt6::Core
     Qt6::Widgets
@@ -63,11 +63,11 @@ target_link_libraries(p2p_ui
     Qt6::Qml
     Qt6::Quick
     Qt6::QuickWidgets
-    p2p_core
-    p2p_lt
+    torrentlink_core
+    torrentlink_lt
 )
 
-target_compile_features(p2p_ui PUBLIC cxx_std_17)
-pfd_set_target_warnings(p2p_ui)
+target_compile_features(torrentlink_ui PUBLIC cxx_std_17)
+pfd_set_target_warnings(torrentlink_ui)
 
  

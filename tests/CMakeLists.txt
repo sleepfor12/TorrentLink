@@ -1,0 +1,54 @@
+add_executable(torrentlink_tests
+  test_main.cc
+  test_sanity.cc
+  test_base_errors.cc
+  test_format.cc
+  test_input_sanitizer.cc
+  test_io.cc
+  test_process_utils.cc
+  test_paths.cc
+  test_threading.cc
+  test_types.cc
+  test_clock.cc
+  test_fs_utils.cc
+  test_system_info.cc
+  test_time_stamps.cc
+  test_time_format.cc
+  test_throttle.cc
+  test_debounce.cc
+  test_lt_error_conversions.cc
+  test_lt_task_event_mapper.cc
+  test_lt_task_event_dispatcher.cc
+  test_lt_task_alert_adapter.cc
+  test_session_worker.cc
+  test_ring_buffer.cc
+  test_log_store.cc
+  test_logger.cc
+  test_task_state_store.cc
+  test_task_pipeline.cc
+  test_task_pipeline_service.cc
+  test_rss_parser.cc
+  test_rss_repository.cc
+  test_rss_service.cc
+  test_rss_rule_engine.cc
+  test_rss_series_tracker.cc
+  test_rss_auto_download.cc
+  test_rss_dedup.cc
+  test_rss_opml.cc
+  test_save_path_policy.cc
+  test_task_add_builder.cc
+)
+
+target_link_libraries(torrentlink_tests
+  PRIVATE
+    GTest::gtest
+    Qt6::Core
+    p2p_base
+    p2p_core
+    p2p_lt
+)
+
+pfd_set_target_warnings(torrentlink_tests)
+
+include(GoogleTest)
+gtest_discover_tests(torrentlink_tests)

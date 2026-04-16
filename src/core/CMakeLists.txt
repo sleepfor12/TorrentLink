@@ -1,4 +1,4 @@
-add_library(p2p_core STATIC
+add_library(torrentlink_core STATIC
   app_settings.h
   app_settings.cc
   config_service.h
@@ -42,19 +42,19 @@ add_library(p2p_core STATIC
   task_pipeline_service.cc
 )
 
-target_include_directories(p2p_core
+target_include_directories(torrentlink_core
   PUBLIC
     ${PROJECT_SOURCE_DIR}/src
 )
 
-target_link_libraries(p2p_core
+target_link_libraries(torrentlink_core
   PUBLIC
     Qt6::Core
     Qt6::Gui
     Qt6::Network
-    p2p_base
+    torrentlink_base
 )
 
-target_compile_features(p2p_core PUBLIC cxx_std_17)
-pfd_set_target_warnings(p2p_core)
+target_compile_features(torrentlink_core PUBLIC cxx_std_17)
+pfd_set_target_warnings(torrentlink_core)
 

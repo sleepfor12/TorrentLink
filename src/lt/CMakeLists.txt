@@ -1,4 +1,4 @@
-add_library(p2p_lt STATIC
+add_library(torrentlink_lt STATIC
   error_conversions.h
   error_conversions.cc
   task_event_mapper.h
@@ -19,18 +19,18 @@ add_library(p2p_lt STATIC
   session_worker.cc
 )
 
-target_include_directories(p2p_lt
+target_include_directories(torrentlink_lt
   PUBLIC
     ${PROJECT_SOURCE_DIR}/src
 )
 
-target_link_libraries(p2p_lt
+target_link_libraries(torrentlink_lt
   PUBLIC
     Qt6::Core
-    p2p_base
+    torrentlink_base
     ${PFD_LIBTORRENT_TARGET}
 )
 
-target_compile_features(p2p_lt PUBLIC cxx_std_17)
-pfd_set_target_warnings(p2p_lt)
+target_compile_features(torrentlink_lt PUBLIC cxx_std_17)
+pfd_set_target_warnings(torrentlink_lt)
 

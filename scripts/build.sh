@@ -44,5 +44,3 @@ if [[ "${TESTING}" == "ON" ]] && [[ "$RUN_TESTS" -eq 1 ]]; then
 fi
 
 echo "=== 完成 ==="
-echo "可执行文件: ${BUILD_DIR}/p2p_downloader"
-echo "运行示例: ./${BUILD_DIR}/p2p_downloader \"magnet:?xt=urn:btih:...\""

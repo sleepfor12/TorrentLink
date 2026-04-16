@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.22)
 
-project(p2p_file_download_system
+project(torrentlink
   VERSION 0.1.0
   LANGUAGES CXX
 )
@@ -15,8 +15,6 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-# Ensure ABI matches system packages on Linux.
-# Some environments default Clang to libc++ (std::__1), while distro libtorrent/boost are built with libstdc++.
 if(UNIX AND NOT APPLE AND CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
   add_compile_options(-stdlib=libstdc++)
   add_link_options(-stdlib=libstdc++)
@@ -41,19 +39,8 @@ if(BUILD_TESTING)
   set(gtest_force_shared_crt OFF CACHE BOOL "" FORCE)
   set(INSTALL_GTEST OFF CACHE BOOL "" FORCE)
   FetchContent_MakeAvailable(googletest)
-endif()
-
-option(BUILD_BENCHMARKS "Build benchmark targets" ON)
-if(BUILD_BENCHMARKS)
-  include(FetchContent)
-  FetchContent_Declare(
-    benchmark
-    URL https://github.com/google/benchmark/archive/refs/tags/v1.9.1.zip
-  )
-  set(BENCHMARK_ENABLE_TESTING OFF CACHE BOOL "" FORCE)
-  set(BENCHMARK_ENABLE_GTEST_TESTS OFF CACHE BOOL "" FORCE)
-  set(BENCHMARK_ENABLE_INSTALL OFF CACHE BOOL "" FORCE)
-  FetchContent_MakeAvailable(benchmark)
+  find_package(Qt6 REQUIRED COMPONENTS Test)
+  enable_testing()
 endif()
 
 # Qt: enable automatic MOC/UIC/RCC for Widgets apps.
@@ -90,7 +77,7 @@ add_subdirectory(src/core)
 add_subdirectory(src/lt)
 add_subdirectory(src/ui)
 
-add_executable(p2p_downloader
+add_executable(torrentlink
   src/app_controller.h
   src/app_controller.cc
   src/main.cc
@@ -100,111 +87,24 @@ if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/src/main.cc")
   message(FATAL_ERROR "Missing src/main.cc. Create it (Qt app entrypoint) or update add_executable() sources.")
 endif()
 
-target_link_libraries(p2p_downloader
+target_link_libraries(torrentlink
   PRIVATE
     Qt6::Core
     Qt6::Widgets
     Qt6::Network
     ${PFD_LIBTORRENT_TARGET}
-    p2p_base
-    p2p_core
-    p2p_lt
-    p2p_ui
+    torrentlink_base
+    torrentlink_core
+    torrentlink_lt
+    torrentlink_ui
 )
 
-pfd_set_target_warnings(p2p_downloader)
+pfd_set_target_warnings(torrentlink)
 
-target_compile_definitions(p2p_downloader PRIVATE
+target_compile_definitions(torrentlink PRIVATE
   QT_NO_KEYWORDS
 )
 
 if(BUILD_TESTING)
-  find_package(Qt6 REQUIRED COMPONENTS Test)
-  enable_testing()
-
-  add_executable(p2p_tests
-    tests/test_main.cc
-    tests/test_sanity.cc
-    tests/test_base_errors.cc
-    tests/test_format.cc
-    tests/test_input_sanitizer.cc
-    tests/test_io.cc
-    tests/test_process_utils.cc
-    tests/test_paths.cc
-    tests/test_threading.cc
-    tests/test_types.cc
-    tests/test_clock.cc
-    tests/test_fs_utils.cc
-    tests/test_system_info.cc
-    tests/test_time_stamps.cc
-    tests/test_time_format.cc
-    tests/test_throttle.cc
-    tests/test_debounce.cc
-    tests/test_lt_error_conversions.cc
-    tests/test_lt_task_event_mapper.cc
-    tests/test_lt_task_event_dispatcher.cc
-    tests/test_lt_task_alert_adapter.cc
-    tests/test_session_worker.cc
-    tests/test_ring_buffer.cc
-    tests/test_log_store.cc
-    tests/test_logger.cc
-    tests/test_task_state_store.cc
-    tests/test_task_pipeline.cc
-    tests/test_task_pipeline_service.cc
-    tests/test_rss_parser.cc
-    tests/test_rss_repository.cc
-    tests/test_rss_service.cc
-    tests/test_rss_rule_engine.cc
-    tests/test_rss_series_tracker.cc
-    tests/test_rss_auto_download.cc
-    tests/test_rss_dedup.cc
-    tests/test_rss_opml.cc
-    tests/test_save_path_policy.cc
-    tests/test_task_add_builder.cc
-  )
-
-  target_link_libraries(p2p_tests
-    PRIVATE
-      GTest::gtest
-      Qt6::Core
-      p2p_base
-      p2p_core
-      p2p_lt
-  )
-
-  pfd_set_target_warnings(p2p_tests)
-
-  include(GoogleTest)
-  gtest_discover_tests(p2p_tests)
-
-  add_executable(p2p_qt_tests
-    tests/qt/tst_pfd_qt.cpp
-  )
-  target_link_libraries(p2p_qt_tests
-    PRIVATE
-      Qt6::Core
-      Qt6::Test
-      p2p_base
-      p2p_lt
-  )
-  target_include_directories(p2p_qt_tests
-    PRIVATE
-      ${PROJECT_SOURCE_DIR}/src
-  )
-  pfd_set_target_warnings(p2p_qt_tests)
-  add_test(NAME p2p_qt_tests COMMAND p2p_qt_tests)
-endif()
-
-if(BUILD_BENCHMARKS)
-  add_executable(bench_logger_qps
-    benchmarks/bench_logger_qps.cc
-  )
-  target_link_libraries(bench_logger_qps
-    PRIVATE
-      benchmark::benchmark
-      Qt6::Core
-      p2p_base
-      p2p_core
-  )
-  pfd_set_target_warnings(bench_logger_qps)
+  add_subdirectory(tests)
 endif()
