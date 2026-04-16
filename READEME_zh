@@ -20,22 +20,9 @@
 
 ## 项目依赖说明
 
-### 核心依赖（必须）
-
-- `libtorrent-rasterbar`
-  - 用途：提供 BitTorrent 协议栈、会话管理、Peer/Tracker 通信、断点续传能力。
-
-### 构建辅助依赖（推荐）
-
-- `pkg-config`
-  - 用途：在 Linux 上辅助发现第三方库路径（作为依赖发现回退机制）。
-
-### 测试与开发依赖
-
-- `GoogleTest`（通过工程配置启用）
-  - 用途：单元测试与回归验证，使用 `ctest` 统一执行。
-- `.clang-format`
-  - 用途：统一代码风格；配合格式化脚本与 CI 检查。
+- `libtorrent 2.6`
+- `GoogleTest`
+- `qt`
 
 ## 快速构建与运行
 
@@ -53,6 +40,13 @@ ctest --test-dir build --output-on-failure
 - 格式化：`bash scripts/format.sh`
 - 格式检查（CI 使用）：`bash scripts/format_check.sh`
 
+## Bug 与漏洞报告指南
+
+- 普通 Bug：请通过 GitHub Issue 提交，并附上复现步骤、预期行为、实际行为。
+- 安全漏洞：请 **不要** 公开提交 Issue。
+- 请通过邮箱私下报告：`zbysleepallday@outloo.com`。
+- 建议附上受影响版本/commit、影响范围、最小复现或 PoC。
+
 ## Windows 适配状态
 
 - 已纳入 CI：`windows-latest`（Qt + vcpkg libtorrent）。
@@ -69,9 +63,6 @@ ctest --test-dir build --output-on-failure
 - 诊断包导出
 - 开机自启
 
+## 联系方式
 
-
-[联系方式：zbysleepallday@outlook.com](mailto:联系方式：zbysleepallday@outlook.com) / [zbymeiqian414@163.com](mailto:zbymeiqian414@163.com)
-
-
-
+邮箱：zbysleepallday@outloo.com / zbymeiqian414@163.com

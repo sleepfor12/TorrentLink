@@ -1,0 +1,21 @@
+TorrentLink NOTICE
+==================
+
+This project depends on the following third-party libraries:
+
+1. libtorrent (Rasterbar)
+   - Used for BitTorrent protocol/session functionality.
+   - Copyright and license belong to the libtorrent authors.
+
+2. Qt (Qt 6)
+   - Used for UI framework and cross-platform application infrastructure.
+   - Copyright and license belong to The Qt Company
+     and respective contributors.
+
+3. GoogleTest
+   - Used for unit testing.
+   - Copyright and license belong to Google
+     and respective contributors.
+
+Please refer to each dependency's official repository and license files
+for complete license terms and notices.
