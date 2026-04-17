@@ -62,7 +62,6 @@ jobs:
           version: "6.7.2"
           host: windows
           target: desktop
-          modules: qtdeclarative
           cache: true
 
       - name: 缓存 vcpkg
