@@ -81,7 +81,7 @@ jobs:
             git clone https://github.com/microsoft/vcpkg.git C:/vcpkg
           }
           & C:/vcpkg/bootstrap-vcpkg.bat -disableMetrics
-          & C:/vcpkg/vcpkg.exe install libtorrent-rasterbar:x64-windows
+          & C:/vcpkg/vcpkg.exe install libtorrent:x64-windows
 
       - name: 配置（Windows）
         shell: pwsh

@@ -51,8 +51,11 @@ set(CMAKE_AUTORCC ON)
 find_package(Qt6 REQUIRED COMPONENTS Core Widgets Network Qml Quick QuickWidgets)
 
 set(PFD_LIBTORRENT_TARGET "")
+find_package(LibtorrentRasterbar CONFIG QUIET)
 find_package(libtorrent-rasterbar CONFIG QUIET)
-if(TARGET torrent-rasterbar::torrent-rasterbar)
+if(TARGET LibtorrentRasterbar::torrent-rasterbar)
+  set(PFD_LIBTORRENT_TARGET LibtorrentRasterbar::torrent-rasterbar)
+elseif(TARGET torrent-rasterbar::torrent-rasterbar)
   set(PFD_LIBTORRENT_TARGET torrent-rasterbar::torrent-rasterbar)
 elseif(TARGET libtorrent-rasterbar::libtorrent-rasterbar)
   set(PFD_LIBTORRENT_TARGET libtorrent-rasterbar::libtorrent-rasterbar)
@@ -69,7 +72,7 @@ endif()
 if(PFD_LIBTORRENT_TARGET STREQUAL "")
   message(FATAL_ERROR
           "Unable to find libtorrent. On Linux install libtorrent-rasterbar-dev/pkg-config; "
-          "on Windows prefer vcpkg and pass CMAKE_TOOLCHAIN_FILE.")
+          "on Windows use vcpkg (port name: libtorrent) and pass CMAKE_TOOLCHAIN_FILE.")
 endif()
 
 add_subdirectory(src/base)
