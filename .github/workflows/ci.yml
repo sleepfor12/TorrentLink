@@ -76,12 +76,14 @@ jobs:
 
       - name: 安装 libtorrent（vcpkg）
         shell: pwsh
+        working-directory: ${{ github.workspace }}
         run: |
           if (-not (Test-Path C:/vcpkg/.git)) {
             git clone https://github.com/microsoft/vcpkg.git C:/vcpkg
           }
           & C:/vcpkg/bootstrap-vcpkg.bat -disableMetrics
-          & C:/vcpkg/vcpkg.exe install libtorrent:x64-windows
+          # Manifest 模式：依赖见仓库根目录 vcpkg.json，不得再传包名参数
+          & C:/vcpkg/vcpkg.exe install --triplet x64-windows
 
       - name: 配置（Windows，含测试）
         shell: pwsh
