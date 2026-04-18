@@ -24,12 +24,14 @@
 #include <libtorrent/error_code.hpp>
 #include <libtorrent/magnet_uri.hpp>
 
+#include <algorithm>
 #include <future>
 #include <thread>
 
 #include "base/input_sanitizer.h"
 #include "base/io.h"
 #include "base/paths.h"
+#include "core/builtin_http_tracker.h"
 #include "core/config_service.h"
 #include "core/logger.h"
 #include "core/rss/rss_fetcher.h"
@@ -49,6 +51,7 @@ AppController::AppController(QApplication* app, pfd::ui::MainWindow* window,
 
 AppController::~AppController() {
   shuttingDown_.store(true);
+  builtinHttpTracker_.reset();
   std::vector<std::future<void>> tasks;
   {
     std::lock_guard<std::mutex> lk(magnetTasksMu_);
@@ -273,9 +276,23 @@ void AppController::applyRuntimeSettingsFromConfig(const pfd::core::AppSettings*
       s.slow_torrent_ul_rate_threshold, s.slow_torrent_inactive_timer, s.enable_dht, s.enable_upnp,
       s.enable_natpmp, s.enable_lsd, s.proxy_enabled, s.proxy_type, s.proxy_host, s.proxy_port,
       s.proxy_username, s.proxy_password, s.encryption_mode, s.ip_filter_enabled, s.ip_filter_path,
-      s.monitor_port, s.builtin_tracker_enabled, s.builtin_tracker_port,
-      s.builtin_tracker_port_forwarding);
+      s.monitor_port);
   worker_->setDefaultPerTorrentConnectionsLimit(perTorrentConnectionsLimit_);
+  applyBuiltinHttpTrackerFromSettings(s);
+}
+
+void AppController::applyBuiltinHttpTrackerFromSettings(const pfd::core::AppSettings& s) {
+  if (!builtinHttpTracker_) {
+    builtinHttpTracker_ =
+        std::make_unique<pfd::core::BuiltinHttpTracker>(static_cast<QObject*>(app_));
+  }
+  const quint16 port = static_cast<quint16>(std::clamp(s.builtin_tracker_port, 0, 65535));
+  builtinHttpTracker_->apply(s.builtin_tracker_enabled, port);
+  if (s.builtin_tracker_enabled && s.builtin_tracker_port_forwarding) {
+    logInfo(QStringLiteral(
+        "builtin tracker: port forwarding from preferences is not applied in P0 (listen "
+        "127.0.0.1 only)."));
+  }
 }
 
 void AppController::submitArgvMagnet(const QString& magnet) {

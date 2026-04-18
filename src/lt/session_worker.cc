@@ -599,8 +599,7 @@ void SessionWorker::applyRuntimeSettings(
     bool enable_lsd, bool proxy_enabled, const QString& proxy_type, const QString& proxy_host,
     int proxy_port, const QString& proxy_username, const QString& proxy_password,
     const QString& encryption_mode, bool ip_filter_enabled, const QString& ip_filter_path,
-    int monitor_port, bool builtin_tracker_enabled, int builtin_tracker_port,
-    bool builtin_tracker_port_forwarding) {
+    int monitor_port) {
   Impl::ApplyRuntimeSettingsCmd cmd;
   cmd.download_rate_limit_kib = download_rate_limit_kib;
   cmd.upload_rate_limit_kib = upload_rate_limit_kib;
@@ -632,9 +631,6 @@ void SessionWorker::applyRuntimeSettings(
   cmd.ip_filter_enabled = ip_filter_enabled;
   cmd.ip_filter_path = ip_filter_path;
   cmd.monitor_port = monitor_port;
-  cmd.builtin_tracker_enabled = builtin_tracker_enabled;
-  cmd.builtin_tracker_port = builtin_tracker_port;
-  cmd.builtin_tracker_port_forwarding = builtin_tracker_port_forwarding;
   {
     std::lock_guard<std::mutex> lk(impl_->mu);
     impl_->defaultPerTorrentUploadSlotsLimit = std::clamp(per_torrent_upload_slots_limit, 0, 20000);

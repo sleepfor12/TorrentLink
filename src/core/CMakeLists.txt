@@ -1,4 +1,8 @@
 add_library(torrentlink_core STATIC
+  bencode_minimal.h
+  bencode_minimal.cc
+  builtin_http_tracker.h
+  builtin_http_tracker.cc
   app_settings.h
   app_settings.cc
   config_service.h

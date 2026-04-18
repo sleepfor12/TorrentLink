@@ -14,6 +14,11 @@
 #include <vector>
 
 #include "core/app_settings.h"
+
+namespace pfd::core {
+class BuiltinHttpTracker;
+}
+
 #include "core/rss/rss_service.h"
 #include "core/save_path_policy.h"
 #include "core/task_pipeline_service.h"
@@ -60,6 +65,7 @@ private:
                            const QString& savePath, const QString& category,
                            const QString& tagsCsv);
   void applyRuntimeSettingsFromConfig(const pfd::core::AppSettings* app_settings = nullptr);
+  void applyBuiltinHttpTrackerFromSettings(const pfd::core::AppSettings& s);
   void loadPersistedTasks();
   void savePersistedTasks() const;
   void saveResumeData() const;
@@ -134,6 +140,7 @@ private:
   pfd::core::AppSettings cachedAppSettings_{};
   std::unordered_map<QString, QString> knownTaskMagnets_;
 
+  std::unique_ptr<pfd::core::BuiltinHttpTracker> builtinHttpTracker_;
   std::unique_ptr<pfd::core::rss::RssService> rssService_;
   QTimer* rssTimer_{nullptr};
   QTimer* timedActionTimer_{nullptr};

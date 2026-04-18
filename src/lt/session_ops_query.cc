@@ -128,8 +128,7 @@ bool handleOne(libtorrent::session&, Context& ctx, const session_cmds::QueryTask
     auto ti = h.torrent_file();
     if (ti) {
       const auto status = h.status();
-      const bool sequential =
-          bool(status.flags & libtorrent::torrent_flags::sequential_download);
+      const bool sequential = bool(status.flags & libtorrent::torrent_flags::sequential_download);
       const double fileAvailability = status.distributed_copies;
       const auto fileProgress = h.file_progress();
       const auto priorities = h.get_file_priorities();

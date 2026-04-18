@@ -179,9 +179,7 @@ public:
                             const QString& proxy_type, const QString& proxy_host, int proxy_port,
                             const QString& proxy_username, const QString& proxy_password,
                             const QString& encryption_mode, bool ip_filter_enabled,
-                            const QString& ip_filter_path, int monitor_port,
-                            bool builtin_tracker_enabled, int builtin_tracker_port,
-                            bool builtin_tracker_port_forwarding);
+                            const QString& ip_filter_path, int monitor_port);
 
   // 默认对新加入的 torrent 生效；并会尽量应用到已存在的 torrents。
   void setDefaultPerTorrentConnectionsLimit(int per_torrent_connections_limit);

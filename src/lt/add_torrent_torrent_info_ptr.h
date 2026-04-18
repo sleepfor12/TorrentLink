@@ -12,8 +12,8 @@ namespace pfd::lt {
 // Matches libtorrent::add_torrent_params::ti (may be libtorrent::torrent_info or v2::torrent_info).
 using AddTorrentTorrentInfoPtr = decltype(std::declval<libtorrent::add_torrent_params>().ti);
 
-using AddTorrentTorrentInfoConstPtr = std::shared_ptr<
-    const std::remove_const_t<typename AddTorrentTorrentInfoPtr::element_type>>;
+using AddTorrentTorrentInfoConstPtr =
+    std::shared_ptr<const std::remove_const_t<typename AddTorrentTorrentInfoPtr::element_type>>;
 
 template <class... Args>
 inline AddTorrentTorrentInfoPtr make_add_torrent_torrent_info(Args&&... args) {

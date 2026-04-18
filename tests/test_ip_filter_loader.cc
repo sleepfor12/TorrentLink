@@ -1,11 +1,10 @@
-#include <gtest/gtest.h>
-
 #include <QtCore/QTemporaryFile>
 
 #include <libtorrent/address.hpp>
 #include <libtorrent/ip_filter.hpp>
 
 #include <boost/system/error_code.hpp>
+#include <gtest/gtest.h>
 
 #include "lt/ip_filter_loader.h"
 
@@ -60,8 +59,7 @@ TEST(IpFilterLoader, CidrV6) {
 
 TEST(IpFilterLoader, RangeV6) {
   libtorrent::ip_filter f;
-  ASSERT_TRUE(
-      pfd::lt::appendIpFilterLine(QStringLiteral("2001:db8::1 - 2001:db8::3"), &f));
+  ASSERT_TRUE(pfd::lt::appendIpFilterLine(QStringLiteral("2001:db8::1 - 2001:db8::3"), &f));
   EXPECT_EQ(f.access(makeAddr("2001:db8::2")), libtorrent::ip_filter::blocked);
   EXPECT_EQ(f.access(makeAddr("2001:db8::4")), 0u);
 }
@@ -94,8 +92,7 @@ TEST(IpFilterLoader, RangeV4ReversedEndpoints) {
 
 TEST(IpFilterLoader, RangeV6ReversedEndpoints) {
   libtorrent::ip_filter f;
-  ASSERT_TRUE(
-      pfd::lt::appendIpFilterLine(QStringLiteral("2001:db8::3 - 2001:db8::1"), &f));
+  ASSERT_TRUE(pfd::lt::appendIpFilterLine(QStringLiteral("2001:db8::3 - 2001:db8::1"), &f));
   EXPECT_EQ(f.access(makeAddr("2001:db8::2")), libtorrent::ip_filter::blocked);
 }
 
@@ -128,21 +125,19 @@ TEST(IpFilterLoader, LoadIpFilterFile_NullOut) {
 TEST(IpFilterLoader, LoadIpFilterFile_MissingFile) {
   libtorrent::ip_filter f;
   QString err;
-  EXPECT_FALSE(
-      pfd::lt::loadIpFilterFile(QStringLiteral("/nonexistent/path/ip_filter_rules.txt"), &f,
-                                nullptr, &err));
+  EXPECT_FALSE(pfd::lt::loadIpFilterFile(QStringLiteral("/nonexistent/path/ip_filter_rules.txt"),
+                                         &f, nullptr, &err));
   EXPECT_EQ(err, QStringLiteral("cannot open file"));
 }
 
 TEST(IpFilterLoader, LoadIpFilterFile_CountsSuccessfulLines) {
   QTemporaryFile tmp;
   ASSERT_TRUE(tmp.open());
-  tmp.write(
-      "# header\n"
-      "\n"
-      "192.0.2.5\n"
-      "oops-not-ip\n"
-      "192.0.2.6\n");
+  tmp.write("# header\n"
+            "\n"
+            "192.0.2.5\n"
+            "oops-not-ip\n"
+            "192.0.2.6\n");
   tmp.flush();
   tmp.close();
 
@@ -159,9 +154,8 @@ TEST(IpFilterLoader, LoadIpFilterFile_CountsSuccessfulLines) {
 TEST(IpFilterLoader, LoadIpFilterFile_MultilineIpv6AndV4) {
   QTemporaryFile tmp;
   ASSERT_TRUE(tmp.open());
-  tmp.write(
-      "2001:db8::/64\n"
-      "192.0.2.1\n");
+  tmp.write("2001:db8::/64\n"
+            "192.0.2.1\n");
   tmp.flush();
   tmp.close();
 

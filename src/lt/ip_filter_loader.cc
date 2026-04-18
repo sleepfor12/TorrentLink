@@ -20,7 +20,8 @@ libtorrent::address addressFromRaw6(const std::array<unsigned char, 16>& raw) {
 }
 
 void ipv6ApplyPrefixRange(const std::array<unsigned char, 16>& ip, int prefix,
-                          std::array<unsigned char, 16>* first, std::array<unsigned char, 16>* last) {
+                          std::array<unsigned char, 16>* first,
+                          std::array<unsigned char, 16>* last) {
   *first = ip;
   *last = ip;
   if (prefix <= 0) {

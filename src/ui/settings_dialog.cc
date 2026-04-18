@@ -720,8 +720,8 @@ void SettingsDialog::buildLayout() {
   monitorPortSpin_->setRange(0, 65535);
   monitorPortSpin_->setSpecialValueText(QStringLiteral("禁用"));
   monitorPortSpin_->setValue(0);
-  monitorPortSpin_->setToolTip(
-      QStringLiteral("非 0 时在主监听端口之外额外绑定一组 IPv4/IPv6 监听套接字（用于分离观察或兼容旧配置）。"));
+  monitorPortSpin_->setToolTip(QStringLiteral(
+      "非 0 时在主监听端口之外额外绑定一组 IPv4/IPv6 监听套接字（用于分离观察或兼容旧配置）。"));
   discoverForm->addRow(QStringLiteral("监控端口"), monitorPortSpin_);
   builtinTrackerEnabledCheck_ = new QCheckBox(QStringLiteral("启用内置 Tracker"), discoverGroup);
   builtinTrackerEnabledCheck_->setToolTip(
@@ -756,8 +756,8 @@ void SettingsDialog::buildLayout() {
   ipFilterEnabledCheck_ = new QCheckBox(QStringLiteral("启用 IP 过滤"), netAdvancedGroup);
   netAdvancedForm->addRow(QStringLiteral("IP 过滤"), ipFilterEnabledCheck_);
   ipFilterPathEdit_ = new QLineEdit(netAdvancedGroup);
-  ipFilterPathEdit_->setPlaceholderText(QStringLiteral(
-      "IPv4/IPv6 文本规则：单行 IP、CIDR、或 起始 - 结束（# 注释）"));
+  ipFilterPathEdit_->setPlaceholderText(
+      QStringLiteral("IPv4/IPv6 文本规则：单行 IP、CIDR、或 起始 - 结束（# 注释）"));
   netAdvancedForm->addRow(QStringLiteral("规则文件"), ipFilterPathEdit_);
   proxyEnabledCheck_ = new QCheckBox(QStringLiteral("启用代理"), netAdvancedGroup);
   netAdvancedForm->addRow(QStringLiteral("代理"), proxyEnabledCheck_);

@@ -38,6 +38,7 @@ add_executable(torrentlink_tests
   test_rss_opml.cc
   test_save_path_policy.cc
   test_task_add_builder.cc
+  test_builtin_http_tracker.cc
 )
 
 target_link_libraries(torrentlink_tests

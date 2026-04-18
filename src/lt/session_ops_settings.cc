@@ -1,10 +1,10 @@
+#include <QtCore/QStringList>
+
 #include <libtorrent/session.hpp>
 #include <libtorrent/settings_pack.hpp>
 
 #include <algorithm>
 #include <vector>
-
-#include <QtCore/QStringList>
 
 #include "core/logger.h"
 #include "lt/ip_filter_loader.h"
@@ -164,20 +164,14 @@ bool handleOne(libtorrent::session& ses, Context& ctx,
                      .arg(rules));
       } else {
         ses.set_ip_filter(libtorrent::ip_filter{});
-        LOG_WARN(QStringLiteral("[prefs-runtime] ip_filter load failed path=%1 (%2); filter cleared")
-                     .arg(path)
-                     .arg(err));
+        LOG_WARN(
+            QStringLiteral("[prefs-runtime] ip_filter load failed path=%1 (%2); filter cleared")
+                .arg(path)
+                .arg(err));
       }
     }
   } else {
     ses.set_ip_filter(libtorrent::ip_filter{});
-  }
-
-  if (c.builtin_tracker_enabled) {
-    LOG_INFO(QStringLiteral("[prefs-runtime] builtin_tracker is not implemented (no embedded HTTP "
-                            "tracker); ignoring port=%1 forwarding=%2")
-                 .arg(c.builtin_tracker_port)
-                 .arg(c.builtin_tracker_port_forwarding ? 1 : 0));
   }
 
   if (c.per_torrent_upload_slots_limit >= 0) {
