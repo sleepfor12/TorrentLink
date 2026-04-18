@@ -1,13 +1,14 @@
 #ifndef PFD_CORE_BUILTIN_HTTP_TRACKER_H
 #define PFD_CORE_BUILTIN_HTTP_TRACKER_H
 
-#include <memory>
-
 #include <QtCore/QObject>
+
+#include <memory>
 
 namespace pfd::core {
 
-/// 进程内嵌入式 HTTP Tracker（BEP 3 announce，compact IPv4）；监听 127.0.0.1，与 libtorrent 会话无关。
+/// 进程内嵌入式 HTTP Tracker（BEP 3 announce，compact IPv4）；监听 127.0.0.1，与 libtorrent
+/// 会话无关。
 class BuiltinHttpTracker final : public QObject {
   Q_OBJECT
 

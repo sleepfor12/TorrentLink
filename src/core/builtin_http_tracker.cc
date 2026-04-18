@@ -1,8 +1,5 @@
 #include "core/builtin_http_tracker.h"
 
-#include "core/bencode_minimal.h"
-#include "core/logger.h"
-
 #include <QtCore/QDateTime>
 #include <QtCore/QMetaObject>
 #include <QtCore/QPointer>
@@ -18,6 +15,9 @@
 
 #include <algorithm>
 #include <vector>
+
+#include "core/bencode_minimal.h"
+#include "core/logger.h"
 
 namespace pfd::core {
 namespace detail {
@@ -111,9 +111,9 @@ public:
       return;
     }
     auto& vec = it.value();
-    vec.erase(std::remove_if(vec.begin(), vec.end(),
-                             [&](const Peer& p) { return p.peer_id == peer_id; }),
-              vec.end());
+    vec.erase(
+        std::remove_if(vec.begin(), vec.end(), [&](const Peer& p) { return p.peer_id == peer_id; }),
+        vec.end());
     if (vec.isEmpty()) {
       by_ih_.erase(it);
     }
@@ -122,9 +122,10 @@ public:
   void prune(qint64 now_ms) {
     for (auto it = by_ih_.begin(); it != by_ih_.end();) {
       auto& vec = it.value();
-      vec.erase(std::remove_if(vec.begin(), vec.end(),
-                               [&](const Peer& p) { return (now_ms - p.last_seen_ms) > kPeerTtlMs; }),
-                vec.end());
+      vec.erase(
+          std::remove_if(vec.begin(), vec.end(),
+                         [&](const Peer& p) { return (now_ms - p.last_seen_ms) > kPeerTtlMs; }),
+          vec.end());
       if (vec.isEmpty()) {
         it = by_ih_.erase(it);
       } else {
@@ -161,8 +162,8 @@ public:
     return n;
   }
 
-  [[nodiscard]] QByteArray buildCompactPeers(const QByteArray& ih, const QByteArray& exclude_peer_id,
-                                             int numwant) const {
+  [[nodiscard]] QByteArray buildCompactPeers(const QByteArray& ih,
+                                             const QByteArray& exclude_peer_id, int numwant) const {
     const auto it = by_ih_.find(ih);
     if (it == by_ih_.end()) {
       return {};
@@ -203,9 +204,8 @@ public:
     connect(&server_, &QTcpServer::newConnection, this, &TrackerWorker::onNewConnection);
     cleanup_ = new QTimer(this);
     cleanup_->setInterval(60 * 1000);
-    QObject::connect(cleanup_, &QTimer::timeout, this, [this]() {
-      table_.prune(QDateTime::currentMSecsSinceEpoch());
-    });
+    QObject::connect(cleanup_, &QTimer::timeout, this,
+                     [this]() { table_.prune(QDateTime::currentMSecsSinceEpoch()); });
     cleanup_->start();
   }
 

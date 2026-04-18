@@ -1,9 +1,9 @@
-#include <gtest/gtest.h>
-
 #include <QtCore/QByteArray>
 #include <QtCore/QString>
 #include <QtNetwork/QHostAddress>
 #include <QtNetwork/QTcpSocket>
+
+#include <gtest/gtest.h>
 
 #include "core/bencode_minimal.h"
 #include "core/builtin_http_tracker.h"
@@ -108,8 +108,8 @@ namespace {
 
 TEST(BuiltinHttpTrackerBencode, AnnounceOkEmptyPeers) {
   const QByteArray got = pfd::core::bencode::encodeAnnounceOk(1800, 900, 0, 0, {});
-  const QByteArray expected =
-      QByteArrayLiteral("d8:intervali1800e12:min intervali900e8:completei0e10:incompletei0e5:peers0:e");
+  const QByteArray expected = QByteArrayLiteral(
+      "d8:intervali1800e12:min intervali900e8:completei0e10:incompletei0e5:peers0:e");
   EXPECT_EQ(got, expected);
 }
 
@@ -183,8 +183,7 @@ TEST(BuiltinHttpTracker, SmokeAnnounceLocalhostTwoPeers) {
     ASSERT_FALSE(body.isEmpty());
     // First peer (A) at 127.0.0.1:40000 in compact form (B should see A, not self).
     const QByteArray compact_a = QByteArray::fromHex("7f0000019c40");
-    EXPECT_TRUE(body.contains(compact_a))
-        << QString::fromLatin1(body.toHex()).toStdString();
+    EXPECT_TRUE(body.contains(compact_a)) << QString::fromLatin1(body.toHex()).toStdString();
   }
 
   tr.apply(false, 0);
