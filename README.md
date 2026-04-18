@@ -62,7 +62,7 @@ ctest --test-dir build --output-on-failure
 - Current goal: keep compilation and tests green, then gradually align runtime behavior with Linux.
 - Recommended local build setup: CMake + vcpkg (`CMAKE_TOOLCHAIN_FILE` points to the vcpkg toolchain); pass `-DCMAKE_PREFIX_PATH` to your Qt kit if `find_package(Qt6)` fails.
 - Runtime progress (in progress): first batch of advanced network options is connected (listening port, port forwarding toggle, upload slots, proxy parameters).
-- Optional embedded HTTP Tracker: design notes in [docs/HTTP_TRACKER_PLAN.md](docs/HTTP_TRACKER_PLAN.md) (not implemented yet).
+- Optional embedded HTTP Tracker (experimental, P0): process-local `GET /announce` on `127.0.0.1` (see [docs/HTTP_TRACKER_PLAN.md](docs/HTTP_TRACKER_PLAN.md)); managed from app settings and `AppController`, not from the libtorrent session worker.
 
 ## V2 Backlog (Not Implemented Yet)
 
