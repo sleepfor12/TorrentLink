@@ -58,10 +58,11 @@ ctest --test-dir build --output-on-failure
 
 ## Windows Adaptation Status
 
-- Included in CI: `windows-latest` (Qt + vcpkg libtorrent).
-- Current goal: ensure stable compilation first, then gradually align runtime behavior with Linux.
-- Recommended local build setup: CMake + vcpkg (`CMAKE_TOOLCHAIN_FILE` points to the vcpkg toolchain).
+- Included in CI: `windows-latest` (Qt + vcpkg libtorrent); **Release 构建后运行 `ctest`**（与 Linux 一样拉取 GoogleTest）。
+- Current goal: keep compilation and tests green, then gradually align runtime behavior with Linux.
+- Recommended local build setup: CMake + vcpkg (`CMAKE_TOOLCHAIN_FILE` points to the vcpkg toolchain); pass `-DCMAKE_PREFIX_PATH` to your Qt kit if `find_package(Qt6)` fails.
 - Runtime progress (in progress): first batch of advanced network options is connected (listening port, port forwarding toggle, upload slots, proxy parameters).
+- Optional embedded HTTP Tracker: design notes in [docs/HTTP_TRACKER_PLAN.md](docs/HTTP_TRACKER_PLAN.md) (not implemented yet).
 
 ## V2 Backlog (Not Implemented Yet)
 
@@ -75,6 +76,7 @@ ctest --test-dir build --output-on-failure
 ## Author Information
 
 Author: sleepfor12
+
 Email: [zbysleepallday@outloo.com](mailto:zbysleepallday@outloo.com) / [zbymeiqian414@163.com](mailto:zbymeiqian414@163.com)
 
 ## Acknowledgements
