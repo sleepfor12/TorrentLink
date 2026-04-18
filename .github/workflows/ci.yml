@@ -51,7 +51,7 @@ jobs:
         run: bash scripts/build.sh
 
   build-windows:
-    name: Windows 构建
+    name: Windows 构建与测试
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -83,14 +83,28 @@ jobs:
           & C:/vcpkg/bootstrap-vcpkg.bat -disableMetrics
           & C:/vcpkg/vcpkg.exe install libtorrent:x64-windows
 
-      - name: 配置（Windows）
+      - name: 配置（Windows，含测试）
         shell: pwsh
-        run: >
-          cmake -S . -B build-win
-          -DCMAKE_BUILD_TYPE=Release
-          -DBUILD_TESTING=OFF
-          -DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake
-          -DVCPKG_TARGET_TRIPLET=x64-windows
+        run: |
+          $qtRoot = $null
+          if ($env:QT_ROOT_DIR -and (Test-Path -LiteralPath $env:QT_ROOT_DIR)) {
+            $qtRoot = $env:QT_ROOT_DIR
+          } elseif ($env:Qt6_DIR -and (Test-Path -LiteralPath $env:Qt6_DIR)) {
+            $qtRoot = (Get-Item -LiteralPath $env:Qt6_DIR).Parent.Parent.Parent.FullName
+          }
+          if (-not $qtRoot) {
+            Write-Error "Set QT_ROOT_DIR or Qt6_DIR for CMAKE_PREFIX_PATH (install-qt-action usually sets one)."
+            exit 1
+          }
+          cmake -S . -B build-win `
+            -DCMAKE_BUILD_TYPE=Release `
+            -DBUILD_TESTING=ON `
+            -DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake `
+            -DVCPKG_TARGET_TRIPLET=x64-windows `
+            -DCMAKE_PREFIX_PATH="$qtRoot"
 
       - name: 构建（Windows）
         run: cmake --build build-win --config Release --parallel
+
+      - name: 测试（Windows）
+        run: ctest --test-dir build-win --output-on-failure -C Release
