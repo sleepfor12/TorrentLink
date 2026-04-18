@@ -13,7 +13,7 @@ if ! command -v git >/dev/null 2>&1; then
   exit 1
 fi
 
-mapfile -d '' files < <(git ls-files -z '*.h' '*.hpp' '*.hh' '*.c' '*.cc' '*.cpp' '*.cxx')
+mapfile -d '' files < <(git ls-files -z '*.h' '*.hpp' '*.c' '*.cc')
 if [[ "${#files[@]}" -eq 0 ]]; then
   echo "No C/C++ source files found."
   exit 0

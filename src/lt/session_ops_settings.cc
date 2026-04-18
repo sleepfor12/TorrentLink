@@ -2,12 +2,43 @@
 #include <libtorrent/settings_pack.hpp>
 
 #include <algorithm>
+#include <vector>
+
+#include <QtCore/QStringList>
 
 #include "core/logger.h"
+#include "lt/ip_filter_loader.h"
 #include "lt/session_ids.h"
 #include "lt/session_ops.h"
 
 namespace pfd::lt::session_ops {
+namespace {
+
+QString buildListenInterfacesString(int listen_port, int monitor_port) {
+  std::vector<int> ports;
+  auto pushUnique = [&ports](int p) {
+    if (p < 0 || p > 65535) {
+      return;
+    }
+    if (std::find(ports.begin(), ports.end(), p) == ports.end()) {
+      ports.push_back(p);
+    }
+  };
+  pushUnique(listen_port);
+  if (monitor_port > 0) {
+    pushUnique(monitor_port);
+  }
+  if (ports.empty()) {
+    pushUnique(0);
+  }
+  QStringList parts;
+  for (int p : ports) {
+    parts.push_back(QStringLiteral("0.0.0.0:%1,[::]:%1").arg(p));
+  }
+  return parts.join(QLatin1Char(','));
+}
+
+}  // namespace
 
 bool handleOne(libtorrent::session& ses, Context& ctx,
                const session_cmds::ApplyRuntimeSettingsCmd& c) {
@@ -32,9 +63,10 @@ bool handleOne(libtorrent::session& ses, Context& ctx,
   } else if (c.upload_slots_limit == 0) {
     pack.set_int(libtorrent::settings_pack::unchoke_slots_limit, -1);
   }
-  pack.set_str(
-      libtorrent::settings_pack::listen_interfaces,
-      QStringLiteral("0.0.0.0:%1,[::]:%1").arg(std::clamp(c.listen_port, 0, 65535)).toStdString());
+  pack.set_str(libtorrent::settings_pack::listen_interfaces,
+               buildListenInterfacesString(std::clamp(c.listen_port, 0, 65535),
+                                           std::clamp(c.monitor_port, 0, 65535))
+                   .toStdString());
 
   if (c.active_downloads > 0) {
     pack.set_int(libtorrent::settings_pack::active_downloads, c.active_downloads);
@@ -114,6 +146,40 @@ bool handleOne(libtorrent::session& ses, Context& ctx,
   }
 
   ses.apply_settings(pack);
+
+  if (c.ip_filter_enabled) {
+    const QString path = c.ip_filter_path.trimmed();
+    if (path.isEmpty()) {
+      ses.set_ip_filter(libtorrent::ip_filter{});
+      LOG_WARN(QStringLiteral(
+          "[prefs-runtime] ip_filter enabled but path empty; cleared session ip_filter"));
+    } else {
+      libtorrent::ip_filter ipf;
+      QString err;
+      int rules = 0;
+      if (loadIpFilterFile(path, &ipf, &rules, &err)) {
+        ses.set_ip_filter(ipf);
+        LOG_INFO(QStringLiteral("[prefs-runtime] ip_filter loaded path=%1 rules=%2")
+                     .arg(path)
+                     .arg(rules));
+      } else {
+        ses.set_ip_filter(libtorrent::ip_filter{});
+        LOG_WARN(QStringLiteral("[prefs-runtime] ip_filter load failed path=%1 (%2); filter cleared")
+                     .arg(path)
+                     .arg(err));
+      }
+    }
+  } else {
+    ses.set_ip_filter(libtorrent::ip_filter{});
+  }
+
+  if (c.builtin_tracker_enabled) {
+    LOG_INFO(QStringLiteral("[prefs-runtime] builtin_tracker is not implemented (no embedded HTTP "
+                            "tracker); ignoring port=%1 forwarding=%2")
+                 .arg(c.builtin_tracker_port)
+                 .arg(c.builtin_tracker_port_forwarding ? 1 : 0));
+  }
+
   if (c.per_torrent_upload_slots_limit >= 0) {
     // Apply per-torrent upload slots for existing handles best-effort.
     for (auto& [_, h] : ctx.handlesByTaskId) {
@@ -123,9 +189,9 @@ bool handleOne(libtorrent::session& ses, Context& ctx,
     }
   }
   LOG_INFO(QStringLiteral(
-               "[lt.worker] Runtime settings applied dl=%1KiB/s ul=%2KiB/s conn=%3 active_dl=%4 "
-               "active_seed=%5 active=%6 up_slots=%7 pt_up_slots=%8 listen=%9 dht=%10 upnp=%11 "
-               "natpmp=%12 lsd=%13 proxy=%14 enc=%15")
+               "[prefs-runtime] applied dl=%1KiB/s ul=%2KiB/s conn=%3 active_dl=%4 active_seed=%5 "
+               "active=%6 up_slots=%7 pt_up_slots=%8 listen=%9 monitor=%10 ipf=%11 dht=%12 "
+               "upnp=%13 natpmp=%14 lsd=%15 proxy=%16 enc=%17")
                .arg(c.download_rate_limit_kib)
                .arg(c.upload_rate_limit_kib)
                .arg(c.connections_limit)
@@ -135,6 +201,8 @@ bool handleOne(libtorrent::session& ses, Context& ctx,
                .arg(c.upload_slots_limit)
                .arg(c.per_torrent_upload_slots_limit)
                .arg(c.listen_port)
+               .arg(c.monitor_port)
+               .arg(c.ip_filter_enabled ? QStringLiteral("on") : QStringLiteral("off"))
                .arg(c.enable_dht ? QStringLiteral("on") : QStringLiteral("off"))
                .arg(c.enable_upnp ? QStringLiteral("on") : QStringLiteral("off"))
                .arg(c.enable_natpmp ? QStringLiteral("on") : QStringLiteral("off"))

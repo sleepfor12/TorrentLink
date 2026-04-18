@@ -20,6 +20,7 @@ add_executable(torrentlink_tests
   test_lt_task_event_mapper.cc
   test_lt_task_event_dispatcher.cc
   test_lt_task_alert_adapter.cc
+  test_ip_filter_loader.cc
   test_session_worker.cc
   test_ring_buffer.cc
   test_log_store.cc

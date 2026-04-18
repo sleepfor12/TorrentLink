@@ -272,7 +272,9 @@ void AppController::applyRuntimeSettingsFromConfig(const pfd::core::AppSettings*
       s.dont_count_slow_torrents, s.slow_torrent_dl_rate_threshold,
       s.slow_torrent_ul_rate_threshold, s.slow_torrent_inactive_timer, s.enable_dht, s.enable_upnp,
       s.enable_natpmp, s.enable_lsd, s.proxy_enabled, s.proxy_type, s.proxy_host, s.proxy_port,
-      s.proxy_username, s.proxy_password, s.encryption_mode);
+      s.proxy_username, s.proxy_password, s.encryption_mode, s.ip_filter_enabled, s.ip_filter_path,
+      s.monitor_port, s.builtin_tracker_enabled, s.builtin_tracker_port,
+      s.builtin_tracker_port_forwarding);
   worker_->setDefaultPerTorrentConnectionsLimit(perTorrentConnectionsLimit_);
 }
 

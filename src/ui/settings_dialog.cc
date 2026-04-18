@@ -720,8 +720,12 @@ void SettingsDialog::buildLayout() {
   monitorPortSpin_->setRange(0, 65535);
   monitorPortSpin_->setSpecialValueText(QStringLiteral("禁用"));
   monitorPortSpin_->setValue(0);
+  monitorPortSpin_->setToolTip(
+      QStringLiteral("非 0 时在主监听端口之外额外绑定一组 IPv4/IPv6 监听套接字（用于分离观察或兼容旧配置）。"));
   discoverForm->addRow(QStringLiteral("监控端口"), monitorPortSpin_);
   builtinTrackerEnabledCheck_ = new QCheckBox(QStringLiteral("启用内置 Tracker"), discoverGroup);
+  builtinTrackerEnabledCheck_->setToolTip(
+      QStringLiteral("当前版本尚未实现嵌入式 HTTP Tracker；保存后会在日志中提示，不影响下载。"));
   builtinTrackerPortSpin_ = new QSpinBox(discoverGroup);
   builtinTrackerPortSpin_->setRange(0, 65535);
   builtinTrackerPortSpin_->setSpecialValueText(QStringLiteral("自动"));
@@ -743,7 +747,8 @@ void SettingsDialog::buildLayout() {
   encryptionModeBox_->addItem(QStringLiteral("强制（只允许加密连接）"), QStringLiteral("forced"));
   encryptionModeBox_->addItem(QStringLiteral("禁用（只允许明文连接）"), QStringLiteral("disabled"));
   encForm->addRow(QStringLiteral("策略"), encryptionModeBox_);
-  auto* netAdvancedGroup = new QGroupBox(QStringLiteral("代理与 IP 过滤（重启后生效）"), netTab);
+  auto* netAdvancedGroup =
+      new QGroupBox(QStringLiteral("代理与 IP 过滤（保存后对会话即时应用）"), netTab);
   auto* netAdvancedForm = new QFormLayout(netAdvancedGroup);
   netAdvancedForm->setFieldGrowthPolicy(QFormLayout::ExpandingFieldsGrow);
   netAdvancedForm->setFormAlignment(Qt::AlignTop);
@@ -751,7 +756,8 @@ void SettingsDialog::buildLayout() {
   ipFilterEnabledCheck_ = new QCheckBox(QStringLiteral("启用 IP 过滤"), netAdvancedGroup);
   netAdvancedForm->addRow(QStringLiteral("IP 过滤"), ipFilterEnabledCheck_);
   ipFilterPathEdit_ = new QLineEdit(netAdvancedGroup);
-  ipFilterPathEdit_->setPlaceholderText(QStringLiteral("过滤规则文件路径（CIDR/规则列表）"));
+  ipFilterPathEdit_->setPlaceholderText(QStringLiteral(
+      "IPv4/IPv6 文本规则：单行 IP、CIDR、或 起始 - 结束（# 注释）"));
   netAdvancedForm->addRow(QStringLiteral("规则文件"), ipFilterPathEdit_);
   proxyEnabledCheck_ = new QCheckBox(QStringLiteral("启用代理"), netAdvancedGroup);
   netAdvancedForm->addRow(QStringLiteral("代理"), proxyEnabledCheck_);

@@ -16,6 +16,8 @@ add_library(torrentlink_lt STATIC
   session_ops_control.cc
   session_ops_settings.cc
   session_ops_query.cc
+  ip_filter_loader.h
+  ip_filter_loader.cc
   session_worker.h
   session_worker.cc
 )
@@ -28,6 +30,7 @@ target_include_directories(torrentlink_lt
 target_link_libraries(torrentlink_lt
   PUBLIC
     Qt6::Core
+    Qt6::Network
     torrentlink_base
     ${PFD_LIBTORRENT_TARGET}
 )

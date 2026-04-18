@@ -141,6 +141,13 @@ struct ApplyRuntimeSettingsCmd {
   QString proxy_username;
   QString proxy_password;
   QString encryption_mode{QStringLiteral("enabled")};
+
+  bool ip_filter_enabled{false};
+  QString ip_filter_path;
+  int monitor_port{0};
+  bool builtin_tracker_enabled{false};
+  int builtin_tracker_port{0};
+  bool builtin_tracker_port_forwarding{false};
 };
 
 struct SetDefaultPerTorrentConnectionsLimitCmd {
