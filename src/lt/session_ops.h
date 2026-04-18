@@ -10,12 +10,12 @@
 #include <memory>
 #include <optional>
 
+#include "lt/add_torrent_torrent_info_ptr.h"
 #include "lt/session_cmds.h"
 #include "lt/session_worker.h"
 
 namespace libtorrent {
-class session;
-class torrent_info;
+struct session;
 }  // namespace libtorrent
 
 namespace pfd::lt::session_ops {
@@ -25,7 +25,7 @@ struct Context {
   int& defaultPerTorrentConnectionsLimit;
   std::map<QString, int>& perTaskConnectionsLimit;
   std::map<QString, SessionWorker::AddTorrentOptions>& pendingAddOpts;
-  std::map<QString, std::shared_ptr<const libtorrent::torrent_info>>& preparedTorrentInfo;
+  std::map<QString, pfd::lt::AddTorrentTorrentInfoConstPtr>& preparedTorrentInfo;
   std::map<QString, std::shared_ptr<std::promise<std::optional<SessionWorker::MagnetMetadata>>>>&
       pendingMagnetMeta;
   int& pendingResumeDataSaves;
@@ -34,6 +34,8 @@ struct Context {
   std::shared_ptr<std::promise<int>>& resumeDataDone;
   /// 非 libtorrent alert 产生的视图（例如重复 info-hash 拒绝），由 SessionWorker 合并进回调批次。
   std::vector<LtAlertView>* syntheticAlertViews{nullptr};
+  /// 若非空，指向 worker 内待完成的会话统计查询；由 SessionWorker 在 post_session_stats 后兑现。
+  std::shared_ptr<std::promise<SessionWorker::SessionStats>>* pendingSessionStats{nullptr};
 };
 
 // Returns true if cmd is handled (and run() should continue).

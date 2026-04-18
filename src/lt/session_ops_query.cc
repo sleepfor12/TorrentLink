@@ -5,7 +5,7 @@
 #include <libtorrent/magnet_uri.hpp>
 #include <libtorrent/peer_info.hpp>
 #include <libtorrent/session.hpp>
-#include <libtorrent/session_status.hpp>
+#include <libtorrent/torrent_flags.hpp>
 #include <libtorrent/torrent_handle.hpp>
 #include <libtorrent/torrent_info.hpp>
 
@@ -21,7 +21,7 @@ namespace pfd::lt::session_ops {
 namespace {
 
 SessionWorker::FilePriorityLevel toLevel(libtorrent::download_priority_t p, bool sequential) {
-  const int v = static_cast<int>(p);
+  const int v = static_cast<int>(static_cast<std::uint8_t>(p));
   if (v <= 0) {
     return SessionWorker::FilePriorityLevel::kDoNotDownload;
   }
@@ -47,9 +47,11 @@ static SessionWorker::TrackerStatus mapTrackerStatus(const libtorrent::announce_
   bool hasError = false;
   bool worked = false;
   for (const auto& ep : ae.endpoints) {
-    updating = updating || ep.updating;
-    hasError = hasError || static_cast<bool>(ep.last_error) || ep.fails > 0;
-    worked = worked || ep.is_working();
+    for (const auto& ih : ep.info_hashes) {
+      updating = updating || ih.updating;
+      hasError = hasError || static_cast<bool>(ih.last_error) || ih.fails > 0;
+      worked = worked || (ih.fails == 0 && !ih.updating);
+    }
   }
   if (updating)
     return SessionWorker::TrackerStatus::kUpdating;
@@ -105,15 +107,16 @@ bool handleOne(libtorrent::session&, Context& ctx, const session_cmds::QueryTask
   return true;
 }
 
-bool handleOne(libtorrent::session& ses, Context&, const session_cmds::QuerySessionStatsCmd& c) {
-  SessionWorker::SessionStats out;
-  const auto ss = ses.status();
-  out.dht_nodes = ss.dht_nodes;
-  out.download_rate = static_cast<qint64>(ss.download_rate);
-  out.upload_rate = static_cast<qint64>(ss.upload_rate);
-  if (c.done != nullptr) {
-    c.done->set_value(out);
+bool handleOne(libtorrent::session&, Context& ctx, const session_cmds::QuerySessionStatsCmd& c) {
+  if (c.done == nullptr) {
+    return true;
   }
+  if (ctx.pendingSessionStats != nullptr) {
+    *ctx.pendingSessionStats = c.done;
+    return true;
+  }
+  SessionWorker::SessionStats out{};
+  c.done->set_value(out);
   return true;
 }
 
@@ -125,7 +128,8 @@ bool handleOne(libtorrent::session&, Context& ctx, const session_cmds::QueryTask
     auto ti = h.torrent_file();
     if (ti) {
       const auto status = h.status();
-      const bool sequential = status.sequential_download;
+      const bool sequential =
+          bool(status.flags & libtorrent::torrent_flags::sequential_download);
       const double fileAvailability = status.distributed_copies;
       const auto fileProgress = h.file_progress();
       const auto priorities = h.get_file_priorities();
@@ -170,9 +174,9 @@ bool handleOne(libtorrent::session&, Context& ctx, const session_cmds::QueryTask
   if (it != ctx.handlesByTaskId.end() && it->second.is_valid()) {
     auto h = it->second;
     const auto st = h.status();
-    const bool dhtEnabled = (st.flags & libtorrent::torrent_flags::disable_dht) == 0;
-    const bool pexEnabled = (st.flags & libtorrent::torrent_flags::disable_pex) == 0;
-    const bool lsdEnabled = (st.flags & libtorrent::torrent_flags::disable_lsd) == 0;
+    const bool dhtEnabled = !bool(st.flags & libtorrent::torrent_flags::disable_dht);
+    const bool pexEnabled = !bool(st.flags & libtorrent::torrent_flags::disable_pex);
+    const bool lsdEnabled = !bool(st.flags & libtorrent::torrent_flags::disable_lsd);
     auto makeFixed = [](const QString& name, bool enabled) {
       SessionWorker::TrackerRowSnapshot r;
       r.url = name;
@@ -205,19 +209,36 @@ bool handleOne(libtorrent::session&, Context& ctx, const session_cmds::QueryTask
       row.status = mapTrackerStatus(ae);
 
       for (const auto& ep : ae.endpoints) {
-        if (row.users < 0 && ep.scrape_incomplete >= 0)
-          row.users = ep.scrape_incomplete;
-        if (row.seeds < 0 && ep.scrape_complete >= 0)
-          row.seeds = ep.scrape_complete;
-        if (row.downloads < 0 && ep.scrape_downloaded >= 0)
-          row.downloads = ep.scrape_downloaded;
+        int ep_scrape_inc = -1;
+        int ep_scrape_comp = -1;
+        int ep_scrape_down = -1;
+        for (const auto& ih : ep.info_hashes) {
+          if (ep_scrape_inc < 0 && ih.scrape_incomplete >= 0) {
+            ep_scrape_inc = ih.scrape_incomplete;
+          }
+          if (ep_scrape_comp < 0 && ih.scrape_complete >= 0) {
+            ep_scrape_comp = ih.scrape_complete;
+          }
+          if (ep_scrape_down < 0 && ih.scrape_downloaded >= 0) {
+            ep_scrape_down = ih.scrape_downloaded;
+          }
+        }
+        if (row.users < 0 && ep_scrape_inc >= 0) {
+          row.users = ep_scrape_inc;
+        }
+        if (row.seeds < 0 && ep_scrape_comp >= 0) {
+          row.seeds = ep_scrape_comp;
+        }
+        if (row.downloads < 0 && ep_scrape_down >= 0) {
+          row.downloads = ep_scrape_down;
+        }
         SessionWorker::TrackerEndpointSnapshot endpoint;
         endpoint.ip = QString::fromStdString(ep.local_endpoint.address().to_string());
         endpoint.port = ep.local_endpoint.port();
         endpoint.status = mapEndpointStatus(ep);
-        endpoint.users = ep.scrape_incomplete;
-        endpoint.seeds = ep.scrape_complete;
-        endpoint.downloads = ep.scrape_downloaded;
+        endpoint.users = ep_scrape_inc;
+        endpoint.seeds = ep_scrape_comp;
+        endpoint.downloads = ep_scrape_down;
         const bool hasV1 = h.info_hashes().has_v1();
         const bool hasV2 = h.info_hashes().has_v2();
         if (hasV1 && hasV2)
@@ -228,10 +249,20 @@ bool handleOne(libtorrent::session&, Context& ctx, const session_cmds::QueryTask
           endpoint.btProtocol = QStringLiteral("v1");
         if (!endpoint.ip.isEmpty() && endpoint.port > 0)
           row.endpoints.push_back(endpoint);
-        if (row.nextAnnounceSec < 0 && ep.next_announce != (libtorrent::time_point32::min)()) {
+        bool any_next = false;
+        bool any_min = false;
+        for (const auto& ih : ep.info_hashes) {
+          if (ih.next_announce != (libtorrent::time_point32::min)()) {
+            any_next = true;
+          }
+          if (ih.min_announce != (libtorrent::time_point32::min)()) {
+            any_min = true;
+          }
+        }
+        if (row.nextAnnounceSec < 0 && any_next) {
           row.nextAnnounceSec = 0;
         }
-        if (row.minAnnounceSec < 0 && ep.min_announce != (libtorrent::time_point32::min)()) {
+        if (row.minAnnounceSec < 0 && any_min) {
           row.minAnnounceSec = 0;
         }
       }

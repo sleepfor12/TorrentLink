@@ -13,6 +13,7 @@
 
 #include "base/input_sanitizer.h"
 #include "core/logger.h"
+#include "lt/add_torrent_torrent_info_ptr.h"
 #include "lt/session_ids.h"
 #include "lt/session_ops.h"
 
@@ -133,7 +134,7 @@ bool handleOne(libtorrent::session& ses, Context& ctx,
   ctx.handlesByTaskId.erase(key);
 
   libtorrent::add_torrent_params atp;
-  atp.ti = std::make_shared<libtorrent::torrent_info>(*itTi->second);
+  atp.ti = pfd::lt::make_add_torrent_torrent_info(*itTi->second);
   atp.save_path = c.savePath.toStdString();
   const QStringList cleanTrackers = pfd::base::sanitizeTrackers(c.trackers);
   for (const auto& tracker : cleanTrackers) {
@@ -174,7 +175,7 @@ bool handleOne(libtorrent::session& ses, Context& ctx, const session_cmds::AddTo
   }
   libtorrent::error_code ec;
   libtorrent::add_torrent_params atp;
-  atp.ti = std::make_shared<libtorrent::torrent_info>(c.filePath.toStdString(), ec);
+  atp.ti = pfd::lt::make_add_torrent_torrent_info(c.filePath.toStdString(), ec);
   if (ec || !atp.ti) {
     LOG_ERROR(QString("SessionWorker load torrent file failed: %1")
                   .arg(QString::fromStdString(ec.message())));

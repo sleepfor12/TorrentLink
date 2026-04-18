@@ -1,5 +1,6 @@
 #include <libtorrent/announce_entry.hpp>
 #include <libtorrent/session.hpp>
+#include <libtorrent/torrent_flags.hpp>
 #include <libtorrent/torrent_handle.hpp>
 #include <libtorrent/torrent_info.hpp>
 
@@ -154,7 +155,11 @@ bool handleOne(libtorrent::session&, Context& ctx,
                const session_cmds::SetSequentialDownloadCmd& c) {
   const auto it = ctx.handlesByTaskId.find(session_ids::taskIdKey(c.taskId));
   if (it != ctx.handlesByTaskId.end() && it->second.is_valid()) {
-    it->second.set_sequential_download(c.enabled);
+    if (c.enabled) {
+      it->second.set_flags(libtorrent::torrent_flags::sequential_download);
+    } else {
+      it->second.unset_flags(libtorrent::torrent_flags::sequential_download);
+    }
     LOG_INFO(QStringLiteral("[lt.worker] Sequential download taskId=%1 enabled=%2")
                  .arg(c.taskId.toString())
                  .arg(c.enabled ? QStringLiteral("true") : QStringLiteral("false")));
@@ -165,7 +170,11 @@ bool handleOne(libtorrent::session&, Context& ctx,
 bool handleOne(libtorrent::session&, Context& ctx, const session_cmds::SetAutoManagedCmd& c) {
   const auto it = ctx.handlesByTaskId.find(session_ids::taskIdKey(c.taskId));
   if (it != ctx.handlesByTaskId.end() && it->second.is_valid()) {
-    it->second.auto_managed(c.enabled);
+    if (c.enabled) {
+      it->second.set_flags(libtorrent::torrent_flags::auto_managed);
+    } else {
+      it->second.unset_flags(libtorrent::torrent_flags::auto_managed);
+    }
     LOG_INFO(QStringLiteral("[lt.worker] Auto managed taskId=%1 enabled=%2")
                  .arg(c.taskId.toString())
                  .arg(c.enabled ? QStringLiteral("true") : QStringLiteral("false")));
@@ -176,7 +185,7 @@ bool handleOne(libtorrent::session&, Context& ctx, const session_cmds::SetAutoMa
 bool handleOne(libtorrent::session&, Context& ctx, const session_cmds::ForceStartCmd& c) {
   const auto it = ctx.handlesByTaskId.find(session_ids::taskIdKey(c.taskId));
   if (it != ctx.handlesByTaskId.end() && it->second.is_valid()) {
-    it->second.auto_managed(false);
+    it->second.unset_flags(libtorrent::torrent_flags::auto_managed);
     it->second.resume();
     LOG_INFO(QStringLiteral("[lt.worker] Force start taskId=%1").arg(c.taskId.toString()));
   }
@@ -292,7 +301,7 @@ bool handleOne(libtorrent::session&, Context& ctx, const session_cmds::SetTaskFi
     return true;
   }
   if (c.level == SessionWorker::FilePriorityLevel::kFileOrder) {
-    h.set_sequential_download(true);
+    h.set_flags(libtorrent::torrent_flags::sequential_download);
   }
   const auto target = toLtPriority(c.level);
   for (const int raw : c.fileIndices) {

@@ -11,7 +11,7 @@
 #include <libtorrent/download_priority.hpp>
 #include <libtorrent/magnet_uri.hpp>
 #include <libtorrent/session.hpp>
-#include <libtorrent/session_status.hpp>
+#include <libtorrent/session_stats.hpp>
 #include <libtorrent/settings_pack.hpp>
 #include <libtorrent/torrent_flags.hpp>
 #include <libtorrent/torrent_info.hpp>
@@ -29,6 +29,7 @@
 #include <variant>
 
 #include "core/logger.h"
+#include "lt/add_torrent_torrent_info_ptr.h"
 #include "lt/session_cmds.h"
 #include "lt/session_ids.h"
 #include "lt/session_ops.h"
@@ -90,13 +91,14 @@ struct SessionWorker::Impl {
   int defaultPerTorrentUploadSlotsLimit{0};
   std::map<QString, int> perTaskConnectionsLimit;
   std::map<QString, SessionWorker::AddTorrentOptions> pendingAddOpts;
-  std::map<QString, std::shared_ptr<const libtorrent::torrent_info>> preparedTorrentInfo;
+  std::map<QString, AddTorrentTorrentInfoConstPtr> preparedTorrentInfo;
   std::map<QString, std::shared_ptr<std::promise<std::optional<SessionWorker::MagnetMetadata>>>>
       pendingMagnetMeta;
   int pendingResumeDataSaves{0};
   int completedResumeDataSaves{0};
   QString resumeDataDir;
   std::shared_ptr<std::promise<int>> resumeDataDone;
+  std::shared_ptr<std::promise<SessionWorker::SessionStats>> pendingSessionStats_;
 
   void enqueue(Cmd cmd) {
     const auto describeCmd = [](const Cmd& c) -> const char* {
@@ -257,7 +259,7 @@ struct SessionWorker::Impl {
                                  preparedTorrentInfo,     pendingMagnetMeta,
                                  pendingResumeDataSaves,  completedResumeDataSaves,
                                  resumeDataDir,           resumeDataDone,
-                                 &syntheticFromCmds};
+                                 &syntheticFromCmds,      &pendingSessionStats_};
         if (session_ops::handleCmd(ses, ctx, cmd)) {
           continue;
         }
@@ -267,11 +269,36 @@ struct SessionWorker::Impl {
         }
       }
 
+      if (pendingSessionStats_) {
+        ses.post_session_stats();
+      }
+
       ses.post_torrent_updates();
       std::vector<libtorrent::alert*> alerts;
       ses.pop_alerts(&alerts);
       std::vector<LtAlertView> views = std::move(syntheticFromCmds);
       for (const libtorrent::alert* a : alerts) {
+        if (auto* stats_alert = libtorrent::alert_cast<libtorrent::session_stats_alert>(a);
+            stats_alert != nullptr && pendingSessionStats_) {
+          SessionWorker::SessionStats s{};
+          const int dht_idx = libtorrent::find_metric_idx("dht.dht_nodes");
+          const auto vals = stats_alert->counters();
+          if (dht_idx >= 0 &&
+              static_cast<std::size_t>(dht_idx) < static_cast<std::size_t>(vals.size())) {
+            s.dht_nodes = static_cast<int>(vals[static_cast<std::size_t>(dht_idx)]);
+          }
+          for (auto const& th : ses.get_torrents()) {
+            if (!th.is_valid()) {
+              continue;
+            }
+            const auto ts = th.status();
+            s.download_rate += static_cast<qint64>(ts.download_rate);
+            s.upload_rate += static_cast<qint64>(ts.upload_rate);
+          }
+          pendingSessionStats_->set_value(s);
+          pendingSessionStats_.reset();
+          continue;
+        }
         if (auto* meta = libtorrent::alert_cast<libtorrent::metadata_received_alert>(a);
             meta != nullptr) {
           const auto ih = meta->handle.info_hashes();

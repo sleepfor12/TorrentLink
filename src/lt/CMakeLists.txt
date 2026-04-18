@@ -1,4 +1,5 @@
 add_library(torrentlink_lt STATIC
+  add_torrent_torrent_info_ptr.h
   error_conversions.h
   error_conversions.cc
   task_event_mapper.h

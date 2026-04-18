@@ -30,7 +30,7 @@ QString toHexV2(const libtorrent::info_hash_t& ih) {
 
 pfd::base::TaskStatus mapTorrentState(const libtorrent::torrent_status& status) {
   using S = libtorrent::torrent_status::state_t;
-  if ((status.flags & libtorrent::torrent_flags::paused) != 0) {
+  if (bool(status.flags & libtorrent::torrent_flags::paused)) {
     return pfd::base::TaskStatus::kPaused;
   }
   switch (status.state) {
