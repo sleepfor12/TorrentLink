@@ -77,7 +77,7 @@ ctest --test-dir build --output-on-failure
 
 Author: sleepfor12
 
-Email: [zbysleepallday@outloo.com](mailto:zbysleepallday@outloo.com) / [zbymeiqian414@163.com](mailto:zbymeiqian414@163.com)
+Email: [zbysleepallday@outlook.com](mailto:zbysleepallday@outlook.com) / [zbymeiqian414@163.com](mailto:zbymeiqian414@163.com)
 
 ## Acknowledgements
 

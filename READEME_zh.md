@@ -76,7 +76,7 @@ ctest --test-dir build --output-on-failure
 
 作者：sleepfor12
 
-邮箱：[zbysleepallday@outloo.com](mailto:zbysleepallday@outloo.com) / [zbymeiqian414@163.com](mailto:zbymeiqian414@163.com)
+邮箱：[zbysleepallday@outlook.com](mailto:zbysleepallday@outlook.com) / [zbymeiqian414@163.com](mailto:zbymeiqian414@163.com)
 
 ## 致谢
 
