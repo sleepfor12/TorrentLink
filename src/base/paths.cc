@@ -45,7 +45,9 @@ QString resumeDir() {
   if (base.isEmpty()) {
     return QString();
   }
-  return ensureTrailingSlash(QDir(base).filePath(QStringLiteral("resume")));
+  // Append "resume" to the already-suffixed app data path so the result always shares the same
+  // string prefix as appDataDir() (QDir::filePath can diverge on symlinks / Windows edge cases).
+  return ensureTrailingSlash(base + QStringLiteral("resume"));
 }
 
 bool ensureExists(const QString& path) {

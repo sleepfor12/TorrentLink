@@ -44,8 +44,11 @@ TEST(Paths, ResumeDirIsSubdirOfAppData) {
   const QString resume = resumeDir();
   EXPECT_FALSE(resume.isEmpty());
   EXPECT_TRUE(resume.startsWith(appData));
-  const QString resumeNoTrailing = resume.left(resume.size() - 1);
-  EXPECT_EQ(QFileInfo(resumeNoTrailing).fileName(), QStringLiteral("resume"));
+  QString resumeTrimmed = resume;
+  while (resumeTrimmed.endsWith(QLatin1Char('/')) || resumeTrimmed.endsWith(QLatin1Char('\\'))) {
+    resumeTrimmed.chop(1);
+  }
+  EXPECT_EQ(QFileInfo(resumeTrimmed).fileName(), QStringLiteral("resume"));
 }
 
 TEST(Paths, EnsureExistsCreatesDirectory) {
