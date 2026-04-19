@@ -10,6 +10,7 @@
 #include <libtorrent/torrent_info.hpp>
 
 #include <algorithm>
+#include <chrono>
 #include <sstream>
 
 #include "core/logger.h"
@@ -42,42 +43,111 @@ SessionWorker::FilePriorityLevel toLevel(libtorrent::download_priority_t p, bool
 
 }  // namespace
 
-static SessionWorker::TrackerStatus mapTrackerStatus(const libtorrent::announce_entry& ae) {
-  bool updating = false;
-  bool hasError = false;
-  bool worked = false;
-  for (const auto& ep : ae.endpoints) {
-    for (const auto& ih : ep.info_hashes) {
-      updating = updating || ih.updating;
-      hasError = hasError || static_cast<bool>(ih.last_error) || ih.fails > 0;
-      worked = worked || (ih.fails == 0 && !ih.updating);
-    }
+// announce_infohash: see libtorrent/announce_entry.hpp — "working" requires a successful
+// response (start/scrape), not merely fails==0 before the first attempt.
+[[nodiscard]] static int secondsUntilTimePoint32(libtorrent::time_point32 tp) {
+  if (tp == (libtorrent::time_point32::min)()) {
+    return -1;
   }
-  if (updating)
-    return SessionWorker::TrackerStatus::kUpdating;
-  if (worked)
-    return SessionWorker::TrackerStatus::kWorking;
-  if (hasError)
-    return SessionWorker::TrackerStatus::kCannotConnect;
-  return SessionWorker::TrackerStatus::kNotWorking;
+  const auto now =
+      std::chrono::time_point_cast<libtorrent::seconds32>(libtorrent::clock_type::now());
+  if (tp <= now) {
+    return 0;
+  }
+  return static_cast<int>((tp - now).count());
 }
 
-static SessionWorker::TrackerStatus mapEndpointStatus(const libtorrent::announce_endpoint& ep) {
-  bool updating = false;
-  bool hasError = false;
-  bool worked = false;
-  for (const auto& ih : ep.info_hashes) {
-    updating = updating || ih.updating;
-    hasError = hasError || static_cast<bool>(ih.last_error) || ih.fails > 0;
-    worked = worked || (ih.fails == 0 && !ih.updating);
+[[nodiscard]] static bool infohashHasSuccessfulContact(const libtorrent::announce_infohash& ih) {
+  return ih.start_sent || ih.complete_sent || ih.scrape_incomplete >= 0 ||
+         ih.scrape_complete >= 0 || ih.scrape_downloaded >= 0;
+}
+
+[[nodiscard]] static SessionWorker::TrackerStatus
+mapInfohashStatus(const libtorrent::announce_infohash& ih) {
+  using T = SessionWorker::TrackerStatus;
+  if (ih.updating) {
+    return T::kUpdating;
   }
-  if (updating)
-    return SessionWorker::TrackerStatus::kUpdating;
-  if (worked)
-    return SessionWorker::TrackerStatus::kWorking;
-  if (hasError)
-    return SessionWorker::TrackerStatus::kCannotConnect;
-  return SessionWorker::TrackerStatus::kNotWorking;
+  if (ih.fails > 0 || static_cast<bool>(ih.last_error)) {
+    return T::kCannotConnect;
+  }
+  if (infohashHasSuccessfulContact(ih)) {
+    return T::kWorking;
+  }
+  return T::kNotWorking;
+}
+
+[[nodiscard]] static SessionWorker::TrackerStatus
+aggregateInfohashStatuses(const libtorrent::announce_endpoint& ep) {
+  using T = SessionWorker::TrackerStatus;
+  bool anyUpdating = false;
+  bool anyWorking = false;
+  bool anyCannot = false;
+  for (const auto& ih : ep.info_hashes) {
+    const T s = mapInfohashStatus(ih);
+    if (s == T::kUpdating) {
+      anyUpdating = true;
+    } else if (s == T::kWorking) {
+      anyWorking = true;
+    } else if (s == T::kCannotConnect) {
+      anyCannot = true;
+    }
+  }
+  if (anyUpdating) {
+    return T::kUpdating;
+  }
+  if (anyWorking) {
+    return T::kWorking;
+  }
+  if (anyCannot) {
+    return T::kCannotConnect;
+  }
+  return T::kNotWorking;
+}
+
+[[nodiscard]] static SessionWorker::TrackerStatus
+mapTrackerStatus(const libtorrent::announce_entry& ae) {
+  using T = SessionWorker::TrackerStatus;
+  bool anyUpdating = false;
+  bool anyWorking = false;
+  bool anyCannot = false;
+  for (const auto& ep : ae.endpoints) {
+    for (const auto& ih : ep.info_hashes) {
+      const T s = mapInfohashStatus(ih);
+      if (s == T::kUpdating) {
+        anyUpdating = true;
+      } else if (s == T::kWorking) {
+        anyWorking = true;
+      } else if (s == T::kCannotConnect) {
+        anyCannot = true;
+      }
+    }
+  }
+  if (anyUpdating) {
+    return T::kUpdating;
+  }
+  if (anyWorking) {
+    return T::kWorking;
+  }
+  if (anyCannot) {
+    return T::kCannotConnect;
+  }
+  return T::kNotWorking;
+}
+
+[[nodiscard]] static QString messageFromAnnounceEndpoint(const libtorrent::announce_endpoint& ep) {
+  QStringList parts;
+  for (const auto& ih : ep.info_hashes) {
+    if (!ih.message.empty()) {
+      parts.append(QString::fromStdString(ih.message));
+    } else if (ih.last_error) {
+      parts.append(QString::fromStdString(ih.last_error.message()));
+    }
+  }
+  if (parts.isEmpty()) {
+    return {};
+  }
+  return parts.join(QStringLiteral("; "));
 }
 
 bool handleOne(libtorrent::session&, Context& ctx, const session_cmds::QueryTaskCopyPayloadCmd& c) {
@@ -207,6 +277,7 @@ bool handleOne(libtorrent::session&, Context& ctx, const session_cmds::QueryTask
         row.btProtocol = QStringLiteral("N/A");
       row.status = mapTrackerStatus(ae);
 
+      QStringList rowMsgParts;
       for (const auto& ep : ae.endpoints) {
         int ep_scrape_inc = -1;
         int ep_scrape_comp = -1;
@@ -231,40 +302,59 @@ bool handleOne(libtorrent::session&, Context& ctx, const session_cmds::QueryTask
         if (row.downloads < 0 && ep_scrape_down >= 0) {
           row.downloads = ep_scrape_down;
         }
-        SessionWorker::TrackerEndpointSnapshot endpoint;
-        endpoint.ip = QString::fromStdString(ep.local_endpoint.address().to_string());
-        endpoint.port = ep.local_endpoint.port();
-        endpoint.status = mapEndpointStatus(ep);
-        endpoint.users = ep_scrape_inc;
-        endpoint.seeds = ep_scrape_comp;
-        endpoint.downloads = ep_scrape_down;
+        SessionWorker::TrackerEndpointSnapshot outEp;
+        outEp.ip = QString::fromStdString(ep.local_endpoint.address().to_string());
+        outEp.port = ep.local_endpoint.port();
+        outEp.status = aggregateInfohashStatuses(ep);
+        outEp.users = ep_scrape_inc;
+        outEp.seeds = ep_scrape_comp;
+        outEp.downloads = ep_scrape_down;
         const bool hasV1 = h.info_hashes().has_v1();
         const bool hasV2 = h.info_hashes().has_v2();
-        if (hasV1 && hasV2)
-          endpoint.btProtocol = QStringLiteral("hybrid");
-        else if (hasV2)
-          endpoint.btProtocol = QStringLiteral("v2");
-        else
-          endpoint.btProtocol = QStringLiteral("v1");
-        if (!endpoint.ip.isEmpty() && endpoint.port > 0)
-          row.endpoints.push_back(endpoint);
-        bool any_next = false;
-        bool any_min = false;
+        if (hasV1 && hasV2) {
+          outEp.btProtocol = QStringLiteral("hybrid");
+        } else if (hasV2) {
+          outEp.btProtocol = QStringLiteral("v2");
+        } else {
+          outEp.btProtocol = QStringLiteral("v1");
+        }
+        int epNextSec = -1;
+        int epMinSec = -1;
         for (const auto& ih : ep.info_hashes) {
-          if (ih.next_announce != (libtorrent::time_point32::min)()) {
-            any_next = true;
+          const int n = secondsUntilTimePoint32(ih.next_announce);
+          const int m = secondsUntilTimePoint32(ih.min_announce);
+          if (n >= 0) {
+            epNextSec = epNextSec < 0 ? n : std::min(epNextSec, n);
           }
-          if (ih.min_announce != (libtorrent::time_point32::min)()) {
-            any_min = true;
+          if (m >= 0) {
+            epMinSec = epMinSec < 0 ? m : std::min(epMinSec, m);
           }
         }
-        if (row.nextAnnounceSec < 0 && any_next) {
-          row.nextAnnounceSec = 0;
+        outEp.nextAnnounceSec = epNextSec;
+        outEp.minAnnounceSec = epMinSec;
+        if (epNextSec >= 0) {
+          if (row.nextAnnounceSec < 0) {
+            row.nextAnnounceSec = epNextSec;
+          } else {
+            row.nextAnnounceSec = std::min(row.nextAnnounceSec, epNextSec);
+          }
         }
-        if (row.minAnnounceSec < 0 && any_min) {
-          row.minAnnounceSec = 0;
+        if (epMinSec >= 0) {
+          if (row.minAnnounceSec < 0) {
+            row.minAnnounceSec = epMinSec;
+          } else {
+            row.minAnnounceSec = std::min(row.minAnnounceSec, epMinSec);
+          }
+        }
+        outEp.message = messageFromAnnounceEndpoint(ep);
+        if (!outEp.message.isEmpty()) {
+          rowMsgParts.append(outEp.message);
+        }
+        if (!outEp.ip.isEmpty() && outEp.port > 0) {
+          row.endpoints.push_back(std::move(outEp));
         }
       }
+      row.message = rowMsgParts.isEmpty() ? QString() : rowMsgParts.join(QStringLiteral(" | "));
       if (row.endpoints.empty()) {
         const QUrl u(row.url);
         if (u.isValid() && !u.host().trimmed().isEmpty() && u.port() > 0) {
@@ -285,6 +375,7 @@ bool handleOne(libtorrent::session&, Context& ctx, const session_cmds::QueryTask
           endpoint.downloads = row.downloads;
           endpoint.nextAnnounceSec = row.nextAnnounceSec;
           endpoint.minAnnounceSec = row.minAnnounceSec;
+          endpoint.message = row.message;
           row.endpoints.push_back(std::move(endpoint));
         }
       }

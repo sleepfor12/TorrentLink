@@ -51,6 +51,7 @@ public:
     int downloads{-1};
     int nextAnnounceSec{-1};
     int minAnnounceSec{-1};
+    QString message;
   };
 
   struct TrackerRowSnapshot {
@@ -63,6 +64,7 @@ public:
     int downloads{-1};
     int nextAnnounceSec{-1};
     int minAnnounceSec{-1};
+    QString message;
     bool readOnly{false};
     std::vector<TrackerEndpointSnapshot> endpoints;
   };

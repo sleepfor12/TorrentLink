@@ -10,10 +10,13 @@
 #include <QtWidgets/QHeaderView>
 #include <QtWidgets/QInputDialog>
 #include <QtWidgets/QMenu>
+#include <QtWidgets/QScrollBar>
 #include <QtWidgets/QTreeWidget>
 #include <QtWidgets/QTreeWidgetItem>
 #include <QtWidgets/QTreeWidgetItemIterator>
 #include <QtWidgets/QVBoxLayout>
+
+#include <algorithm>
 
 #include "base/format.h"
 #include "base/input_sanitizer.h"
@@ -23,11 +26,32 @@ namespace pfd::ui {
 
 namespace {
 enum ItemType : int { kFixed = 0, kTracker = 1, kEndpoint = 2 };
+constexpr int kColMsg = 7;
+constexpr int kColNext = 8;
+constexpr int kColMin = 9;
 constexpr int kRoleType = Qt::UserRole + 1;
 constexpr int kRoleUrl = Qt::UserRole + 2;
 constexpr int kRoleNextAnnounce = Qt::UserRole + 3;
 constexpr int kRoleMinAnnounce = Qt::UserRole + 4;
 QByteArray gTrackerHeaderState;
+const QString kTierEmDash = QStringLiteral("\u2014");
+
+[[nodiscard]] QString qbStyleFixedLabel(const QString& rawName) {
+  return QStringLiteral("** %1 **").arg(rawName.trimmed());
+}
+
+void applyTrackerItemLayout(QTreeWidgetItem* item) {
+  if (item == nullptr) {
+    return;
+  }
+  item->setTextAlignment(0, Qt::AlignLeft | Qt::AlignVCenter);
+  item->setTextAlignment(2, Qt::AlignLeft | Qt::AlignVCenter);
+  item->setTextAlignment(3, Qt::AlignLeft | Qt::AlignVCenter);
+  item->setTextAlignment(kColMsg, Qt::AlignLeft | Qt::AlignVCenter);
+  for (int col : {1, 4, 5, 6, kColNext, kColMin}) {
+    item->setTextAlignment(col, Qt::AlignRight | Qt::AlignVCenter);
+  }
+}
 }  // namespace
 
 TrackerDetailPage::TrackerDetailPage(QWidget* parent) : QWidget(parent) {
@@ -47,6 +71,9 @@ void TrackerDetailPage::setHandlers(QueryTrackersFn queryFn, AddTrackerFn addFn,
 }
 
 void TrackerDetailPage::setSnapshot(const pfd::core::TaskSnapshot& snap) {
+  if (snap.taskId == taskId_) {
+    return;
+  }
   taskId_ = snap.taskId;
   reload();
 }
@@ -80,13 +107,26 @@ void TrackerDetailPage::buildLayout() {
   root->setSpacing(6);
 
   tree_ = new QTreeWidget(this);
-  tree_->setColumnCount(9);
+  tree_->setColumnCount(10);
   tree_->setHeaderLabels({QStringLiteral("URL/Announce 端点"), QStringLiteral("层级"),
                           QStringLiteral("BT 协议"), QStringLiteral("状态"), QStringLiteral("用户"),
-                          QStringLiteral("种子"), QStringLiteral("下载"),
-                          QStringLiteral("下一个 Announce"), QStringLiteral("最小 Announce")});
+                          QStringLiteral("种子"), QStringLiteral("下载次数"),
+                          QStringLiteral("消息"), QStringLiteral("下一个 Announce"),
+                          QStringLiteral("最小 Announce")});
   tree_->setAlternatingRowColors(true);
+  tree_->setAnimated(true);
+  tree_->setUniformRowHeights(true);
+  tree_->setIndentation(20);
+  tree_->setRootIsDecorated(true);
   tree_->setContextMenuPolicy(Qt::CustomContextMenu);
+  tree_->setStyleSheet(QStringLiteral(
+      "QTreeWidget{border:1px solid #e7ebf3;border-radius:4px;background:#ffffff;"
+      "alternate-background-color:#f6f8fc;outline:0;}"
+      "QTreeWidget::item{padding:3px 6px;border:none;}"
+      "QTreeWidget::item:selected,QTreeWidget::item:selected:active{"
+      "background:#2f6fed;color:#ffffff;}"
+      "QHeaderView::section{background:#f8fbff;color:#50607a;border:none;border-bottom:1px solid "
+      "#e7ebf3;padding:8px;font-weight:600;}"));
   tree_->header()->setSectionResizeMode(0, QHeaderView::Stretch);
   tree_->header()->setSectionResizeMode(1, QHeaderView::ResizeToContents);
   if (!gTrackerHeaderState.isEmpty()) {
@@ -175,6 +215,8 @@ void TrackerDetailPage::reload() {
       expandedUrls.insert(oldItem->data(0, kRoleUrl).toString());
     }
   }
+  QScrollBar* vbar = tree_->verticalScrollBar();
+  const int scrollValue = vbar != nullptr ? vbar->value() : 0;
   tree_->clear();
   if (taskId_.isNull() || !queryFn_)
     return;
@@ -189,46 +231,54 @@ void TrackerDetailPage::reload() {
                           &toSelect](const pfd::lt::SessionWorker::TrackerRowSnapshot& r,
                                      int type) {
     auto* item = new QTreeWidgetItem(tree_);
-    item->setText(0, r.url);
-    item->setText(1, type == kTracker ? QString::number(r.tier) : QStringLiteral("0"));
+    item->setText(0, type == kFixed ? qbStyleFixedLabel(r.url) : r.url);
+    item->setText(1, type == kTracker ? QString::number(r.tier) : kTierEmDash);
     item->setText(2, r.btProtocol.isEmpty() ? QStringLiteral("N/A") : r.btProtocol);
     item->setText(3, statusText(r.status));
     item->setText(4, countText(r.users));
     item->setText(5, countText(r.seeds));
     item->setText(6, countText(r.downloads));
-    item->setText(7, announceText(r.nextAnnounceSec));
-    item->setText(8, announceText(r.minAnnounceSec));
+    item->setText(kColMsg, r.message);
+    item->setText(kColNext, announceText(r.nextAnnounceSec));
+    item->setText(kColMin, announceText(r.minAnnounceSec));
     item->setData(0, kRoleType, type);
     item->setData(0, kRoleUrl, r.url);
-    item->setData(7, kRoleNextAnnounce, r.nextAnnounceSec);
-    item->setData(8, kRoleMinAnnounce, r.minAnnounceSec);
+    item->setData(kColNext, kRoleNextAnnounce, r.nextAnnounceSec);
+    item->setData(kColMin, kRoleMinAnnounce, r.minAnnounceSec);
     if (type == kFixed) {
-      item->setForeground(0, QBrush(QColor(100, 116, 139)));
+      item->setForeground(0, QBrush(QColor(71, 85, 105)));
       item->setForeground(3, QBrush(QColor(100, 116, 139)));
     } else {
       item->setForeground(3, QBrush(statusColor(r.status)));
     }
+    applyTrackerItemLayout(item);
+    const bool expanded = expandedUrls.contains(r.url);
     for (const auto& ep : r.endpoints) {
       auto* child = new QTreeWidgetItem(item);
       child->setText(0, QStringLiteral("%1:%2").arg(ep.ip).arg(ep.port));
-      child->setText(1, QString());
+      child->setText(1, type == kTracker ? QString::number(r.tier) : kTierEmDash);
       child->setText(2, ep.btProtocol.isEmpty() ? QStringLiteral("N/A") : ep.btProtocol);
       child->setText(3, statusText(ep.status));
       child->setText(4, countText(ep.users));
       child->setText(5, countText(ep.seeds));
       child->setText(6, countText(ep.downloads));
-      child->setText(7, announceText(ep.nextAnnounceSec));
-      child->setText(8, announceText(ep.minAnnounceSec));
+      child->setText(kColMsg, ep.message);
+      child->setText(kColNext, announceText(ep.nextAnnounceSec));
+      child->setText(kColMin, announceText(ep.minAnnounceSec));
       child->setData(0, kRoleType, kEndpoint);
       child->setData(0, kRoleUrl, r.url);
       child->setForeground(3, QBrush(statusColor(ep.status)));
+      applyTrackerItemLayout(child);
       if (toSelect == nullptr && selectedType == kEndpoint && selectedUrl == r.url &&
-          selectedEndpointText == child->text(0)) {
+          selectedEndpointText == child->text(0) && expanded) {
         toSelect = child;
       }
     }
-    if (expandedUrls.contains(r.url)) {
+    if (expanded) {
       item->setExpanded(true);
+    }
+    if (toSelect == nullptr && selectedType == kEndpoint && selectedUrl == r.url && !expanded) {
+      toSelect = item;
     }
     if (toSelect == nullptr && selectedType != kEndpoint && selectedUrl == r.url) {
       toSelect = item;
@@ -243,6 +293,9 @@ void TrackerDetailPage::reload() {
   if (toSelect != nullptr) {
     tree_->setCurrentItem(toSelect);
   }
+  if (vbar != nullptr) {
+    vbar->setValue(std::min(scrollValue, vbar->maximum()));
+  }
 }
 
 void TrackerDetailPage::decrementAnnounceCountdowns() {
@@ -253,16 +306,16 @@ void TrackerDetailPage::decrementAnnounceCountdowns() {
     const int type = item->data(0, kRoleType).toInt();
     if (type != kFixed && type != kTracker)
       continue;
-    int nextSec = item->data(7, kRoleNextAnnounce).toInt();
-    int minSec = item->data(8, kRoleMinAnnounce).toInt();
+    int nextSec = item->data(kColNext, kRoleNextAnnounce).toInt();
+    int minSec = item->data(kColMin, kRoleMinAnnounce).toInt();
     if (nextSec > 0)
       --nextSec;
     if (minSec > 0)
       --minSec;
-    item->setData(7, kRoleNextAnnounce, nextSec);
-    item->setData(8, kRoleMinAnnounce, minSec);
-    item->setText(7, announceText(nextSec));
-    item->setText(8, announceText(minSec));
+    item->setData(kColNext, kRoleNextAnnounce, nextSec);
+    item->setData(kColMin, kRoleMinAnnounce, minSec);
+    item->setText(kColNext, announceText(nextSec));
+    item->setText(kColMin, announceText(minSec));
   }
 }
 
