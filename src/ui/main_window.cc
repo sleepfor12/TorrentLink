@@ -18,7 +18,7 @@
 namespace pfd::ui {
 
 MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
-  setWindowTitle(QStringLiteral("极速下载"));
+  setWindowTitle(QStringLiteral("TorrentLink"));
   resize(1180, 760);
   setupMenuBar();
   applyTheme();

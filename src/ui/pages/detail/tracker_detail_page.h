@@ -9,6 +9,7 @@
 #include "lt/session_worker.h"
 
 class QTreeWidget;
+class QTreeWidgetItem;
 class QTimer;
 class QShowEvent;
 class QHideEvent;
@@ -53,6 +54,9 @@ private:
   static QString countText(int n);
   static QString announceText(int seconds);
   void decrementAnnounceCountdowns();
+  void updateAnnounceCellsForItem(QTreeWidgetItem* urlRow);
+  void applySavedSortIndicator();
+  void pinFixedRowsToTop();
 
   QueryTrackersFn queryFn_;
   AddTrackerFn addFn_;
@@ -65,6 +69,8 @@ private:
   QTreeWidget* tree_{nullptr};
   QTimer* refreshTimer_{nullptr};
   int refreshTick_{0};
+  int sortColumn_{0};
+  bool sortAscending_{true};
 };
 
 }  // namespace pfd::ui

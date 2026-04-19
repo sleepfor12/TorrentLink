@@ -13,6 +13,16 @@ using pfd::base::configDir;
 using pfd::base::ensureExists;
 using pfd::base::resumeDir;
 
+[[nodiscard]] bool resumeDirIsUnderAppData(const QString& appData, const QString& resume) {
+  const QString ad = QDir::cleanPath(appData);
+  const QString rd = QDir::cleanPath(resume);
+#if defined(Q_OS_WIN)
+  return rd.startsWith(ad, Qt::CaseInsensitive);
+#else
+  return rd.startsWith(ad);
+#endif
+}
+
 TEST(Paths, AppDataDirNonEmptyAndEndsWithSlash) {
   const QString dir = appDataDir();
   EXPECT_FALSE(dir.isEmpty());
@@ -43,7 +53,7 @@ TEST(Paths, ResumeDirIsSubdirOfAppData) {
   const QString appData = appDataDir();
   const QString resume = resumeDir();
   EXPECT_FALSE(resume.isEmpty());
-  EXPECT_TRUE(resume.startsWith(appData));
+  EXPECT_TRUE(resumeDirIsUnderAppData(appData, resume));
   QString resumeTrimmed = resume;
   while (resumeTrimmed.endsWith(QLatin1Char('/')) || resumeTrimmed.endsWith(QLatin1Char('\\'))) {
     resumeTrimmed.chop(1);

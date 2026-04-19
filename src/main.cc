@@ -16,8 +16,8 @@ int main(int argc, char** argv) {
   QApplication app(argc, argv);
 
   // 让 QSettings/QStandardPaths 拥有稳定的应用标识
-  QCoreApplication::setOrganizationName(QStringLiteral("pfd"));
-  QCoreApplication::setApplicationName(QStringLiteral("p2p_downloader"));
+  QCoreApplication::setOrganizationName(QStringLiteral("TorrentLink"));
+  QCoreApplication::setApplicationName(QStringLiteral("TorrentLink"));
 
   const auto st = pfd::core::ConfigService::loadAppSettings();
   QDir().mkpath(st.log_dir);
