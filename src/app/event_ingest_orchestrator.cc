@@ -8,12 +8,13 @@ namespace pfd::app {
 EventIngestOrchestrator::EventIngestOrchestrator(pfd::core::TaskPipelineService* pipeline)
     : pipeline_(pipeline) {}
 
-void EventIngestOrchestrator::lockProgressStatus(const pfd::base::TaskId& taskId, qint64 lockUntilMs) {
+void EventIngestOrchestrator::lockProgressStatus(const pfd::base::TaskId& taskId,
+                                                 qint64 lockUntilMs) {
   statusLockUntilMs_[taskId.toString(QUuid::WithoutBraces)] = lockUntilMs;
 }
 
-EventIngestOrchestrator::IngestResult EventIngestOrchestrator::ingest(
-    const std::vector<pfd::lt::LtAlertView>& views) {
+EventIngestOrchestrator::IngestResult
+EventIngestOrchestrator::ingest(const std::vector<pfd::lt::LtAlertView>& views) {
   IngestResult result;
   if (pipeline_ == nullptr || views.empty()) {
     return result;

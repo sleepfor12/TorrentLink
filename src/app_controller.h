@@ -19,14 +19,14 @@ namespace pfd::core {
 class BuiltinHttpTracker;
 }
 
+#include "app/event_ingest_orchestrator.h"
+#include "app/refresh_scheduler.h"
+#include "app/rss_download_pipeline.h"
+#include "app/task_batch_use_case.h"
+#include "app/task_persistence_coordinator.h"
 #include "core/rss/rss_service.h"
 #include "core/save_path_policy.h"
 #include "core/task_pipeline_service.h"
-#include "app/rss_download_pipeline.h"
-#include "app/event_ingest_orchestrator.h"
-#include "app/task_batch_use_case.h"
-#include "app/task_persistence_coordinator.h"
-#include "app/refresh_scheduler.h"
 #include "lt/session_worker.h"
 #include "ui/main_window.h"
 #include "ui/system_tray.h"

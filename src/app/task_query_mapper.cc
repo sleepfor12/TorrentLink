@@ -14,8 +14,8 @@ pfd::core::TaskTrackerStatusDto toDto(pfd::lt::SessionWorker::TrackerStatus s) {
 
 }  // namespace
 
-std::vector<pfd::core::TaskFileEntryDto> mapTaskFiles(
-    const std::vector<pfd::lt::SessionWorker::FileEntrySnapshot>& input) {
+std::vector<pfd::core::TaskFileEntryDto>
+mapTaskFiles(const std::vector<pfd::lt::SessionWorker::FileEntrySnapshot>& input) {
   std::vector<pfd::core::TaskFileEntryDto> out;
   out.reserve(input.size());
   for (const auto& src : input) {
@@ -32,8 +32,8 @@ std::vector<pfd::core::TaskFileEntryDto> mapTaskFiles(
   return out;
 }
 
-pfd::core::TaskTrackerSnapshotDto mapTaskTrackers(
-    const pfd::lt::SessionWorker::TaskTrackerSnapshot& input) {
+pfd::core::TaskTrackerSnapshotDto
+mapTaskTrackers(const pfd::lt::SessionWorker::TaskTrackerSnapshot& input) {
   auto mapRows = [](const std::vector<pfd::lt::SessionWorker::TrackerRowSnapshot>& rows) {
     std::vector<pfd::core::TaskTrackerRowDto> out;
     out.reserve(rows.size());
@@ -75,8 +75,8 @@ pfd::core::TaskTrackerSnapshotDto mapTaskTrackers(
   return out;
 }
 
-std::vector<pfd::core::TaskPeerDto> mapTaskPeers(
-    const std::vector<pfd::lt::SessionWorker::PeerSnapshot>& input) {
+std::vector<pfd::core::TaskPeerDto>
+mapTaskPeers(const std::vector<pfd::lt::SessionWorker::PeerSnapshot>& input) {
   std::vector<pfd::core::TaskPeerDto> out;
   out.reserve(input.size());
   for (const auto& src : input) {
@@ -96,8 +96,8 @@ std::vector<pfd::core::TaskPeerDto> mapTaskPeers(
   return out;
 }
 
-std::vector<pfd::core::TaskWebSeedDto> mapTaskWebSeeds(
-    const std::vector<pfd::lt::SessionWorker::WebSeedSnapshot>& input) {
+std::vector<pfd::core::TaskWebSeedDto>
+mapTaskWebSeeds(const std::vector<pfd::lt::SessionWorker::WebSeedSnapshot>& input) {
   std::vector<pfd::core::TaskWebSeedDto> out;
   out.reserve(input.size());
   for (const auto& src : input) {
@@ -109,7 +109,8 @@ std::vector<pfd::core::TaskWebSeedDto> mapTaskWebSeeds(
   return out;
 }
 
-pfd::lt::SessionWorker::FilePriorityLevel mapTaskFilePriorityLevel(pfd::core::TaskFilePriorityLevel p) {
+pfd::lt::SessionWorker::FilePriorityLevel
+mapTaskFilePriorityLevel(pfd::core::TaskFilePriorityLevel p) {
   return static_cast<pfd::lt::SessionWorker::FilePriorityLevel>(p);
 }
 

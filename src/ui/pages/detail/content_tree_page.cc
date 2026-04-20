@@ -201,8 +201,7 @@ void ContentTreePage::reloadTree() {
     item->setText(4, minAvail >= 0.0 ? QString::number(minAvail, 'f', 2) : QStringLiteral("--"));
     if (ps.size() == 1) {
       item->setData(0, kPriorityRole, *ps.begin());
-      item->setText(
-          3, priorityText(static_cast<pfd::core::TaskFilePriorityLevel>(*ps.begin())));
+      item->setText(3, priorityText(static_cast<pfd::core::TaskFilePriorityLevel>(*ps.begin())));
     } else {
       item->setData(0, kPriorityRole, -1);
       item->setText(3, QStringLiteral("混合"));
@@ -313,8 +312,7 @@ void ContentTreePage::showContextMenu(const QPoint& pos) {
     return;
   }
   if (chosen->parentWidget() == priorityMenu) {
-    applyPriorityToSelection(
-        static_cast<pfd::core::TaskFilePriorityLevel>(chosen->data().toInt()));
+    applyPriorityToSelection(static_cast<pfd::core::TaskFilePriorityLevel>(chosen->data().toInt()));
   }
 }
 

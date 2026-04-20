@@ -62,7 +62,8 @@ void RssDownloadPipeline::schedulePumpMagnet(StartMagnetFn startFn) {
   }
   if (shouldSchedule) {
     QMetaObject::invokeMethod(
-        owner_, [this, fn = std::move(startFn)]() { pumpMagnetQueueOnUi(fn); }, Qt::QueuedConnection);
+        owner_, [this, fn = std::move(startFn)]() { pumpMagnetQueueOnUi(fn); },
+        Qt::QueuedConnection);
   }
 }
 
@@ -76,9 +77,9 @@ void RssDownloadPipeline::schedulePumpRssTorrent(StartRssTorrentFn startFn) {
     }
   }
   if (shouldSchedule) {
-    QMetaObject::invokeMethod(owner_,
-                              [this, fn = std::move(startFn)]() { pumpRssTorrentUrlQueueOnUi(fn); },
-                              Qt::QueuedConnection);
+    QMetaObject::invokeMethod(
+        owner_, [this, fn = std::move(startFn)]() { pumpRssTorrentUrlQueueOnUi(fn); },
+        Qt::QueuedConnection);
   }
 }
 

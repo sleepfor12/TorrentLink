@@ -17,7 +17,8 @@ class HttpSourcePage : public QWidget {
   Q_OBJECT
 
 public:
-  using QueryWebSeedsFn = std::function<std::vector<pfd::core::TaskWebSeedDto>(const pfd::base::TaskId&)>;
+  using QueryWebSeedsFn =
+      std::function<std::vector<pfd::core::TaskWebSeedDto>(const pfd::base::TaskId&)>;
 
   explicit HttpSourcePage(QWidget* parent = nullptr);
 

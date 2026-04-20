@@ -20,7 +20,8 @@ class TrackerDetailPage : public QWidget {
   Q_OBJECT
 
 public:
-  using QueryTrackersFn = std::function<pfd::core::TaskTrackerSnapshotDto(const pfd::base::TaskId&)>;
+  using QueryTrackersFn =
+      std::function<pfd::core::TaskTrackerSnapshotDto(const pfd::base::TaskId&)>;
   using AddTrackerFn = std::function<void(const pfd::base::TaskId&, const QString&)>;
   using EditTrackerFn =
       std::function<void(const pfd::base::TaskId&, const QString&, const QString&)>;

@@ -28,10 +28,10 @@
 #include <future>
 #include <thread>
 
+#include "app/task_query_mapper.h"
 #include "base/input_sanitizer.h"
 #include "base/io.h"
 #include "base/paths.h"
-#include "app/task_query_mapper.h"
 #include "core/builtin_http_tracker.h"
 #include "core/config_service.h"
 #include "core/logger.h"
@@ -75,9 +75,10 @@ void AppController::initialize() {
   taskBatchUseCase_ = std::make_unique<pfd::app::TaskBatchUseCase>(
       worker_, [this]() { return pipeline_->snapshots(); });
   eventIngestOrchestrator_ = std::make_unique<pfd::app::EventIngestOrchestrator>(pipeline_);
-  rssDownloadPipeline_ = std::make_unique<pfd::app::RssDownloadPipeline>(static_cast<QObject*>(app_));
-  uiRefreshScheduler_ = std::make_unique<pfd::app::RefreshScheduler>(
-      static_cast<QObject*>(app_), 100, [this]() {
+  rssDownloadPipeline_ =
+      std::make_unique<pfd::app::RssDownloadPipeline>(static_cast<QObject*>(app_));
+  uiRefreshScheduler_ =
+      std::make_unique<pfd::app::RefreshScheduler>(static_cast<QObject*>(app_), 100, [this]() {
         const auto snaps = pipeline_->snapshots();
         window_->refreshTasks(snaps);
         applySeedingPolicy(snaps);
@@ -132,13 +133,11 @@ void AppController::initialize() {
   QObject::connect(systemTray_, &pfd::ui::SystemTray::quitRequested, static_cast<QObject*>(app_),
                    [this]() { app_->quit(); });
   QObject::connect(systemTray_, &pfd::ui::SystemTray::pauseAllRequested,
-                   static_cast<QObject*>(app_), [this]() {
-                     taskBatchUseCase_->pauseAllActiveTasks();
-                   });
+                   static_cast<QObject*>(app_),
+                   [this]() { taskBatchUseCase_->pauseAllActiveTasks(); });
   QObject::connect(systemTray_, &pfd::ui::SystemTray::resumeAllRequested,
-                   static_cast<QObject*>(app_), [this]() {
-                     taskBatchUseCase_->resumeAllPausedTasks();
-                   });
+                   static_cast<QObject*>(app_),
+                   [this]() { taskBatchUseCase_->resumeAllPausedTasks(); });
 
   QObject::connect(app_, &QApplication::aboutToQuit, static_cast<QObject*>(app_), [this]() {
     shuttingDown_.store(true);
@@ -921,11 +920,13 @@ void AppController::bindUiCallbacks() {
     worker_->forceReannounceAllTrackers(taskId);
   });
 
-  window_->setOnQueryTaskPeers(
-      [this](const pfd::base::TaskId& taskId) { return pfd::app::mapTaskPeers(worker_->queryTaskPeers(taskId)); });
+  window_->setOnQueryTaskPeers([this](const pfd::base::TaskId& taskId) {
+    return pfd::app::mapTaskPeers(worker_->queryTaskPeers(taskId));
+  });
 
-  window_->setOnQueryTaskWebSeeds(
-      [this](const pfd::base::TaskId& taskId) { return pfd::app::mapTaskWebSeeds(worker_->queryTaskWebSeeds(taskId)); });
+  window_->setOnQueryTaskWebSeeds([this](const pfd::base::TaskId& taskId) {
+    return pfd::app::mapTaskWebSeeds(worker_->queryTaskWebSeeds(taskId));
+  });
 
   window_->setOnMoveTask([this](const pfd::base::TaskId& taskId, const QString& targetPath) {
     const auto pathErr = pfd::base::validatePath(targetPath);
@@ -1394,7 +1395,8 @@ void AppController::injectTransitionalStatus(const pfd::base::TaskId& taskId,
   pipeline_->consume(ev);
 
   if (eventIngestOrchestrator_ != nullptr) {
-    eventIngestOrchestrator_->lockProgressStatus(taskId, QDateTime::currentMSecsSinceEpoch() + 1000);
+    eventIngestOrchestrator_->lockProgressStatus(taskId,
+                                                 QDateTime::currentMSecsSinceEpoch() + 1000);
   }
 
   uiRefreshScheduler_->requestRefresh();

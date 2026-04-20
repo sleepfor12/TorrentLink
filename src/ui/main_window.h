@@ -213,7 +213,8 @@ private:
   std::function<void(const pfd::base::TaskId&)> onQueuePositionTop_;
   std::function<void(const pfd::base::TaskId&)> onQueuePositionBottom_;
   std::function<CopyPayload(const pfd::base::TaskId&)> onQueryCopyPayload_;
-  std::function<std::vector<pfd::core::TaskFileEntryDto>(const pfd::base::TaskId&)> onQueryTaskFiles_;
+  std::function<std::vector<pfd::core::TaskFileEntryDto>(const pfd::base::TaskId&)>
+      onQueryTaskFiles_;
   std::function<void(const pfd::base::TaskId&, const std::vector<int>&,
                      pfd::core::TaskFilePriorityLevel)>
       onSetTaskFilePriority_;
@@ -227,7 +228,8 @@ private:
   std::function<void(const pfd::base::TaskId&, const QString&)> onForceReannounceTracker_;
   std::function<void(const pfd::base::TaskId&)> onForceReannounceAllTrackers_;
   std::function<std::vector<pfd::core::TaskPeerDto>(const pfd::base::TaskId&)> onQueryTaskPeers_;
-  std::function<std::vector<pfd::core::TaskWebSeedDto>(const pfd::base::TaskId&)> onQueryTaskWebSeeds_;
+  std::function<std::vector<pfd::core::TaskWebSeedDto>(const pfd::base::TaskId&)>
+      onQueryTaskWebSeeds_;
   pfd::core::rss::RssService* rssService_{nullptr};
 };
 
