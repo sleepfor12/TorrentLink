@@ -31,6 +31,7 @@
 #include "base/input_sanitizer.h"
 #include "base/io.h"
 #include "base/paths.h"
+#include "app/task_query_mapper.h"
 #include "core/builtin_http_tracker.h"
 #include "core/config_service.h"
 #include "core/logger.h"
@@ -40,7 +41,6 @@
 #include "core/task_event.h"
 #include "core/task_snapshot.h"
 #include "lt/session_ids.h"
-#include "lt/task_event_mapper.h"
 
 namespace pfd::app {
 
@@ -62,8 +62,9 @@ AppController::~AppController() {
       f.wait();
     }
   }
-  savePersistedTasks();
-  saveResumeData();
+  if (taskPersistenceCoordinator_) {
+    taskPersistenceCoordinator_->saveNow();
+  }
   saveSettings();
 }
 
@@ -71,17 +72,19 @@ void AppController::initialize() {
   loadSettings();
   loadPersistedTasks();
 
-  refreshThrottle_ = new QTimer(static_cast<QObject*>(app_));
-  refreshThrottle_->setSingleShot(true);
-  refreshThrottle_->setInterval(100);
-  QObject::connect(refreshThrottle_, &QTimer::timeout, static_cast<QObject*>(app_), [this]() {
-    if (refreshPending_) {
-      refreshPending_ = false;
-      const auto snaps = pipeline_->snapshots();
-      window_->refreshTasks(snaps);
-      applySeedingPolicy(snaps);
-    }
-  });
+  taskBatchUseCase_ = std::make_unique<pfd::app::TaskBatchUseCase>(
+      worker_, [this]() { return pipeline_->snapshots(); });
+  eventIngestOrchestrator_ = std::make_unique<pfd::app::EventIngestOrchestrator>(pipeline_);
+  rssDownloadPipeline_ = std::make_unique<pfd::app::RssDownloadPipeline>(static_cast<QObject*>(app_));
+  uiRefreshScheduler_ = std::make_unique<pfd::app::RefreshScheduler>(
+      static_cast<QObject*>(app_), 100, [this]() {
+        const auto snaps = pipeline_->snapshots();
+        window_->refreshTasks(snaps);
+        applySeedingPolicy(snaps);
+      });
+  taskPersistenceCoordinator_ = std::make_unique<pfd::app::TaskPersistenceCoordinator>(
+      static_cast<QObject*>(app_), [this]() { savePersistedTasks(); },
+      [this]() { saveResumeData(); });
 
   bindUiCallbacks();
   bindWorkerCallbacks();
@@ -130,28 +133,18 @@ void AppController::initialize() {
                    [this]() { app_->quit(); });
   QObject::connect(systemTray_, &pfd::ui::SystemTray::pauseAllRequested,
                    static_cast<QObject*>(app_), [this]() {
-                     const auto snaps = pipeline_->snapshots();
-                     for (const auto& s : snaps) {
-                       if (s.status == pfd::base::TaskStatus::kDownloading ||
-                           s.status == pfd::base::TaskStatus::kSeeding) {
-                         worker_->pauseTask(s.taskId);
-                       }
-                     }
+                     taskBatchUseCase_->pauseAllActiveTasks();
                    });
   QObject::connect(systemTray_, &pfd::ui::SystemTray::resumeAllRequested,
                    static_cast<QObject*>(app_), [this]() {
-                     const auto snaps = pipeline_->snapshots();
-                     for (const auto& s : snaps) {
-                       if (s.status == pfd::base::TaskStatus::kPaused) {
-                         worker_->resumeTask(s.taskId);
-                       }
-                     }
+                     taskBatchUseCase_->resumeAllPausedTasks();
                    });
 
   QObject::connect(app_, &QApplication::aboutToQuit, static_cast<QObject*>(app_), [this]() {
     shuttingDown_.store(true);
-    savePersistedTasks();
-    saveResumeData();
+    if (taskPersistenceCoordinator_) {
+      taskPersistenceCoordinator_->saveNow();
+    }
     if (rssService_)
       rssService_->saveState();
   });
@@ -194,16 +187,8 @@ void AppController::initialize() {
 }
 
 void AppController::schedulePersistedTasksAutoSave() {
-  auto* timer = new QTimer(static_cast<QObject*>(app_));
-  timer->setInterval(taskAutoSaveMs_);
-  QObject::connect(timer, &QTimer::timeout, static_cast<QObject*>(app_), [this]() {
-    if (shuttingDown_.load()) {
-      return;
-    }
-    savePersistedTasks();
-    saveResumeData();
-  });
-  timer->start();
+  taskPersistenceCoordinator_->setAutoSaveIntervalMs(taskAutoSaveMs_);
+  taskPersistenceCoordinator_->startAutoSave();
 }
 
 void AppController::scheduleTimedAction() {
@@ -326,39 +311,21 @@ void AppController::enqueueMagnet(const QString& uri, const QString& savePath,
                                   const pfd::core::rss::RssDownloadSettlement& rssSettlement,
                                   bool skipInteractiveAdd, const QString& category,
                                   const QString& tagsCsv) {
-  {
-    std::lock_guard<std::mutex> lk(magnetMu_);
-    magnetQueue_.push_back(
-        MagnetQueueItem{uri, savePath, rssSettlement, skipInteractiveAdd, category, tagsCsv});
-    if (!magnetPumpScheduled_) {
-      magnetPumpScheduled_ = true;
-      QMetaObject::invokeMethod(
-          static_cast<QObject*>(app_), [this]() { pumpMagnetQueueOnUi(); }, Qt::QueuedConnection);
-    }
-  }
-}
-
-void AppController::pumpMagnetQueueOnUi() {
-  if (shuttingDown_.load()) {
-    return;
-  }
-  for (;;) {
-    MagnetQueueItem item;
-    {
-      std::lock_guard<std::mutex> lk(magnetMu_);
-      magnetPumpScheduled_ = false;
-      if (magnetInFlight_ >= magnetMaxInFlight_) {
-        return;
-      }
-      if (magnetQueue_.empty()) {
-        return;
-      }
-      item = magnetQueue_.front();
-      magnetQueue_.pop_front();
-      ++magnetInFlight_;
-    }
-    startOneMagnetOnUi(std::move(item));
-  }
+  rssDownloadPipeline_->setMagnetMaxInFlight(magnetMaxInFlight_);
+  rssDownloadPipeline_->enqueueMagnet(
+      pfd::app::RssDownloadPipeline::MagnetQueueItem{uri, savePath, rssSettlement,
+                                                     skipInteractiveAdd, category, tagsCsv},
+      [this](pfd::app::RssDownloadPipeline::MagnetQueueItem item) {
+        if (!shuttingDown_.load()) {
+          startOneMagnetOnUi(std::move(item));
+        } else {
+          settleRssDownloadIfNeeded(item.rssSettlement, false);
+          rssDownloadPipeline_->finishMagnet(
+              [this](pfd::app::RssDownloadPipeline::MagnetQueueItem next) {
+                startOneMagnetOnUi(std::move(next));
+              });
+        }
+      });
 }
 
 void AppController::settleRssDownloadIfNeeded(const pfd::core::rss::RssDownloadSettlement& s,
@@ -372,12 +339,13 @@ void AppController::settleRssDownloadIfNeeded(const pfd::core::rss::RssDownloadS
   }
 }
 
-void AppController::startOneMagnetOnUi(MagnetQueueItem item) {
+void AppController::startOneMagnetOnUi(pfd::app::RssDownloadPipeline::MagnetQueueItem item) {
   const pfd::core::rss::RssDownloadSettlement rssS = item.rssSettlement;
   if (shuttingDown_.load()) {
     settleRssDownloadIfNeeded(rssS, false);
-    std::lock_guard<std::mutex> lk(magnetMu_);
-    magnetInFlight_ = std::max(0, magnetInFlight_ - 1);
+    rssDownloadPipeline_->finishMagnet([this](pfd::app::RssDownloadPipeline::MagnetQueueItem next) {
+      startOneMagnetOnUi(std::move(next));
+    });
     return;
   }
   const QString trimmed = item.uri.trimmed();
@@ -387,19 +355,9 @@ void AppController::startOneMagnetOnUi(MagnetQueueItem item) {
     if (!trimmed.isEmpty()) {
       logError(QStringLiteral("Magnet URI rejected: %1").arg(magnetErr.message()));
     }
-    bool shouldPump = false;
-    {
-      std::lock_guard<std::mutex> lk(magnetMu_);
-      magnetInFlight_ = std::max(0, magnetInFlight_ - 1);
-      shouldPump = (!magnetQueue_.empty() && !magnetPumpScheduled_);
-      if (shouldPump) {
-        magnetPumpScheduled_ = true;
-      }
-    }
-    if (shouldPump) {
-      QMetaObject::invokeMethod(
-          static_cast<QObject*>(app_), [this]() { pumpMagnetQueueOnUi(); }, Qt::QueuedConnection);
-    }
+    rssDownloadPipeline_->finishMagnet([this](pfd::app::RssDownloadPipeline::MagnetQueueItem next) {
+      startOneMagnetOnUi(std::move(next));
+    });
     return;
   }
 
@@ -424,7 +382,14 @@ void AppController::startOneMagnetOnUi(MagnetQueueItem item) {
     const auto metaOpt = workerPtr->prepareMagnetMetadata(trimmed, tempMetaPath, 12000);
     if (shuttingDown_.load() || windowGuard.isNull()) {
       QMetaObject::invokeMethod(
-          static_cast<QObject*>(app_), [this, rssS]() { settleRssDownloadIfNeeded(rssS, false); },
+          static_cast<QObject*>(app_),
+          [this, rssS]() {
+            settleRssDownloadIfNeeded(rssS, false);
+            rssDownloadPipeline_->finishMagnet(
+                [this](pfd::app::RssDownloadPipeline::MagnetQueueItem next) {
+                  startOneMagnetOnUi(std::move(next));
+                });
+          },
           Qt::QueuedConnection);
       return;
     }
@@ -434,25 +399,10 @@ void AppController::startOneMagnetOnUi(MagnetQueueItem item) {
         [=]() {
           // 任何结果（成功/失败/取消）都要释放 in-flight 并继续 pump
           const auto finish = [this]() {
-            if (shuttingDown_.load()) {
-              std::lock_guard<std::mutex> lk(magnetMu_);
-              magnetInFlight_ = std::max(0, magnetInFlight_ - 1);
-              return;
-            }
-            bool shouldPump = false;
-            {
-              std::lock_guard<std::mutex> lk(magnetMu_);
-              magnetInFlight_ = std::max(0, magnetInFlight_ - 1);
-              shouldPump = (!magnetQueue_.empty() && !magnetPumpScheduled_);
-              if (shouldPump) {
-                magnetPumpScheduled_ = true;
-              }
-            }
-            if (shouldPump) {
-              QMetaObject::invokeMethod(
-                  static_cast<QObject*>(app_), [this]() { pumpMagnetQueueOnUi(); },
-                  Qt::QueuedConnection);
-            }
+            rssDownloadPipeline_->finishMagnet(
+                [this](pfd::app::RssDownloadPipeline::MagnetQueueItem next) {
+                  startOneMagnetOnUi(std::move(next));
+                });
           };
 
           if (windowGuard.isNull()) {
@@ -580,70 +530,43 @@ void AppController::startOneMagnetOnUi(MagnetQueueItem item) {
 void AppController::enqueueRssTorrentUrl(
     const QString& url, const QString& savePath, const QString& referer,
     const pfd::core::rss::RssDownloadSettlement& rssSettlement) {
-  {
-    std::lock_guard<std::mutex> lk(rssTorrentMu_);
-    rssTorrentQueue_.push_back(
-        RssTorrentUrlQueueItem{url.trimmed(), savePath, referer, rssSettlement});
-    if (!rssTorrentPumpScheduled_) {
-      rssTorrentPumpScheduled_ = true;
-      QMetaObject::invokeMethod(
-          static_cast<QObject*>(app_), [this]() { pumpRssTorrentUrlQueueOnUi(); },
-          Qt::QueuedConnection);
-    }
-  }
+  rssDownloadPipeline_->enqueueRssTorrentUrl(
+      pfd::app::RssDownloadPipeline::RssTorrentUrlQueueItem{url.trimmed(), savePath, referer,
+                                                            rssSettlement},
+      [this](pfd::app::RssDownloadPipeline::RssTorrentUrlQueueItem item) {
+        if (!shuttingDown_.load()) {
+          startOneRssTorrentUrlOnUi(std::move(item));
+        } else {
+          settleRssDownloadIfNeeded(item.rssSettlement, false);
+          rssDownloadPipeline_->finishRssTorrent(
+              [this](pfd::app::RssDownloadPipeline::RssTorrentUrlQueueItem next) {
+                startOneRssTorrentUrlOnUi(std::move(next));
+              });
+        }
+      });
 }
 
-void AppController::pumpRssTorrentUrlQueueOnUi() {
-  if (shuttingDown_.load()) {
-    return;
-  }
-  for (;;) {
-    RssTorrentUrlQueueItem item;
-    {
-      std::lock_guard<std::mutex> lk(rssTorrentMu_);
-      rssTorrentPumpScheduled_ = false;
-      if (rssTorrentInFlight_ >= rssTorrentMaxInFlight_) {
-        return;
-      }
-      if (rssTorrentQueue_.empty()) {
-        return;
-      }
-      item = rssTorrentQueue_.front();
-      rssTorrentQueue_.pop_front();
-      ++rssTorrentInFlight_;
-    }
-    startOneRssTorrentUrlOnUi(std::move(item));
-  }
-}
-
-void AppController::startOneRssTorrentUrlOnUi(RssTorrentUrlQueueItem item) {
+void AppController::startOneRssTorrentUrlOnUi(
+    pfd::app::RssDownloadPipeline::RssTorrentUrlQueueItem item) {
   const QString url = item.url.trimmed();
   const QString referer = item.referer.trimmed();
   const pfd::core::rss::RssDownloadSettlement rssS = item.rssSettlement;
   if (url.isEmpty()) {
     settleRssDownloadIfNeeded(rssS, false);
     logError(QStringLiteral("RSS torrent URL is empty."));
-    bool shouldPump = false;
-    {
-      std::lock_guard<std::mutex> lk(rssTorrentMu_);
-      rssTorrentInFlight_ = std::max(0, rssTorrentInFlight_ - 1);
-      shouldPump = (!rssTorrentQueue_.empty() && !rssTorrentPumpScheduled_);
-      if (shouldPump) {
-        rssTorrentPumpScheduled_ = true;
-      }
-    }
-    if (shouldPump) {
-      QMetaObject::invokeMethod(
-          static_cast<QObject*>(app_), [this]() { pumpRssTorrentUrlQueueOnUi(); },
-          Qt::QueuedConnection);
-    }
+    rssDownloadPipeline_->finishRssTorrent(
+        [this](pfd::app::RssDownloadPipeline::RssTorrentUrlQueueItem next) {
+          startOneRssTorrentUrlOnUi(std::move(next));
+        });
     return;
   }
 
   if (shuttingDown_.load()) {
     settleRssDownloadIfNeeded(rssS, false);
-    std::lock_guard<std::mutex> lk(rssTorrentMu_);
-    rssTorrentInFlight_ = std::max(0, rssTorrentInFlight_ - 1);
+    rssDownloadPipeline_->finishRssTorrent(
+        [this](pfd::app::RssDownloadPipeline::RssTorrentUrlQueueItem next) {
+          startOneRssTorrentUrlOnUi(std::move(next));
+        });
     return;
   }
 
@@ -690,20 +613,10 @@ void AppController::startOneRssTorrentUrlOnUi(RssTorrentUrlQueueItem item) {
           static_cast<QObject*>(app_),
           [this, rssS]() {
             settleRssDownloadIfNeeded(rssS, false);
-            bool shouldPump = false;
-            {
-              std::lock_guard<std::mutex> lk(rssTorrentMu_);
-              rssTorrentInFlight_ = std::max(0, rssTorrentInFlight_ - 1);
-              shouldPump = (!rssTorrentQueue_.empty() && !rssTorrentPumpScheduled_);
-              if (shouldPump) {
-                rssTorrentPumpScheduled_ = true;
-              }
-            }
-            if (shouldPump) {
-              QMetaObject::invokeMethod(
-                  static_cast<QObject*>(app_), [this]() { pumpRssTorrentUrlQueueOnUi(); },
-                  Qt::QueuedConnection);
-            }
+            rssDownloadPipeline_->finishRssTorrent(
+                [this](pfd::app::RssDownloadPipeline::RssTorrentUrlQueueItem next) {
+                  startOneRssTorrentUrlOnUi(std::move(next));
+                });
           },
           Qt::QueuedConnection);
       return;
@@ -718,25 +631,10 @@ void AppController::startOneRssTorrentUrlOnUi(RssTorrentUrlQueueItem item) {
         [this, windowGuard, workerPtr, pathCopy, errCopy, url, resolvedSavePath, useDefaultTrackers,
          defaultTrackersCopy, rssS]() {
           const auto finish = [this]() {
-            if (shuttingDown_.load()) {
-              std::lock_guard<std::mutex> lk(rssTorrentMu_);
-              rssTorrentInFlight_ = std::max(0, rssTorrentInFlight_ - 1);
-              return;
-            }
-            bool shouldPump = false;
-            {
-              std::lock_guard<std::mutex> lk(rssTorrentMu_);
-              rssTorrentInFlight_ = std::max(0, rssTorrentInFlight_ - 1);
-              shouldPump = (!rssTorrentQueue_.empty() && !rssTorrentPumpScheduled_);
-              if (shouldPump) {
-                rssTorrentPumpScheduled_ = true;
-              }
-            }
-            if (shouldPump) {
-              QMetaObject::invokeMethod(
-                  static_cast<QObject*>(app_), [this]() { pumpRssTorrentUrlQueueOnUi(); },
-                  Qt::QueuedConnection);
-            }
+            rssDownloadPipeline_->finishRssTorrent(
+                [this](pfd::app::RssDownloadPipeline::RssTorrentUrlQueueItem next) {
+                  startOneRssTorrentUrlOnUi(std::move(next));
+                });
           };
 
           if (windowGuard.isNull()) {
@@ -965,16 +863,16 @@ void AppController::bindUiCallbacks() {
   });
   window_->setOnQueryTaskFiles([this](const pfd::base::TaskId& taskId) {
     LOG_DEBUG(QStringLiteral("[main] UI query task files taskId=%1").arg(taskId.toString()));
-    return worker_->queryTaskFiles(taskId);
+    return pfd::app::mapTaskFiles(worker_->queryTaskFiles(taskId));
   });
   window_->setOnSetTaskFilePriority([this](const pfd::base::TaskId& taskId,
                                            const std::vector<int>& fileIndices,
-                                           pfd::lt::SessionWorker::FilePriorityLevel level) {
+                                           pfd::core::TaskFilePriorityLevel level) {
     LOG_INFO(QStringLiteral("[main] UI set task file priority taskId=%1 level=%2 files=%3")
                  .arg(taskId.toString())
                  .arg(static_cast<int>(level))
                  .arg(fileIndices.size()));
-    worker_->setTaskFilePriority(taskId, fileIndices, level);
+    worker_->setTaskFilePriority(taskId, fileIndices, pfd::app::mapTaskFilePriorityLevel(level));
   });
   window_->setOnRenameTaskFileOrFolder(
       [this](const pfd::base::TaskId& taskId, const QString& logicalPath, const QString& newName) {
@@ -984,7 +882,7 @@ void AppController::bindUiCallbacks() {
       });
   window_->setOnQueryTaskTrackerSnapshot([this](const pfd::base::TaskId& taskId) {
     LOG_DEBUG(QStringLiteral("[main] UI query task trackers taskId=%1").arg(taskId.toString()));
-    return worker_->queryTaskTrackers(taskId);
+    return pfd::app::mapTaskTrackers(worker_->queryTaskTrackers(taskId));
   });
   window_->setOnAddTaskTracker([this](const pfd::base::TaskId& taskId, const QString& url) {
     const auto err = pfd::base::validateTrackerUrl(url);
@@ -1024,10 +922,10 @@ void AppController::bindUiCallbacks() {
   });
 
   window_->setOnQueryTaskPeers(
-      [this](const pfd::base::TaskId& taskId) { return worker_->queryTaskPeers(taskId); });
+      [this](const pfd::base::TaskId& taskId) { return pfd::app::mapTaskPeers(worker_->queryTaskPeers(taskId)); });
 
   window_->setOnQueryTaskWebSeeds(
-      [this](const pfd::base::TaskId& taskId) { return worker_->queryTaskWebSeeds(taskId); });
+      [this](const pfd::base::TaskId& taskId) { return pfd::app::mapTaskWebSeeds(worker_->queryTaskWebSeeds(taskId)); });
 
   window_->setOnMoveTask([this](const pfd::base::TaskId& taskId, const QString& targetPath) {
     const auto pathErr = pfd::base::validatePath(targetPath);
@@ -1129,56 +1027,33 @@ void AppController::bindWorkerCallbacks() {
     QMetaObject::invokeMethod(
         static_cast<QObject*>(app_),
         [this, views = std::move(views)]() {
-          std::vector<pfd::core::TaskEvent> events;
-          events.reserve(views.size());
           for (const auto& view : views) {
             if (!view.magnet.isEmpty()) {
               upsertKnownTaskMagnet(view.taskId, view.magnet);
             }
-            const auto ev = pfd::lt::mapAlertToTaskEvent(view);
-            if (ev.has_value()) {
-              events.push_back(*ev);
-            }
           }
-          if (!events.empty()) {
-            const qint64 nowMs = QDateTime::currentMSecsSinceEpoch();
-            for (auto& ev : events) {
-              if (ev.type == pfd::core::TaskEventType::kProgressUpdated) {
-                const QString key = ev.taskId.toString(QUuid::WithoutBraces);
-                auto lockIt = statusLockUntilMs_.find(key);
-                if (lockIt != statusLockUntilMs_.end()) {
-                  if (nowMs < lockIt->second) {
-                    ev.status = pfd::base::TaskStatus::kUnknown;
-                  } else {
-                    statusLockUntilMs_.erase(lockIt);
-                  }
-                }
+          const auto ingestResult = eventIngestOrchestrator_->ingest(views);
+          LOG_DEBUG(QStringLiteral("[main] Consumed alert batch: views=%1 dup=%2 removed=%3")
+                        .arg(views.size())
+                        .arg(ingestResult.duplicateRejectedTaskIds.size())
+                        .arg(ingestResult.removedTaskIds.size()));
+          for (const auto& taskId : ingestResult.removedTaskIds) {
+            knownTaskMagnets_.erase(taskId.toString(QUuid::WithoutBraces));
+          }
+          QSet<QString> duplicateUiShown;
+          for (const auto& taskId : ingestResult.duplicateRejectedTaskIds) {
+            const QString tid = taskId.toString(QUuid::WithoutBraces);
+            if (duplicateUiShown.contains(tid)) {
+              continue;
+            }
+            duplicateUiShown.insert(tid);
+            QString label;
+            if (const auto snap = pipeline_->snapshot(taskId)) {
+              if (!snap->name.isEmpty()) {
+                label = snap->name;
               }
             }
-            LOG_DEBUG(QStringLiteral("[main] Consuming alert batch: views=%1 events=%2")
-                          .arg(views.size())
-                          .arg(events.size()));
-            pipeline_->consumeBatch(events);
-            QSet<QString> duplicateUiShown;
-            for (const auto& ev : events) {
-              if (ev.type == pfd::core::TaskEventType::kRemoved) {
-                knownTaskMagnets_.erase(ev.taskId.toString(QUuid::WithoutBraces));
-              }
-              if (ev.type == pfd::core::TaskEventType::kDuplicateRejected) {
-                const QString tid = ev.taskId.toString(QUuid::WithoutBraces);
-                if (duplicateUiShown.contains(tid)) {
-                  continue;
-                }
-                duplicateUiShown.insert(tid);
-                QString label;
-                if (const auto snap = pipeline_->snapshot(ev.taskId)) {
-                  if (!snap->name.isEmpty()) {
-                    label = snap->name;
-                  }
-                }
-                window_->notifyTaskAlreadyInList(label);
-              }
-            }
+            window_->notifyTaskAlreadyInList(label);
           }
           if (systemTray_ != nullptr) {
             const auto snapshots = pipeline_->snapshots();
@@ -1193,9 +1068,7 @@ void AppController::bindWorkerCallbacks() {
               systemTray_->showNotification(QStringLiteral("下载完成"), name);
             }
           }
-          refreshPending_ = true;
-          if (!refreshThrottle_->isActive())
-            refreshThrottle_->start();
+          uiRefreshScheduler_->requestRefresh();
         },
         Qt::QueuedConnection);
   });
@@ -1249,7 +1122,7 @@ void AppController::applyTaskMetaUpdate(const pfd::base::TaskId& taskId, const Q
   ev.category = category;
   ev.tags = tagsCsv;
   pipeline_->consume(ev);
-  window_->refreshTasks(pipeline_->snapshots());
+  uiRefreshScheduler_->requestRefresh();
 }
 
 void AppController::loadSettings() {
@@ -1520,10 +1393,11 @@ void AppController::injectTransitionalStatus(const pfd::base::TaskId& taskId,
   ev.status = status;
   pipeline_->consume(ev);
 
-  const QString key = taskId.toString(QUuid::WithoutBraces);
-  statusLockUntilMs_[key] = QDateTime::currentMSecsSinceEpoch() + 1000;
+  if (eventIngestOrchestrator_ != nullptr) {
+    eventIngestOrchestrator_->lockProgressStatus(taskId, QDateTime::currentMSecsSinceEpoch() + 1000);
+  }
 
-  window_->refreshTasks(pipeline_->snapshots());
+  uiRefreshScheduler_->requestRefresh();
 }
 
 void AppController::logInfo(const QString& msg) const {

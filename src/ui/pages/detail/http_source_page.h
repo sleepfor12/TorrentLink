@@ -5,8 +5,8 @@
 
 #include <functional>
 
+#include "core/task_query_dto.h"
 #include "core/task_snapshot.h"
-#include "lt/session_worker.h"
 
 class QTableWidget;
 class QTimer;
@@ -17,8 +17,7 @@ class HttpSourcePage : public QWidget {
   Q_OBJECT
 
 public:
-  using QueryWebSeedsFn =
-      std::function<std::vector<pfd::lt::SessionWorker::WebSeedSnapshot>(const pfd::base::TaskId&)>;
+  using QueryWebSeedsFn = std::function<std::vector<pfd::core::TaskWebSeedDto>(const pfd::base::TaskId&)>;
 
   explicit HttpSourcePage(QWidget* parent = nullptr);
 

@@ -36,6 +36,7 @@ add_library(torrentlink_core STATIC
   log_store.h
   log_store.cc
   task_event.h
+  task_query_dto.h
   task_snapshot.h
   task_snapshot.cc
   task_state_store.h

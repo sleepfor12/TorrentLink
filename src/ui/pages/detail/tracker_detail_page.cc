@@ -296,8 +296,8 @@ void TrackerDetailPage::buildLayout() {
   });
 }
 
-QString TrackerDetailPage::statusText(pfd::lt::SessionWorker::TrackerStatus s) {
-  using T = pfd::lt::SessionWorker::TrackerStatus;
+QString TrackerDetailPage::statusText(pfd::core::TaskTrackerStatusDto s) {
+  using T = pfd::core::TaskTrackerStatusDto;
   switch (s) {
     case T::kCannotConnect:
       return QStringLiteral("无法连接");
@@ -321,8 +321,8 @@ QString TrackerDetailPage::announceText(int seconds) {
   return pfd::base::formatDuration(seconds);
 }
 
-static QColor statusColor(pfd::lt::SessionWorker::TrackerStatus s) {
-  using T = pfd::lt::SessionWorker::TrackerStatus;
+static QColor statusColor(pfd::core::TaskTrackerStatusDto s) {
+  using T = pfd::core::TaskTrackerStatusDto;
   switch (s) {
     case T::kWorking:
       return QColor(22, 163, 74);
@@ -374,8 +374,7 @@ void TrackerDetailPage::reload() {
 
   QTreeWidgetItem* toSelect = nullptr;
   const auto appendRow = [this, &expandedUrls, &selectedUrl, &selectedType, &selectedEndpointText,
-                          &toSelect](const pfd::lt::SessionWorker::TrackerRowSnapshot& r,
-                                     int type) {
+                          &toSelect](const pfd::core::TaskTrackerRowDto& r, int type) {
     auto* item = new TrackerTreeItem(tree_);
     const QString display0 = type == kFixed ? qbStyleFixedLabel(r.url) : r.url;
     item->setText(0, display0);

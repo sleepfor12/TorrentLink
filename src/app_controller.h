@@ -22,6 +22,11 @@ class BuiltinHttpTracker;
 #include "core/rss/rss_service.h"
 #include "core/save_path_policy.h"
 #include "core/task_pipeline_service.h"
+#include "app/rss_download_pipeline.h"
+#include "app/event_ingest_orchestrator.h"
+#include "app/task_batch_use_case.h"
+#include "app/task_persistence_coordinator.h"
+#include "app/refresh_scheduler.h"
 #include "lt/session_worker.h"
 #include "ui/main_window.h"
 #include "ui/system_tray.h"
@@ -44,15 +49,6 @@ public:
   void submitArgvMagnet(const QString& magnet);
 
 private:
-  struct MagnetQueueItem {
-    QString uri;
-    QString savePath;
-    pfd::core::rss::RssDownloadSettlement rssSettlement;
-    bool skipInteractiveAdd{false};
-    QString category;
-    QString tagsCsv;
-  };
-
   void updateRssTimerInterval();
   void loadSettings();
   void saveSettings() const;
@@ -83,20 +79,11 @@ private:
                      const pfd::core::rss::RssDownloadSettlement& rssSettlement = {},
                      bool skipInteractiveAdd = false, const QString& category = {},
                      const QString& tagsCsv = {});
-  void pumpMagnetQueueOnUi();
-  void startOneMagnetOnUi(MagnetQueueItem item);
-
-  struct RssTorrentUrlQueueItem {
-    QString url;
-    QString savePath;
-    QString referer;
-    pfd::core::rss::RssDownloadSettlement rssSettlement;
-  };
+  void startOneMagnetOnUi(pfd::app::RssDownloadPipeline::MagnetQueueItem item);
   void enqueueRssTorrentUrl(const QString& url, const QString& savePath,
                             const QString& referer = {},
                             const pfd::core::rss::RssDownloadSettlement& rssSettlement = {});
-  void pumpRssTorrentUrlQueueOnUi();
-  void startOneRssTorrentUrlOnUi(RssTorrentUrlQueueItem item);
+  void startOneRssTorrentUrlOnUi(pfd::app::RssDownloadPipeline::RssTorrentUrlQueueItem item);
 
   QApplication* app_{nullptr};
   pfd::ui::MainWindow* window_{nullptr};
@@ -114,17 +101,7 @@ private:
   int perTorrentConnectionsLimit_{0};
   pfd::core::SavePathPolicy savePathPolicy_;
 
-  std::mutex magnetMu_;
-  std::deque<MagnetQueueItem> magnetQueue_;
-  int magnetInFlight_{0};
   int magnetMaxInFlight_{8};  // 同时最多弹出 5-10 个，默认取 8
-  bool magnetPumpScheduled_{false};
-
-  std::mutex rssTorrentMu_;
-  std::deque<RssTorrentUrlQueueItem> rssTorrentQueue_;
-  int rssTorrentInFlight_{0};
-  int rssTorrentMaxInFlight_{8};
-  bool rssTorrentPumpScheduled_{false};
 
   std::mutex magnetTasksMu_;
   std::vector<std::future<void>> magnetTasks_;
@@ -148,10 +125,12 @@ private:
   pfd::ui::SystemTray* systemTray_{nullptr};
   std::unordered_set<QString> notifiedFinished_;
 
-  QTimer* refreshThrottle_{nullptr};
-  bool refreshPending_{false};
+  std::unique_ptr<pfd::app::RefreshScheduler> uiRefreshScheduler_;
+  std::unique_ptr<pfd::app::TaskBatchUseCase> taskBatchUseCase_;
+  std::unique_ptr<pfd::app::RssDownloadPipeline> rssDownloadPipeline_;
+  std::unique_ptr<pfd::app::TaskPersistenceCoordinator> taskPersistenceCoordinator_;
 
-  std::unordered_map<QString, qint64> statusLockUntilMs_;
+  std::unique_ptr<pfd::app::EventIngestOrchestrator> eventIngestOrchestrator_;
 };
 
 }  // namespace pfd::app

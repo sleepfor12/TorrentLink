@@ -39,6 +39,8 @@ add_executable(torrentlink_tests
   test_save_path_policy.cc
   test_task_add_builder.cc
   test_builtin_http_tracker.cc
+  test_task_query_mapper.cc
+  ../src/app/task_query_mapper.cc
 )
 
 target_link_libraries(torrentlink_tests

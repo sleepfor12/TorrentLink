@@ -5,8 +5,8 @@
 
 #include <functional>
 
+#include "core/task_query_dto.h"
 #include "core/task_snapshot.h"
-#include "lt/session_worker.h"
 
 class QTreeWidget;
 class QTreeWidgetItem;
@@ -20,8 +20,7 @@ class TrackerDetailPage : public QWidget {
   Q_OBJECT
 
 public:
-  using QueryTrackersFn =
-      std::function<pfd::lt::SessionWorker::TaskTrackerSnapshot(const pfd::base::TaskId&)>;
+  using QueryTrackersFn = std::function<pfd::core::TaskTrackerSnapshotDto(const pfd::base::TaskId&)>;
   using AddTrackerFn = std::function<void(const pfd::base::TaskId&, const QString&)>;
   using EditTrackerFn =
       std::function<void(const pfd::base::TaskId&, const QString&, const QString&)>;
@@ -50,7 +49,7 @@ private:
   void actionCopyTracker(const QString& url);
   void actionReannounceTracker(const QString& url);
   void actionReannounceAll();
-  static QString statusText(pfd::lt::SessionWorker::TrackerStatus s);
+  static QString statusText(pfd::core::TaskTrackerStatusDto s);
   static QString countText(int n);
   static QString announceText(int seconds);
   void decrementAnnounceCountdowns();

@@ -5,8 +5,8 @@
 
 #include <functional>
 
+#include "core/task_query_dto.h"
 #include "core/task_snapshot.h"
-#include "lt/session_worker.h"
 
 class QTableWidget;
 class QTimer;
@@ -17,8 +17,7 @@ class PeerListPage : public QWidget {
   Q_OBJECT
 
 public:
-  using QueryPeersFn =
-      std::function<std::vector<pfd::lt::SessionWorker::PeerSnapshot>(const pfd::base::TaskId&)>;
+  using QueryPeersFn = std::function<std::vector<pfd::core::TaskPeerDto>(const pfd::base::TaskId&)>;
 
   explicit PeerListPage(QWidget* parent = nullptr);
 

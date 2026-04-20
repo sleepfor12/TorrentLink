@@ -32,8 +32,8 @@ enum Role {
   kPriorityRole,
 };
 
-QString priorityText(pfd::lt::SessionWorker::FilePriorityLevel p) {
-  using P = pfd::lt::SessionWorker::FilePriorityLevel;
+QString priorityText(pfd::core::TaskFilePriorityLevel p) {
+  using P = pfd::core::TaskFilePriorityLevel;
   switch (p) {
     case P::kNotDownloaded:
       return QStringLiteral("未下载");
@@ -202,7 +202,7 @@ void ContentTreePage::reloadTree() {
     if (ps.size() == 1) {
       item->setData(0, kPriorityRole, *ps.begin());
       item->setText(
-          3, priorityText(static_cast<pfd::lt::SessionWorker::FilePriorityLevel>(*ps.begin())));
+          3, priorityText(static_cast<pfd::core::TaskFilePriorityLevel>(*ps.begin())));
     } else {
       item->setData(0, kPriorityRole, -1);
       item->setText(3, QStringLiteral("混合"));
@@ -262,17 +262,16 @@ void ContentTreePage::showContextMenu(const QPoint& pos) {
   auto* openContainingAct = menu.addAction(QStringLiteral("打开包含文件夹"));
   auto* renameAct = menu.addAction(QStringLiteral("重命名"));
   QMenu* priorityMenu = menu.addMenu(QStringLiteral("设置优先级"));
-  auto addPriority = [priorityMenu](const QString& text,
-                                    pfd::lt::SessionWorker::FilePriorityLevel lv) {
+  auto addPriority = [priorityMenu](const QString& text, pfd::core::TaskFilePriorityLevel lv) {
     QAction* a = priorityMenu->addAction(text);
     a->setData(static_cast<int>(lv));
   };
-  addPriority(QStringLiteral("未下载"), pfd::lt::SessionWorker::FilePriorityLevel::kNotDownloaded);
-  addPriority(QStringLiteral("不下载"), pfd::lt::SessionWorker::FilePriorityLevel::kDoNotDownload);
-  addPriority(QStringLiteral("正常"), pfd::lt::SessionWorker::FilePriorityLevel::kNormal);
-  addPriority(QStringLiteral("高"), pfd::lt::SessionWorker::FilePriorityLevel::kHigh);
-  addPriority(QStringLiteral("最高"), pfd::lt::SessionWorker::FilePriorityLevel::kHighest);
-  addPriority(QStringLiteral("按文件顺序"), pfd::lt::SessionWorker::FilePriorityLevel::kFileOrder);
+  addPriority(QStringLiteral("未下载"), pfd::core::TaskFilePriorityLevel::kNotDownloaded);
+  addPriority(QStringLiteral("不下载"), pfd::core::TaskFilePriorityLevel::kDoNotDownload);
+  addPriority(QStringLiteral("正常"), pfd::core::TaskFilePriorityLevel::kNormal);
+  addPriority(QStringLiteral("高"), pfd::core::TaskFilePriorityLevel::kHigh);
+  addPriority(QStringLiteral("最高"), pfd::core::TaskFilePriorityLevel::kHighest);
+  addPriority(QStringLiteral("按文件顺序"), pfd::core::TaskFilePriorityLevel::kFileOrder);
 
   openFolderAct->setEnabled(hasOpenPath);
   openContainingAct->setEnabled(hasOpenPath);
@@ -315,11 +314,11 @@ void ContentTreePage::showContextMenu(const QPoint& pos) {
   }
   if (chosen->parentWidget() == priorityMenu) {
     applyPriorityToSelection(
-        static_cast<pfd::lt::SessionWorker::FilePriorityLevel>(chosen->data().toInt()));
+        static_cast<pfd::core::TaskFilePriorityLevel>(chosen->data().toInt()));
   }
 }
 
-void ContentTreePage::applyPriorityToSelection(pfd::lt::SessionWorker::FilePriorityLevel level) {
+void ContentTreePage::applyPriorityToSelection(pfd::core::TaskFilePriorityLevel level) {
   if (!setPriorityFn_ || tree_ == nullptr)
     return;
   std::vector<int> all;

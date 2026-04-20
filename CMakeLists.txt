@@ -81,6 +81,18 @@ add_subdirectory(src/lt)
 add_subdirectory(src/ui)
 
 add_executable(torrentlink
+  src/app/task_batch_use_case.h
+  src/app/task_batch_use_case.cc
+  src/app/rss_download_pipeline.h
+  src/app/rss_download_pipeline.cc
+  src/app/event_ingest_orchestrator.h
+  src/app/event_ingest_orchestrator.cc
+  src/app/refresh_scheduler.h
+  src/app/refresh_scheduler.cc
+  src/app/task_persistence_coordinator.h
+  src/app/task_persistence_coordinator.cc
+  src/app/task_query_mapper.h
+  src/app/task_query_mapper.cc
   src/app_controller.h
   src/app_controller.cc
   src/main.cc

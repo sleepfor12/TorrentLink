@@ -291,15 +291,14 @@ void MainWindow::setOnQueryCopyPayload(
 }
 
 void MainWindow::setOnQueryTaskFiles(
-    std::function<std::vector<pfd::lt::SessionWorker::FileEntrySnapshot>(const pfd::base::TaskId&)>
-        cb) {
+    std::function<std::vector<pfd::core::TaskFileEntryDto>(const pfd::base::TaskId&)> cb) {
   onQueryTaskFiles_ = std::move(cb);
   syncContentHandlers();
 }
 
 void MainWindow::setOnSetTaskFilePriority(
     std::function<void(const pfd::base::TaskId&, const std::vector<int>&,
-                       pfd::lt::SessionWorker::FilePriorityLevel)>
+                       pfd::core::TaskFilePriorityLevel)>
         cb) {
   onSetTaskFilePriority_ = std::move(cb);
   syncContentHandlers();
@@ -312,7 +311,7 @@ void MainWindow::setOnRenameTaskFileOrFolder(
 }
 
 void MainWindow::setOnQueryTaskTrackerSnapshot(
-    std::function<pfd::lt::SessionWorker::TaskTrackerSnapshot(const pfd::base::TaskId&)> cb) {
+    std::function<pfd::core::TaskTrackerSnapshotDto(const pfd::base::TaskId&)> cb) {
   onQueryTaskTrackerSnapshot_ = std::move(cb);
   syncTrackerHandlers();
 }
@@ -347,7 +346,7 @@ void MainWindow::setOnForceReannounceAllTrackers(std::function<void(const pfd::b
 }
 
 void MainWindow::setOnQueryTaskPeers(
-    std::function<std::vector<pfd::lt::SessionWorker::PeerSnapshot>(const pfd::base::TaskId&)> cb) {
+    std::function<std::vector<pfd::core::TaskPeerDto>(const pfd::base::TaskId&)> cb) {
   onQueryTaskPeers_ = std::move(cb);
   if (transferPage_ != nullptr) {
     transferPage_->setPeerHandlers(onQueryTaskPeers_);
@@ -355,8 +354,7 @@ void MainWindow::setOnQueryTaskPeers(
 }
 
 void MainWindow::setOnQueryTaskWebSeeds(
-    std::function<std::vector<pfd::lt::SessionWorker::WebSeedSnapshot>(const pfd::base::TaskId&)>
-        cb) {
+    std::function<std::vector<pfd::core::TaskWebSeedDto>(const pfd::base::TaskId&)> cb) {
   onQueryTaskWebSeeds_ = std::move(cb);
   if (transferPage_ != nullptr) {
     transferPage_->setHttpSourceHandlers(onQueryTaskWebSeeds_);
