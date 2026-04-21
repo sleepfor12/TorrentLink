@@ -23,6 +23,9 @@ class BuiltinHttpTracker;
 #include "app/refresh_scheduler.h"
 #include "app/rss_download_pipeline.h"
 #include "app/task_batch_use_case.h"
+#include "app/task_control_command_use_case.h"
+#include "app/task_detail_query_use_case.h"
+#include "app/task_meta_command_use_case.h"
 #include "app/task_persistence_coordinator.h"
 #include "core/rss/rss_service.h"
 #include "core/save_path_policy.h"
@@ -53,6 +56,12 @@ private:
   void loadSettings();
   void saveSettings() const;
   void bindUiCallbacks();
+  void bindUiAddCallbacks();
+  void bindUiTaskControlCallbacks();
+  void bindUiTaskDetailCallbacks();
+  void bindUiTrackerCallbacks();
+  void bindUiTaskMetaCallbacks();
+  void bindUiMiscCallbacks();
   void bindWorkerCallbacks();
   void scheduleTimedAction();
   void executeTimedAction();
@@ -127,6 +136,9 @@ private:
 
   std::unique_ptr<pfd::app::RefreshScheduler> uiRefreshScheduler_;
   std::unique_ptr<pfd::app::TaskBatchUseCase> taskBatchUseCase_;
+  std::unique_ptr<pfd::app::TaskControlCommandUseCase> taskControlCommandUseCase_;
+  std::unique_ptr<pfd::app::TaskDetailQueryUseCase> taskDetailQueryUseCase_;
+  std::unique_ptr<pfd::app::TaskMetaCommandUseCase> taskMetaCommandUseCase_;
   std::unique_ptr<pfd::app::RssDownloadPipeline> rssDownloadPipeline_;
   std::unique_ptr<pfd::app::TaskPersistenceCoordinator> taskPersistenceCoordinator_;
 

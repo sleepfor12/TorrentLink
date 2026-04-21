@@ -70,10 +70,32 @@ AppController::~AppController() {
 
 void AppController::initialize() {
   loadSettings();
-  loadPersistedTasks();
 
   taskBatchUseCase_ = std::make_unique<pfd::app::TaskBatchUseCase>(
       worker_, [this]() { return pipeline_->snapshots(); });
+  taskControlCommandUseCase_ = std::make_unique<pfd::app::TaskControlCommandUseCase>(
+      [this](const pfd::base::TaskId& taskId) { worker_->pauseTask(taskId); },
+      [this](const pfd::base::TaskId& taskId) { worker_->resumeTask(taskId); },
+      [this](const pfd::base::TaskId& taskId, bool removeFiles) {
+        worker_->removeTask(taskId, removeFiles);
+      },
+      [this](const pfd::base::TaskId& taskId, int limit) {
+        worker_->setTaskConnectionsLimit(taskId, limit);
+      },
+      [this](const pfd::base::TaskId& taskId) { worker_->forceStartTask(taskId); },
+      [this](const pfd::base::TaskId& taskId) { worker_->forceRecheckTask(taskId); },
+      [this](const pfd::base::TaskId& taskId) { worker_->forceReannounceTask(taskId); },
+      [this](const pfd::base::TaskId& taskId, bool enabled) {
+        worker_->setSequentialDownload(taskId, enabled);
+      },
+      [this](const pfd::base::TaskId& taskId, bool enabled) {
+        worker_->setAutoManagedTask(taskId, enabled);
+      },
+      [this](const QString& msg) { logInfo(msg); });
+  taskDetailQueryUseCase_ = std::make_unique<pfd::app::TaskDetailQueryUseCase>(pipeline_, worker_);
+  taskMetaCommandUseCase_ = std::make_unique<pfd::app::TaskMetaCommandUseCase>(
+      [this](const pfd::core::TaskEvent& ev) { pipeline_->consume(ev); },
+      [this](const QString& msg) { logError(msg); });
   eventIngestOrchestrator_ = std::make_unique<pfd::app::EventIngestOrchestrator>(pipeline_);
   rssDownloadPipeline_ =
       std::make_unique<pfd::app::RssDownloadPipeline>(static_cast<QObject*>(app_));
@@ -86,6 +108,7 @@ void AppController::initialize() {
   taskPersistenceCoordinator_ = std::make_unique<pfd::app::TaskPersistenceCoordinator>(
       static_cast<QObject*>(app_), [this]() { savePersistedTasks(); },
       [this]() { saveResumeData(); });
+  loadPersistedTasks();
 
   bindUiCallbacks();
   bindWorkerCallbacks();
@@ -684,6 +707,15 @@ void AppController::startOneRssTorrentUrlOnUi(
 }
 
 void AppController::bindUiCallbacks() {
+  bindUiAddCallbacks();
+  bindUiTaskControlCallbacks();
+  bindUiTaskDetailCallbacks();
+  bindUiTrackerCallbacks();
+  bindUiTaskMetaCallbacks();
+  bindUiMiscCallbacks();
+}
+
+void AppController::bindUiAddCallbacks() {
   window_->setOnAddMagnet([this](const QString& uri, const QString& savePath) {
     const auto trimmed = uri.trimmed();
     const auto valErr = pfd::base::validateMagnetUri(trimmed);
@@ -785,27 +817,21 @@ void AppController::bindUiCallbacks() {
             .arg(req.ui.selectedBytes)
             .arg(req.ui.totalBytes));
   });
+}
 
+void AppController::bindUiTaskControlCallbacks() {
   window_->setOnPauseTask([this](const pfd::base::TaskId& taskId) {
-    worker_->pauseTask(taskId);
+    taskControlCommandUseCase_->pauseTask(taskId);
     injectTransitionalStatus(taskId, pfd::base::TaskStatus::kPaused);
-    logInfo(QStringLiteral("Pause requested, waiting worker confirmation. taskId=%1")
-                .arg(taskId.toString()));
   });
 
   window_->setOnResumeTask([this](const pfd::base::TaskId& taskId) {
-    worker_->resumeTask(taskId);
+    taskControlCommandUseCase_->resumeTask(taskId);
     injectTransitionalStatus(taskId, pfd::base::TaskStatus::kQueued);
-    logInfo(QStringLiteral("Resume requested, waiting worker confirmation. taskId=%1")
-                .arg(taskId.toString()));
   });
 
   window_->setOnRemoveTask([this](const pfd::base::TaskId& taskId, bool removeFiles) {
-    worker_->removeTask(taskId, removeFiles);
-    logInfo(
-        QStringLiteral("Remove requested, waiting worker confirmation. taskId=%1 removeFiles=%2")
-            .arg(taskId.toString())
-            .arg(removeFiles ? QStringLiteral("true") : QStringLiteral("false")));
+    taskControlCommandUseCase_->removeTask(taskId, removeFiles);
   });
 
   window_->setOnSeedPolicyChanged([this](bool unlimited, double ratio) {
@@ -818,51 +844,32 @@ void AppController::bindUiCallbacks() {
   });
 
   window_->setOnSetTaskConnectionsLimit([this](const pfd::base::TaskId& taskId, int limit) {
-    worker_->setTaskConnectionsLimit(taskId, limit);
-    logInfo(QStringLiteral("Task connections limit updated. taskId=%1 limit=%2")
-                .arg(taskId.toString())
-                .arg(limit));
+    taskControlCommandUseCase_->setTaskConnectionsLimit(taskId, limit);
   });
   window_->setOnForceStartTask([this](const pfd::base::TaskId& taskId) {
-    worker_->forceStartTask(taskId);
-    logInfo(QStringLiteral("Force start requested. taskId=%1").arg(taskId.toString()));
+    taskControlCommandUseCase_->forceStartTask(taskId);
   });
   window_->setOnForceRecheckTask([this](const pfd::base::TaskId& taskId) {
-    worker_->forceRecheckTask(taskId);
-    logInfo(QStringLiteral("Force recheck requested. taskId=%1").arg(taskId.toString()));
+    taskControlCommandUseCase_->forceRecheckTask(taskId);
   });
   window_->setOnForceReannounceTask([this](const pfd::base::TaskId& taskId) {
-    worker_->forceReannounceTask(taskId);
-    logInfo(QStringLiteral("Force reannounce requested. taskId=%1").arg(taskId.toString()));
+    taskControlCommandUseCase_->forceReannounceTask(taskId);
   });
   window_->setOnSetSequentialDownload([this](const pfd::base::TaskId& taskId, bool enabled) {
-    worker_->setSequentialDownload(taskId, enabled);
-    logInfo(QStringLiteral("Sequential download changed. taskId=%1 enabled=%2")
-                .arg(taskId.toString())
-                .arg(enabled ? QStringLiteral("true") : QStringLiteral("false")));
+    taskControlCommandUseCase_->setSequentialDownload(taskId, enabled);
   });
   window_->setOnSetAutoManagedTask([this](const pfd::base::TaskId& taskId, bool enabled) {
-    worker_->setAutoManagedTask(taskId, enabled);
-    logInfo(QStringLiteral("Auto managed changed. taskId=%1 enabled=%2")
-                .arg(taskId.toString())
-                .arg(enabled ? QStringLiteral("true") : QStringLiteral("false")));
+    taskControlCommandUseCase_->setAutoManagedTask(taskId, enabled);
   });
+}
+
+void AppController::bindUiTaskDetailCallbacks() {
   window_->setOnQueryCopyPayload([this](const pfd::base::TaskId& taskId) {
-    pfd::ui::MainWindow::CopyPayload ui;
-    const auto payload = worker_->queryTaskCopyPayload(taskId);
-    auto snap = pipeline_->snapshot(taskId);
-    ui.name = (snap.has_value() ? snap->name : QString());
-    ui.infoHashV1 = payload.infoHashV1;
-    ui.infoHashV2 = payload.infoHashV2;
-    ui.magnet = payload.magnet;
-    ui.torrentId =
-        payload.torrentId.isEmpty() ? taskId.toString(QUuid::WithoutBraces) : payload.torrentId;
-    ui.comment = payload.comment;
-    return ui;
+    return taskDetailQueryUseCase_->queryCopyPayload(taskId);
   });
   window_->setOnQueryTaskFiles([this](const pfd::base::TaskId& taskId) {
     LOG_DEBUG(QStringLiteral("[main] UI query task files taskId=%1").arg(taskId.toString()));
-    return pfd::app::mapTaskFiles(worker_->queryTaskFiles(taskId));
+    return taskDetailQueryUseCase_->queryTaskFiles(taskId);
   });
   window_->setOnSetTaskFilePriority([this](const pfd::base::TaskId& taskId,
                                            const std::vector<int>& fileIndices,
@@ -881,7 +888,7 @@ void AppController::bindUiCallbacks() {
       });
   window_->setOnQueryTaskTrackerSnapshot([this](const pfd::base::TaskId& taskId) {
     LOG_DEBUG(QStringLiteral("[main] UI query task trackers taskId=%1").arg(taskId.toString()));
-    return pfd::app::mapTaskTrackers(worker_->queryTaskTrackers(taskId));
+    return taskDetailQueryUseCase_->queryTaskTrackers(taskId);
   });
   window_->setOnAddTaskTracker([this](const pfd::base::TaskId& taskId, const QString& url) {
     const auto err = pfd::base::validateTrackerUrl(url);
@@ -921,30 +928,15 @@ void AppController::bindUiCallbacks() {
   });
 
   window_->setOnQueryTaskPeers([this](const pfd::base::TaskId& taskId) {
-    return pfd::app::mapTaskPeers(worker_->queryTaskPeers(taskId));
+    return taskDetailQueryUseCase_->queryTaskPeers(taskId);
   });
 
   window_->setOnQueryTaskWebSeeds([this](const pfd::base::TaskId& taskId) {
-    return pfd::app::mapTaskWebSeeds(worker_->queryTaskWebSeeds(taskId));
+    return taskDetailQueryUseCase_->queryTaskWebSeeds(taskId);
   });
+}
 
-  window_->setOnMoveTask([this](const pfd::base::TaskId& taskId, const QString& targetPath) {
-    const auto pathErr = pfd::base::validatePath(targetPath);
-    if (pathErr.hasError()) {
-      logError(QStringLiteral("Move target path rejected: %1").arg(pathErr.message()));
-      return;
-    }
-    worker_->moveStorage(taskId, targetPath);
-    applyTaskMetaUpdate(taskId, QString(), targetPath, QString(), QString());
-    logInfo(
-        QStringLiteral("Move requested. taskId=%1 target=%2").arg(taskId.toString(), targetPath));
-  });
-
-  window_->setOnRenameTask([this](const pfd::base::TaskId& taskId, const QString& name) {
-    applyTaskMetaUpdate(taskId, name, QString(), QString(), QString());
-    logInfo(QStringLiteral("Rename applied. taskId=%1 name=%2").arg(taskId.toString(), name));
-  });
-
+void AppController::bindUiTrackerCallbacks() {
   window_->setOnEditTrackers([this](const pfd::base::TaskId& taskId, const QStringList& trackers) {
     const auto listErr = pfd::base::validateTrackerList(trackers);
     if (listErr.hasError()) {
@@ -961,30 +953,6 @@ void AppController::bindUiCallbacks() {
   window_->setOnQueryTaskTrackers([this](const pfd::base::TaskId& taskId) {
     return taskTrackers_[taskId.toString(QUuid::WithoutBraces)];
   });
-
-  window_->setOnCategoryChanged([this](const pfd::base::TaskId& taskId, const QString& category) {
-    const auto catErr = pfd::base::validateCategory(category);
-    if (catErr.hasError()) {
-      logError(QStringLiteral("Category rejected: %1").arg(catErr.message()));
-      return;
-    }
-    applyTaskMetaUpdate(taskId, QString(), QString(), category, QString());
-    logInfo(
-        QStringLiteral("Category updated. taskId=%1 category=%2").arg(taskId.toString(), category));
-  });
-
-  window_->setOnTagsChanged([this](const pfd::base::TaskId& taskId, const QStringList& tags) {
-    const QString csv = tags.join(QStringLiteral(","));
-    const auto tagsErr = pfd::base::validateTagsCsv(csv);
-    if (tagsErr.hasError()) {
-      logError(QStringLiteral("Tags rejected: %1").arg(tagsErr.message()));
-      return;
-    }
-    applyTaskMetaUpdate(taskId, QString(), QString(), QString(), csv);
-    logInfo(
-        QStringLiteral("Tags updated. taskId=%1 count=%2").arg(taskId.toString()).arg(tags.size()));
-  });
-
   window_->setOnDefaultTrackersChanged([this](bool enabled, const QStringList& trackers) {
     autoApplyDefaultTrackers_ = enabled;
     if (enabled) {
@@ -998,7 +966,49 @@ void AppController::bindUiCallbacks() {
   });
   window_->setOnQueryDefaultTrackers([this]() { return defaultTrackers_; });
   window_->setOnQueryDefaultTrackerEnabled([this]() { return autoApplyDefaultTrackers_; });
+}
 
+void AppController::bindUiTaskMetaCallbacks() {
+  window_->setOnMoveTask([this](const pfd::base::TaskId& taskId, const QString& targetPath) {
+    if (taskMetaCommandUseCase_ == nullptr ||
+        !taskMetaCommandUseCase_->moveTask(taskId, targetPath)) {
+      return;
+    }
+    worker_->moveStorage(taskId, targetPath);
+    uiRefreshScheduler_->requestRefresh();
+    logInfo(
+        QStringLiteral("Move requested. taskId=%1 target=%2").arg(taskId.toString(), targetPath));
+  });
+
+  window_->setOnRenameTask([this](const pfd::base::TaskId& taskId, const QString& name) {
+    if (taskMetaCommandUseCase_ == nullptr || !taskMetaCommandUseCase_->renameTask(taskId, name)) {
+      return;
+    }
+    uiRefreshScheduler_->requestRefresh();
+    logInfo(QStringLiteral("Rename applied. taskId=%1 name=%2").arg(taskId.toString(), name));
+  });
+
+  window_->setOnCategoryChanged([this](const pfd::base::TaskId& taskId, const QString& category) {
+    if (taskMetaCommandUseCase_ == nullptr ||
+        !taskMetaCommandUseCase_->updateCategory(taskId, category)) {
+      return;
+    }
+    uiRefreshScheduler_->requestRefresh();
+    logInfo(
+        QStringLiteral("Category updated. taskId=%1 category=%2").arg(taskId.toString(), category));
+  });
+
+  window_->setOnTagsChanged([this](const pfd::base::TaskId& taskId, const QStringList& tags) {
+    if (taskMetaCommandUseCase_ == nullptr || !taskMetaCommandUseCase_->updateTags(taskId, tags)) {
+      return;
+    }
+    uiRefreshScheduler_->requestRefresh();
+    logInfo(
+        QStringLiteral("Tags updated. taskId=%1 count=%2").arg(taskId.toString()).arg(tags.size()));
+  });
+}
+
+void AppController::bindUiMiscCallbacks() {
   window_->setOnFirstLastPiecePriority([this](const pfd::base::TaskId& taskId, bool enabled) {
     worker_->setFirstLastPiecePriority(taskId, enabled);
     logInfo(QStringLiteral("首尾块优先下载已%1。taskId=%2")
@@ -1115,14 +1125,18 @@ void AppController::applySeedingPolicy(const std::vector<pfd::core::TaskSnapshot
 void AppController::applyTaskMetaUpdate(const pfd::base::TaskId& taskId, const QString& name,
                                         const QString& savePath, const QString& category,
                                         const QString& tagsCsv) {
-  pfd::core::TaskEvent ev;
-  ev.type = pfd::core::TaskEventType::kUpsertMeta;
-  ev.taskId = taskId;
-  ev.name = name;
-  ev.savePath = savePath;
-  ev.category = category;
-  ev.tags = tagsCsv;
-  pipeline_->consume(ev);
+  if (taskMetaCommandUseCase_ != nullptr) {
+    taskMetaCommandUseCase_->upsertMeta(taskId, name, savePath, category, tagsCsv);
+  } else {
+    pfd::core::TaskEvent ev;
+    ev.type = pfd::core::TaskEventType::kUpsertMeta;
+    ev.taskId = taskId;
+    ev.name = name;
+    ev.savePath = savePath;
+    ev.category = category;
+    ev.tags = tagsCsv;
+    pipeline_->consume(ev);
+  }
   uiRefreshScheduler_->requestRefresh();
 }
 

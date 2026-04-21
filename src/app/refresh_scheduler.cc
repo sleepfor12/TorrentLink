@@ -19,6 +19,9 @@ RefreshScheduler::RefreshScheduler(QObject* owner, int intervalMs, RefreshFn ref
 }
 
 void RefreshScheduler::requestRefresh() {
+  if (timer_ == nullptr) {
+    return;
+  }
   refreshPending_ = true;
   if (!timer_->isActive()) {
     timer_->start();

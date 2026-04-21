@@ -93,6 +93,12 @@ add_executable(torrentlink
   src/app/task_persistence_coordinator.cc
   src/app/task_query_mapper.h
   src/app/task_query_mapper.cc
+  src/app/task_detail_query_use_case.h
+  src/app/task_detail_query_use_case.cc
+  src/app/task_control_command_use_case.h
+  src/app/task_control_command_use_case.cc
+  src/app/task_meta_command_use_case.h
+  src/app/task_meta_command_use_case.cc
   src/app_controller.h
   src/app_controller.cc
   src/main.cc
