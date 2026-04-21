@@ -9,6 +9,7 @@ class QCheckBox;
 class QDoubleSpinBox;
 class QComboBox;
 class QSpinBox;
+class QLabel;
 
 class QPlainTextEdit;
 
@@ -38,6 +39,7 @@ public:
 private:
   void buildLayout();
   void wireSignals();
+  void syncDownloadCompleteActionAvailability();
   void browseDownloadDir();
   void browseLogDir();
 
@@ -101,6 +103,8 @@ private:
   QCheckBox* startMinimizedCheck_{nullptr};
   QComboBox* timedActionBox_{nullptr};
   QSpinBox* timedActionDelaySpin_{nullptr};
+  QComboBox* downloadCompleteActionBox_{nullptr};
+  QLabel* downloadCompleteActionHint_{nullptr};
 
   QCheckBox* rssGlobalAutoDownloadCheck_{nullptr};
   QSpinBox* rssRefreshIntervalSpin_{nullptr};
@@ -108,6 +112,9 @@ private:
   QSpinBox* rssHistoryMaxItemsSpin_{nullptr};
   QSpinBox* rssHistoryMaxAgeSpin_{nullptr};
   QLineEdit* rssPlayerCommandEdit_{nullptr};
+  QLineEdit* httpUserAgentEdit_{nullptr};
+  QLineEdit* httpAcceptLanguageEdit_{nullptr};
+  QPlainTextEdit* httpCookieHeaderEdit_{nullptr};
 };
 
 }  // namespace pfd::ui

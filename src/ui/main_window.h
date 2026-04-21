@@ -114,6 +114,7 @@ public:
       std::function<std::vector<pfd::core::TaskWebSeedDto>(const pfd::base::TaskId&)> cb);
   void setSearchDataSources(SearchTab::QuerySnapshotsFn snapshotsFn,
                             SearchTab::QueryRssItemsFn rssItemsFn);
+  void setSearchRequestHeaders(const SearchTab::RequestHeaders& headers);
   void setRssService(pfd::core::rss::RssService* service);
   /// 条目流：日志、默认下载根目录（打开文件夹兜底）、任务列表快照（按磁力反查保存路径）。
   void setRssItemsUiHelpers(std::function<void(const QString&)> appendItemsLog,
@@ -156,6 +157,9 @@ private:
   void openLogCenter();
   void openTorrentFileFromMenu();
   void openTorrentLinksFromMenu();
+  void openCreateTorrentDialog();
+  void openCookieManagerDialog();
+  void openPostDownloadActionsDialog();
   void showTaskContextMenu(const QPoint& pos);
   void syncContentHandlers();
   void syncTrackerHandlers();
@@ -176,11 +180,13 @@ private:
   QAction* logCenterAction_{nullptr};
   QAction* helpAction_{nullptr};
   QAction* aboutAction_{nullptr};
-  QAction* downloadSettingsAction_{nullptr};
   QAction* showLogAction_{nullptr};
   QAction* refreshListAction_{nullptr};
   QAction* openTorrentFileAction_{nullptr};
   QAction* openTorrentLinksAction_{nullptr};
+  QAction* createTorrentAction_{nullptr};
+  QAction* manageCookiesAction_{nullptr};
+  QAction* postDownloadActionsAction_{nullptr};
   QAction* exitAction_{nullptr};
   std::vector<pfd::core::TaskSnapshot> snapshots_;
   std::vector<pfd::core::TaskSnapshot> displayedSnapshots_;

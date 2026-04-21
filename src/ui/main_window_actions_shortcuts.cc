@@ -1,4 +1,5 @@
 #include <QtCore/QDateTime>
+#include <QtCore/QDir>
 #include <QtCore/QEvent>
 #include <QtCore/QFileInfo>
 #include <QtCore/QPoint>
@@ -16,11 +17,15 @@
 #include <QtWidgets/QDialog>
 #include <QtWidgets/QDialogButtonBox>
 #include <QtWidgets/QFileDialog>
+#include <QtWidgets/QFormLayout>
+#include <QtWidgets/QGroupBox>
+#include <QtWidgets/QHeaderView>
 #include <QtWidgets/QInputDialog>
 #include <QtWidgets/QLabel>
 #include <QtWidgets/QLineEdit>
 #include <QtWidgets/QMenu>
 #include <QtWidgets/QMessageBox>
+#include <QtWidgets/QProgressBar>
 #include <QtWidgets/QPushButton>
 #include <QtWidgets/QTableWidget>
 #include <QtWidgets/QTextEdit>
@@ -54,8 +59,17 @@ void MainWindow::bindSignals() {
   if (logCenterAction_ != nullptr) {
     connect(logCenterAction_, &QAction::triggered, this, [this]() { openLogCenter(); });
   }
-  if (downloadSettingsAction_ != nullptr) {
-    connect(downloadSettingsAction_, &QAction::triggered, this, [this]() { openPreferences(); });
+  if (createTorrentAction_ != nullptr) {
+    connect(createTorrentAction_, &QAction::triggered, this,
+            [this]() { openCreateTorrentDialog(); });
+  }
+  if (manageCookiesAction_ != nullptr) {
+    connect(manageCookiesAction_, &QAction::triggered, this,
+            [this]() { openCookieManagerDialog(); });
+  }
+  if (postDownloadActionsAction_ != nullptr) {
+    connect(postDownloadActionsAction_, &QAction::triggered, this,
+            [this]() { openPostDownloadActionsDialog(); });
   }
   if (showLogAction_ != nullptr) {
     connect(showLogAction_, &QAction::triggered, this, [this]() { openLogCenter(); });
@@ -154,6 +168,83 @@ void MainWindow::openTorrentLinksFromMenu() {
     }
   }
   appendLog(QStringLiteral("已提交 Torrent 链接：%1 条").arg(submitted));
+}
+
+void MainWindow::openCreateTorrentDialog() {
+  QDialog dlg(this);
+  dlg.setWindowTitle(QStringLiteral("制作 Torrent"));
+  dlg.setModal(true);
+  dlg.resize(760, 680);
+  auto* root = new QVBoxLayout(&dlg);
+
+  auto* sourceGroup = new QGroupBox(QStringLiteral("选择要共享的文件/文件夹"), &dlg);
+  auto* sourceForm = new QFormLayout(sourceGroup);
+  auto* sourcePath = new QLineEdit(QDir::homePath(), sourceGroup);
+  sourceForm->addRow(QStringLiteral("路径："), sourcePath);
+  root->addWidget(sourceGroup);
+
+  auto* settingsGroup = new QGroupBox(QStringLiteral("设置"), &dlg);
+  auto* settingsForm = new QFormLayout(settingsGroup);
+  auto* pieceSize = new QComboBox(settingsGroup);
+  pieceSize->addItem(QStringLiteral("自动"), 0);
+  pieceSize->addItem(QStringLiteral("256 KiB"), 256 * 1024);
+  pieceSize->addItem(QStringLiteral("512 KiB"), 512 * 1024);
+  settingsForm->addRow(QStringLiteral("分块大小："), pieceSize);
+  settingsForm->addRow(
+      QString(),
+      new QCheckBox(QStringLiteral("私有 torrent（不在 DHT 网络上分发）"), settingsGroup));
+  settingsForm->addRow(QString(), new QCheckBox(QStringLiteral("完成后开始做种"), settingsGroup));
+  root->addWidget(settingsGroup);
+
+  auto* fieldsGroup = new QGroupBox(QStringLiteral("字段"), &dlg);
+  auto* fieldsForm = new QFormLayout(fieldsGroup);
+  fieldsForm->addRow(QStringLiteral("Tracker URL："), new QTextEdit(fieldsGroup));
+  fieldsForm->addRow(QStringLiteral("Web 种子 URL："), new QTextEdit(fieldsGroup));
+  fieldsForm->addRow(QStringLiteral("注释："), new QTextEdit(fieldsGroup));
+  fieldsForm->addRow(QStringLiteral("源："), new QLineEdit(fieldsGroup));
+  root->addWidget(fieldsGroup, 1);
+
+  auto* progress = new QProgressBar(&dlg);
+  progress->setRange(0, 100);
+  progress->setValue(0);
+  root->addWidget(progress);
+
+  auto* buttons = new QDialogButtonBox(QDialogButtonBox::Close, &dlg);
+  auto* createBtn = new QPushButton(QStringLiteral("制作 Torrent"), &dlg);
+  buttons->addButton(createBtn, QDialogButtonBox::AcceptRole);
+  connect(createBtn, &QPushButton::clicked, &dlg, [this]() {
+    QMessageBox::information(this, QStringLiteral("生成 Torrent"),
+                             QStringLiteral("Torrent 生成能力将在下一步接入底层实现。"));
+  });
+  connect(buttons, &QDialogButtonBox::rejected, &dlg, &QDialog::reject);
+  root->addWidget(buttons);
+  dlg.exec();
+}
+
+void MainWindow::openCookieManagerDialog() {
+  QDialog dlg(this);
+  dlg.setWindowTitle(QStringLiteral("管理 Cookies"));
+  dlg.setModal(true);
+  dlg.resize(700, 460);
+  auto* root = new QVBoxLayout(&dlg);
+  auto* table = new QTableWidget(0, 3, &dlg);
+  table->setHorizontalHeaderLabels(
+      {QStringLiteral("域名"), QStringLiteral("Cookie 名"), QStringLiteral("值")});
+  table->horizontalHeader()->setStretchLastSection(true);
+  root->addWidget(table, 1);
+  root->addWidget(new QLabel(
+      QStringLiteral("提示：Cookies 将用于 RSS 与搜索请求头，完整编辑功能下一步完善。"), &dlg));
+  auto* buttons = new QDialogButtonBox(QDialogButtonBox::Close, &dlg);
+  connect(buttons, &QDialogButtonBox::rejected, &dlg, &QDialog::reject);
+  root->addWidget(buttons);
+  dlg.exec();
+}
+
+void MainWindow::openPostDownloadActionsDialog() {
+  QMessageBox::information(
+      this, QStringLiteral("下载完成后的操作"),
+      QStringLiteral(
+          "请在首选项中配置“下载完成后”动作。\n若启用定时动作，则该项自动禁用并强制不执行。"));
 }
 
 void MainWindow::setOnAddMagnet(std::function<void(const QString&, const QString&)> onAddMagnet) {
@@ -366,6 +457,12 @@ void MainWindow::setSearchDataSources(SearchTab::QuerySnapshotsFn snapshotsFn,
   if (searchTab_ != nullptr) {
     searchTab_->setQuerySnapshotsFn(std::move(snapshotsFn));
     searchTab_->setQueryRssItemsFn(std::move(rssItemsFn));
+  }
+}
+
+void MainWindow::setSearchRequestHeaders(const SearchTab::RequestHeaders& headers) {
+  if (searchTab_ != nullptr) {
+    searchTab_->setRequestHeaders(headers);
   }
 }
 

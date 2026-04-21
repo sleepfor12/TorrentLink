@@ -138,6 +138,30 @@ AppSettings AppSettings::load() {
   out.timed_action_delay_minutes =
       s.value(QStringLiteral("ui/timed_action_delay_minutes"), 0).toInt();
   out.timed_action_delay_minutes = std::clamp(out.timed_action_delay_minutes, 0, 10080);
+  out.download_complete_action =
+      s.value(QStringLiteral("ui/download_complete_action"), QStringLiteral("none"))
+          .toString()
+          .trimmed()
+          .toLower();
+  if (out.download_complete_action != QStringLiteral("none") &&
+      out.download_complete_action != QStringLiteral("quit_app") &&
+      out.download_complete_action != QStringLiteral("suspend") &&
+      out.download_complete_action != QStringLiteral("hibernate") &&
+      out.download_complete_action != QStringLiteral("poweroff")) {
+    out.download_complete_action = QStringLiteral("none");
+  }
+  if (out.timed_action != QStringLiteral("none") && out.timed_action_delay_minutes > 0) {
+    out.download_complete_action = QStringLiteral("none");
+  }
+  out.http_user_agent =
+      s.value(QStringLiteral("http/user_agent"), QStringLiteral("TorrentLink/1.0"))
+          .toString()
+          .trimmed();
+  out.http_accept_language =
+      s.value(QStringLiteral("http/accept_language"), QStringLiteral("zh-CN,zh;q=0.9,en;q=0.8"))
+          .toString()
+          .trimmed();
+  out.http_cookie_header = s.value(QStringLiteral("http/cookie_header"), QString()).toString();
 
   if (out.default_download_dir.isEmpty()) {
     out.default_download_dir = QStandardPaths::writableLocation(QStandardPaths::DownloadLocation);
@@ -206,6 +230,15 @@ void AppSettings::save(const AppSettings& in) {
   s.setValue(QStringLiteral("ui/start_minimized"), in.start_minimized);
   s.setValue(QStringLiteral("ui/timed_action"), in.timed_action.trimmed().toLower());
   s.setValue(QStringLiteral("ui/timed_action_delay_minutes"), in.timed_action_delay_minutes);
+  const QString timedAction = in.timed_action.trimmed().toLower();
+  const bool timedActionEnabled =
+      timedAction != QStringLiteral("none") && in.timed_action_delay_minutes > 0;
+  const QString fallbackAction =
+      timedActionEnabled ? QStringLiteral("none") : in.download_complete_action.trimmed().toLower();
+  s.setValue(QStringLiteral("ui/download_complete_action"), fallbackAction);
+  s.setValue(QStringLiteral("http/user_agent"), in.http_user_agent.trimmed());
+  s.setValue(QStringLiteral("http/accept_language"), in.http_accept_language.trimmed());
+  s.setValue(QStringLiteral("http/cookie_header"), in.http_cookie_header);
 }
 
 }  // namespace pfd::core

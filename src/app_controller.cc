@@ -264,10 +264,84 @@ void AppController::executeTimedAction() {
   logInfo(QStringLiteral("Timed action skipped: unknown action=%1").arg(action));
 }
 
+void AppController::maybeRunPostDownloadAction(
+    const std::vector<pfd::core::TaskSnapshot>& snapshots) {
+  const bool timedActionEnabled =
+      cachedAppSettings_.timed_action.trimmed().toLower() != QStringLiteral("none") &&
+      cachedAppSettings_.timed_action_delay_minutes > 0;
+  if (timedActionEnabled) {
+    postDownloadActionTriggered_ = false;
+    return;
+  }
+  if (snapshots.empty()) {
+    postDownloadActionTriggered_ = false;
+    return;
+  }
+
+  bool allFinished = true;
+  for (const auto& s : snapshots) {
+    if (!pfd::base::isFinished(s.status)) {
+      allFinished = false;
+      break;
+    }
+  }
+  if (!allFinished) {
+    postDownloadActionTriggered_ = false;
+    return;
+  }
+  if (postDownloadActionTriggered_) {
+    return;
+  }
+  postDownloadActionTriggered_ = true;
+  executePostDownloadAction(cachedAppSettings_.download_complete_action.trimmed().toLower());
+}
+
+void AppController::executePostDownloadAction(const QString& action) {
+  if (action == QStringLiteral("none") || action.isEmpty()) {
+    return;
+  }
+  if (action == QStringLiteral("quit_app")) {
+    logInfo(QStringLiteral("Post-download action triggered: quit application."));
+    app_->quit();
+    return;
+  }
+
+  QString command = QStringLiteral("/bin/sh");
+  QStringList args;
+#ifdef _WIN32
+  if (action == QStringLiteral("poweroff")) {
+    command = QStringLiteral("shutdown");
+    args = QStringList{QStringLiteral("/s"), QStringLiteral("/t"), QStringLiteral("0")};
+  }
+#else
+  if (action == QStringLiteral("suspend")) {
+    args = QStringList{QStringLiteral("-c"), QStringLiteral("systemctl suspend")};
+  } else if (action == QStringLiteral("hibernate")) {
+    args = QStringList{QStringLiteral("-c"), QStringLiteral("systemctl hibernate")};
+  } else if (action == QStringLiteral("poweroff")) {
+    args = QStringList{QStringLiteral("-c"), QStringLiteral("systemctl poweroff")};
+  }
+#endif
+
+  if (args.isEmpty()) {
+    logInfo(QStringLiteral("Post-download action skipped: unknown action=%1").arg(action));
+    return;
+  }
+  if (QProcess::startDetached(command, args)) {
+    logInfo(QStringLiteral("Post-download action triggered: %1").arg(action));
+    if (action == QStringLiteral("poweroff")) {
+      app_->quit();
+    }
+    return;
+  }
+  logError(QStringLiteral("Post-download action failed: unable to launch action=%1").arg(action));
+}
+
 void AppController::applyRuntimeSettingsFromConfig(const pfd::core::AppSettings* app_settings) {
   const auto s =
       app_settings != nullptr ? *app_settings : pfd::core::ConfigService::loadAppSettings();
   cachedAppSettings_ = s;
+  postDownloadActionTriggered_ = false;
   savePathPolicy_.setDefaultDownloadDir(s.default_download_dir);
   seedUnlimited_ = s.seed_unlimited;
   autoStopSeedRatio_ = s.seed_target_ratio;
@@ -286,6 +360,14 @@ void AppController::applyRuntimeSettingsFromConfig(const pfd::core::AppSettings*
       s.monitor_port);
   worker_->setDefaultPerTorrentConnectionsLimit(perTorrentConnectionsLimit_);
   applyBuiltinHttpTrackerFromSettings(s);
+  if (rssService_ != nullptr) {
+    rssService_->setRequestHeaders(pfd::core::rss::RssFetcher::RequestHeaders{
+        s.http_user_agent, s.http_accept_language, s.http_cookie_header});
+  }
+  if (window_ != nullptr) {
+    window_->setSearchRequestHeaders(pfd::ui::SearchTab::RequestHeaders{
+        s.http_user_agent, s.http_accept_language, s.http_cookie_header});
+  }
 }
 
 void AppController::applyBuiltinHttpTrackerFromSettings(const pfd::core::AppSettings& s) {
@@ -599,10 +681,14 @@ void AppController::startOneRssTorrentUrlOnUi(
   const bool useDefaultTrackers = autoApplyDefaultTrackers_;
   const QStringList defaultTrackersCopy = defaultTrackers_;
 
+  const auto requestHeaders = pfd::core::rss::RssFetcher::RequestHeaders{
+      cachedAppSettings_.http_user_agent, cachedAppSettings_.http_accept_language,
+      cachedAppSettings_.http_cookie_header};
   auto fut = std::async(std::launch::async, [this, windowGuard, workerPtr, url, referer,
                                              resolvedSavePath, useDefaultTrackers,
-                                             defaultTrackersCopy, rssS]() {
+                                             defaultTrackersCopy, rssS, requestHeaders]() {
     pfd::core::rss::RssFetcher fetcher;
+    fetcher.setRequestHeaders(requestHeaders);
     const auto res = fetcher.fetch(url, referer);
 
     QString torrentPath;
@@ -1120,6 +1206,7 @@ void AppController::applySeedingPolicy(const std::vector<pfd::core::TaskSnapshot
       }
     }
   }
+  maybeRunPostDownloadAction(snapshots);
 }
 
 void AppController::applyTaskMetaUpdate(const pfd::base::TaskId& taskId, const QString& name,
@@ -1237,6 +1324,22 @@ void AppController::saveResumeData() const {
   }
   const int saved = worker_->saveAllResumeData(rd);
   LOG_INFO(QStringLiteral("[main] Resume data saved: %1 files").arg(saved));
+
+  // Remove stale resume-data files for tasks that no longer exist.
+  std::unordered_set<QString> activeTaskKeys;
+  const auto snapshots = pipeline_->snapshots();
+  activeTaskKeys.reserve(snapshots.size());
+  for (const auto& s : snapshots) {
+    activeTaskKeys.insert(s.taskId.toString(QUuid::WithoutBraces));
+  }
+  QDirIterator it(rd, {QStringLiteral("*.rd")}, QDir::Files);
+  while (it.hasNext()) {
+    it.next();
+    const QString taskKey = it.fileInfo().completeBaseName();
+    if (activeTaskKeys.count(taskKey) == 0) {
+      QFile::remove(it.filePath());
+    }
+  }
 }
 
 void AppController::loadPersistedTasks() {
@@ -1316,6 +1419,11 @@ void AppController::loadPersistedTasks() {
     while (it.hasNext()) {
       it.next();
       const QString taskKey = it.fileInfo().completeBaseName();
+      // Only restore resume data entries that are present in tasks.json metadata.
+      // This prevents deleted tasks with stale .rd files from reappearing.
+      if (metaByTaskKey.count(taskKey) == 0) {
+        continue;
+      }
       auto [data, err] = pfd::base::readWholeFile(it.filePath());
       if (err.hasError() || data.isEmpty())
         continue;
@@ -1432,6 +1540,9 @@ void AppController::initializeRss() {
           .filePath(QStringLiteral("rss"));
   rssService_ = std::make_unique<pfd::core::rss::RssService>(rssDataDir);
   rssService_->loadState();
+  rssService_->setRequestHeaders(pfd::core::rss::RssFetcher::RequestHeaders{
+      cachedAppSettings_.http_user_agent, cachedAppSettings_.http_accept_language,
+      cachedAppSettings_.http_cookie_header});
 
   rssService_->setDownloadRequestCallback([this](const pfd::core::rss::AutoDownloadRequest& req) {
     if (shuttingDown_.load())
@@ -1467,6 +1578,9 @@ void AppController::initializeRss() {
         }
         return out;
       });
+  window_->setSearchRequestHeaders(pfd::ui::SearchTab::RequestHeaders{
+      cachedAppSettings_.http_user_agent, cachedAppSettings_.http_accept_language,
+      cachedAppSettings_.http_cookie_header});
 
   QObject::connect(window_, &pfd::ui::MainWindow::rssSettingsChanged, static_cast<QObject*>(app_),
                    [this]() { updateRssTimerInterval(); });

@@ -10,8 +10,8 @@ TaskDetailQueryUseCase::TaskDetailQueryUseCase(pfd::core::TaskPipelineService* p
                                                pfd::lt::SessionWorker* worker)
     : pipeline_(pipeline), worker_(worker) {}
 
-pfd::ui::MainWindow::CopyPayload TaskDetailQueryUseCase::queryCopyPayload(
-    const pfd::base::TaskId& taskId) const {
+pfd::ui::MainWindow::CopyPayload
+TaskDetailQueryUseCase::queryCopyPayload(const pfd::base::TaskId& taskId) const {
   pfd::ui::MainWindow::CopyPayload ui;
   if (worker_ == nullptr) {
     return ui;
@@ -24,37 +24,38 @@ pfd::ui::MainWindow::CopyPayload TaskDetailQueryUseCase::queryCopyPayload(
   ui.infoHashV1 = payload.infoHashV1;
   ui.infoHashV2 = payload.infoHashV2;
   ui.magnet = payload.magnet;
-  ui.torrentId = payload.torrentId.isEmpty() ? taskId.toString(QUuid::WithoutBraces) : payload.torrentId;
+  ui.torrentId =
+      payload.torrentId.isEmpty() ? taskId.toString(QUuid::WithoutBraces) : payload.torrentId;
   ui.comment = payload.comment;
   return ui;
 }
 
-std::vector<pfd::core::TaskFileEntryDto> TaskDetailQueryUseCase::queryTaskFiles(
-    const pfd::base::TaskId& taskId) const {
+std::vector<pfd::core::TaskFileEntryDto>
+TaskDetailQueryUseCase::queryTaskFiles(const pfd::base::TaskId& taskId) const {
   if (worker_ == nullptr) {
     return {};
   }
   return pfd::app::mapTaskFiles(worker_->queryTaskFiles(taskId));
 }
 
-pfd::core::TaskTrackerSnapshotDto TaskDetailQueryUseCase::queryTaskTrackers(
-    const pfd::base::TaskId& taskId) const {
+pfd::core::TaskTrackerSnapshotDto
+TaskDetailQueryUseCase::queryTaskTrackers(const pfd::base::TaskId& taskId) const {
   if (worker_ == nullptr) {
     return {};
   }
   return pfd::app::mapTaskTrackers(worker_->queryTaskTrackers(taskId));
 }
 
-std::vector<pfd::core::TaskPeerDto> TaskDetailQueryUseCase::queryTaskPeers(
-    const pfd::base::TaskId& taskId) const {
+std::vector<pfd::core::TaskPeerDto>
+TaskDetailQueryUseCase::queryTaskPeers(const pfd::base::TaskId& taskId) const {
   if (worker_ == nullptr) {
     return {};
   }
   return pfd::app::mapTaskPeers(worker_->queryTaskPeers(taskId));
 }
 
-std::vector<pfd::core::TaskWebSeedDto> TaskDetailQueryUseCase::queryTaskWebSeeds(
-    const pfd::base::TaskId& taskId) const {
+std::vector<pfd::core::TaskWebSeedDto>
+TaskDetailQueryUseCase::queryTaskWebSeeds(const pfd::base::TaskId& taskId) const {
   if (worker_ == nullptr) {
     return {};
   }

@@ -37,6 +37,7 @@ public:
   void setMaxAutoDownloadsPerRefresh(int max);
 
   void setDownloadRequestCallback(DownloadRequestCallback cb);
+  void setRequestHeaders(const RssFetcher::RequestHeaders& headers);
 
   void upsertFeed(const RssFeed& feed);
   void removeFeed(const QString& feed_id);

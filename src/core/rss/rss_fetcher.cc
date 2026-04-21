@@ -7,6 +7,8 @@
 #include <QtNetwork/QNetworkReply>
 #include <QtNetwork/QNetworkRequest>
 
+#include <utility>
+
 namespace pfd::core::rss {
 
 namespace {
@@ -16,6 +18,10 @@ bool isAllowedScheme(const QString& scheme) {
 }
 
 }  // namespace
+
+void RssFetcher::setRequestHeaders(RequestHeaders headers) {
+  headers_ = std::move(headers);
+}
 
 FetchResult RssFetcher::fetch(const QString& url, const QString& referer) const {
   const QUrl parsed(url.trimmed());
@@ -36,7 +42,17 @@ FetchResult RssFetcher::fetch(const QString& url, const QString& referer) const 
     QNetworkAccessManager nam;
     QNetworkRequest req(parsed);
     req.setTransferTimeout(kFetchTimeoutMs);
-    req.setHeader(QNetworkRequest::UserAgentHeader, QStringLiteral("pfd-rss-reader/1.0"));
+    const QString userAgent = headers_.user_agent.trimmed().isEmpty()
+                                  ? QStringLiteral("pfd-rss-reader/1.0")
+                                  : headers_.user_agent.trimmed();
+    req.setHeader(QNetworkRequest::UserAgentHeader, userAgent);
+    if (!headers_.accept_language.trimmed().isEmpty()) {
+      req.setRawHeader(QByteArrayLiteral("Accept-Language"),
+                       headers_.accept_language.trimmed().toUtf8());
+    }
+    if (!headers_.cookie_header.trimmed().isEmpty()) {
+      req.setRawHeader(QByteArrayLiteral("Cookie"), headers_.cookie_header.trimmed().toUtf8());
+    }
     if (!refTrim.isEmpty()) {
       req.setRawHeader(QByteArrayLiteral("Referer"), refTrim.toUtf8());
     }

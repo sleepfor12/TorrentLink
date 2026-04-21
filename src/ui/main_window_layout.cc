@@ -27,18 +27,21 @@ void MainWindow::setupMenuBar() {
   openTorrentLinksAction_ = fileMenu->addAction(QStringLiteral("打开 Torrent 链接"));
   fileMenu->addSeparator();
   exitAction_ = fileMenu->addAction(QStringLiteral("退出"));
-  auto* toolsMenu = menuBar()->addMenu(QStringLiteral("工具"));
-  downloadSettingsAction_ = toolsMenu->addAction(QStringLiteral("下载设置"));
+  auto* toolsMenu = menuBar()->addMenu(QStringLiteral("工具菜单栏"));
+  preferencesAction_ = toolsMenu->addAction(QStringLiteral("首选项"));
+  themeAction_ = toolsMenu->addAction(QStringLiteral("界面主题"));
+  toolsMenu->addSeparator();
   logCenterAction_ = toolsMenu->addAction(QStringLiteral("日志中心"));
+  toolsMenu->addSeparator();
+  createTorrentAction_ = toolsMenu->addAction(QStringLiteral("生成 Torrent"));
+  manageCookiesAction_ = toolsMenu->addAction(QStringLiteral("管理 Cookies"));
+  postDownloadActionsAction_ = toolsMenu->addAction(QStringLiteral("下载完成后的操作"));
   auto* viewMenu = menuBar()->addMenu(QStringLiteral("视图"));
   showLogAction_ = viewMenu->addAction(QStringLiteral("显示日志面板"));
   refreshListAction_ = viewMenu->addAction(QStringLiteral("刷新任务列表"));
   auto* helpMenu = menuBar()->addMenu(QStringLiteral("帮助"));
   helpAction_ = helpMenu->addAction(QStringLiteral("使用说明"));
   aboutAction_ = helpMenu->addAction(QStringLiteral("关于"));
-  auto* settingsMenu = menuBar()->addMenu(QStringLiteral("设置"));
-  preferencesAction_ = settingsMenu->addAction(QStringLiteral("首选项"));
-  themeAction_ = settingsMenu->addAction(QStringLiteral("界面主题"));
 }
 
 void MainWindow::applyTheme() {

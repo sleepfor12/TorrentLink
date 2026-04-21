@@ -65,6 +65,8 @@ private:
   void bindWorkerCallbacks();
   void scheduleTimedAction();
   void executeTimedAction();
+  void maybeRunPostDownloadAction(const std::vector<pfd::core::TaskSnapshot>& snapshots);
+  void executePostDownloadAction(const QString& action);
   void applySeedingPolicy(const std::vector<pfd::core::TaskSnapshot>& snapshots);
   void applyTaskMetaUpdate(const pfd::base::TaskId& taskId, const QString& name,
                            const QString& savePath, const QString& category,
@@ -133,6 +135,7 @@ private:
 
   pfd::ui::SystemTray* systemTray_{nullptr};
   std::unordered_set<QString> notifiedFinished_;
+  bool postDownloadActionTriggered_{false};
 
   std::unique_ptr<pfd::app::RefreshScheduler> uiRefreshScheduler_;
   std::unique_ptr<pfd::app::TaskBatchUseCase> taskBatchUseCase_;

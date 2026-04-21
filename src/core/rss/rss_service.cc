@@ -64,6 +64,10 @@ void RssService::setDownloadRequestCallback(DownloadRequestCallback cb) {
   on_download_request_ = std::move(cb);
 }
 
+void RssService::setRequestHeaders(const RssFetcher::RequestHeaders& headers) {
+  fetcher_.setRequestHeaders(headers);
+}
+
 void RssService::upsertFeed(const RssFeed& feed) {
   auto it =
       std::find_if(feeds_.begin(), feeds_.end(), [&](const RssFeed& x) { return x.id == feed.id; });

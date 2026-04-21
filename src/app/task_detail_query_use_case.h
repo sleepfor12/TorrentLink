@@ -11,16 +11,16 @@ class TaskDetailQueryUseCase {
 public:
   TaskDetailQueryUseCase(pfd::core::TaskPipelineService* pipeline, pfd::lt::SessionWorker* worker);
 
-  [[nodiscard]] pfd::ui::MainWindow::CopyPayload queryCopyPayload(
-      const pfd::base::TaskId& taskId) const;
-  [[nodiscard]] std::vector<pfd::core::TaskFileEntryDto> queryTaskFiles(
-      const pfd::base::TaskId& taskId) const;
-  [[nodiscard]] pfd::core::TaskTrackerSnapshotDto queryTaskTrackers(
-      const pfd::base::TaskId& taskId) const;
-  [[nodiscard]] std::vector<pfd::core::TaskPeerDto> queryTaskPeers(
-      const pfd::base::TaskId& taskId) const;
-  [[nodiscard]] std::vector<pfd::core::TaskWebSeedDto> queryTaskWebSeeds(
-      const pfd::base::TaskId& taskId) const;
+  [[nodiscard]] pfd::ui::MainWindow::CopyPayload
+  queryCopyPayload(const pfd::base::TaskId& taskId) const;
+  [[nodiscard]] std::vector<pfd::core::TaskFileEntryDto>
+  queryTaskFiles(const pfd::base::TaskId& taskId) const;
+  [[nodiscard]] pfd::core::TaskTrackerSnapshotDto
+  queryTaskTrackers(const pfd::base::TaskId& taskId) const;
+  [[nodiscard]] std::vector<pfd::core::TaskPeerDto>
+  queryTaskPeers(const pfd::base::TaskId& taskId) const;
+  [[nodiscard]] std::vector<pfd::core::TaskWebSeedDto>
+  queryTaskWebSeeds(const pfd::base::TaskId& taskId) const;
 
 private:
   pfd::core::TaskPipelineService* pipeline_{nullptr};

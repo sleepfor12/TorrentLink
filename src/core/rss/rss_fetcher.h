@@ -19,7 +19,15 @@ struct FetchResult {
 
 class RssFetcher {
 public:
+  struct RequestHeaders {
+    QString user_agent;
+    QString accept_language;
+    QString cookie_header;
+  };
+
   RssFetcher() = default;
+
+  void setRequestHeaders(RequestHeaders headers);
 
   [[nodiscard]] FetchResult fetch(const QString& url) const {
     return fetch(url, QString());
@@ -27,6 +35,9 @@ public:
 
   /// @param referer 非空时设置 HTTP Referer（防盗链站点常见需要）。
   [[nodiscard]] FetchResult fetch(const QString& url, const QString& referer) const;
+
+private:
+  RequestHeaders headers_;
 };
 
 }  // namespace pfd::core::rss

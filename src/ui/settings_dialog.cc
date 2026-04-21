@@ -211,6 +211,19 @@ pfd::core::AppSettings SettingsDialog::currentSettings() const {
                                               : QStringLiteral("none");
   s.timed_action_delay_minutes =
       timedActionDelaySpin_ != nullptr ? timedActionDelaySpin_->value() : 0;
+  s.download_complete_action = downloadCompleteActionBox_ != nullptr
+                                   ? downloadCompleteActionBox_->currentData().toString()
+                                   : QStringLiteral("none");
+  if (s.timed_action != QStringLiteral("none") && s.timed_action_delay_minutes > 0) {
+    s.download_complete_action = QStringLiteral("none");
+  }
+  s.http_user_agent = httpUserAgentEdit_ != nullptr ? httpUserAgentEdit_->text().trimmed()
+                                                    : QStringLiteral("TorrentLink/1.0");
+  s.http_accept_language = httpAcceptLanguageEdit_ != nullptr
+                               ? httpAcceptLanguageEdit_->text().trimmed()
+                               : QStringLiteral("zh-CN,zh;q=0.9,en;q=0.8");
+  s.http_cookie_header =
+      httpCookieHeaderEdit_ != nullptr ? httpCookieHeaderEdit_->toPlainText().trimmed() : QString();
   return s;
 }
 
@@ -451,6 +464,25 @@ void SettingsDialog::setSettings(const pfd::core::AppSettings& s) {
                                       : QStringLiteral("none");
     timedActionDelaySpin_->setEnabled(currentAction != QStringLiteral("none"));
   }
+  if (downloadCompleteActionBox_ != nullptr) {
+    const QString completeAction = s.download_complete_action.trimmed().toLower();
+    for (int i = 0; i < downloadCompleteActionBox_->count(); ++i) {
+      if (downloadCompleteActionBox_->itemData(i).toString() == completeAction) {
+        downloadCompleteActionBox_->setCurrentIndex(i);
+        break;
+      }
+    }
+  }
+  if (httpUserAgentEdit_ != nullptr) {
+    httpUserAgentEdit_->setText(s.http_user_agent);
+  }
+  if (httpAcceptLanguageEdit_ != nullptr) {
+    httpAcceptLanguageEdit_->setText(s.http_accept_language);
+  }
+  if (httpCookieHeaderEdit_ != nullptr) {
+    httpCookieHeaderEdit_->setPlainText(s.http_cookie_header);
+  }
+  syncDownloadCompleteActionAvailability();
 }
 
 void SettingsDialog::setRssSettings(const pfd::core::rss::RssSettings& s) {
@@ -848,6 +880,23 @@ void SettingsDialog::buildLayout() {
       rssTab);
   rssHint->setProperty("class", QStringLiteral("sectionHint"));
   rssLayout->addWidget(rssHint);
+
+  auto* requestHeaderGroup = new QGroupBox(QStringLiteral("RSS/搜索请求头"), rssTab);
+  auto* requestHeaderForm = new QFormLayout(requestHeaderGroup);
+  requestHeaderForm->setFieldGrowthPolicy(QFormLayout::ExpandingFieldsGrow);
+  requestHeaderForm->setFormAlignment(Qt::AlignTop);
+  requestHeaderForm->setVerticalSpacing(10);
+  httpUserAgentEdit_ = new QLineEdit(requestHeaderGroup);
+  httpUserAgentEdit_->setPlaceholderText(QStringLiteral("例如：TorrentLink/1.0"));
+  requestHeaderForm->addRow(QStringLiteral("User-Agent"), httpUserAgentEdit_);
+  httpAcceptLanguageEdit_ = new QLineEdit(requestHeaderGroup);
+  httpAcceptLanguageEdit_->setPlaceholderText(QStringLiteral("例如：zh-CN,zh;q=0.9,en;q=0.8"));
+  requestHeaderForm->addRow(QStringLiteral("Accept-Language"), httpAcceptLanguageEdit_);
+  httpCookieHeaderEdit_ = new QPlainTextEdit(requestHeaderGroup);
+  httpCookieHeaderEdit_->setMaximumHeight(90);
+  httpCookieHeaderEdit_->setPlaceholderText(QStringLiteral("例如：sid=abc; token=xyz"));
+  requestHeaderForm->addRow(QStringLiteral("Cookie"), httpCookieHeaderEdit_);
+  rssLayout->addWidget(requestHeaderGroup);
   rssLayout->addStretch(1);
   makeScrollableTab(rssTab, QStringLiteral("内容"));
 
@@ -895,6 +944,19 @@ void SettingsDialog::buildLayout() {
   timedActionDelaySpin_->setSuffix(QStringLiteral(" 分钟后"));
   timedActionDelaySpin_->setValue(0);
   behaviorForm->addRow(QStringLiteral("执行时间"), timedActionDelaySpin_);
+
+  downloadCompleteActionBox_ = new QComboBox(behaviorGroup);
+  downloadCompleteActionBox_->addItem(QStringLiteral("不执行"), QStringLiteral("none"));
+  downloadCompleteActionBox_->addItem(QStringLiteral("退出 TorrentLink"),
+                                      QStringLiteral("quit_app"));
+  downloadCompleteActionBox_->addItem(QStringLiteral("系统睡眠"), QStringLiteral("suspend"));
+  downloadCompleteActionBox_->addItem(QStringLiteral("系统休眠"), QStringLiteral("hibernate"));
+  downloadCompleteActionBox_->addItem(QStringLiteral("系统关闭"), QStringLiteral("poweroff"));
+  behaviorForm->addRow(QStringLiteral("下载完成后"), downloadCompleteActionBox_);
+  downloadCompleteActionHint_ = new QLabel(
+      QStringLiteral("已启用定时动作时，此项不可用，并在保存时强制为“不执行”。"), behaviorGroup);
+  downloadCompleteActionHint_->setProperty("class", QStringLiteral("sectionHint"));
+  behaviorForm->addRow(QString(), downloadCompleteActionHint_);
   advancedLayout->addWidget(behaviorGroup);
 
   auto* uiGroup = new QGroupBox(QStringLiteral("界面与性能"), advancedTab);
@@ -998,9 +1060,13 @@ void SettingsDialog::wireSignals() {
     connect(timedActionBox_, &QComboBox::currentIndexChanged, this, [this](int) {
       const QString action = timedActionBox_->currentData().toString();
       timedActionDelaySpin_->setEnabled(action != QStringLiteral("none"));
+      syncDownloadCompleteActionAvailability();
     });
     timedActionDelaySpin_->setEnabled(timedActionBox_->currentData().toString() !=
                                       QStringLiteral("none"));
+    connect(timedActionDelaySpin_, &QSpinBox::valueChanged, this,
+            [this](int) { syncDownloadCompleteActionAvailability(); });
+    syncDownloadCompleteActionAvailability();
   }
   if (ipFilterEnabledCheck_ != nullptr && ipFilterPathEdit_ != nullptr) {
     connect(ipFilterEnabledCheck_, &QCheckBox::toggled, this,
@@ -1071,6 +1137,20 @@ void SettingsDialog::browseLogDir() {
       QFileDialog::getExistingDirectory(this, QStringLiteral("选择日志保存目录"), base);
   if (!dir.isEmpty() && logDirEdit_ != nullptr) {
     logDirEdit_->setText(dir);
+  }
+}
+
+void SettingsDialog::syncDownloadCompleteActionAvailability() {
+  if (downloadCompleteActionBox_ == nullptr || timedActionBox_ == nullptr ||
+      timedActionDelaySpin_ == nullptr) {
+    return;
+  }
+  const QString action = timedActionBox_->currentData().toString();
+  const bool timedActionEnabled =
+      action != QStringLiteral("none") && timedActionDelaySpin_->value() > 0;
+  downloadCompleteActionBox_->setEnabled(!timedActionEnabled);
+  if (downloadCompleteActionHint_ != nullptr) {
+    downloadCompleteActionHint_->setVisible(timedActionEnabled);
   }
 }
 

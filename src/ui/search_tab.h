@@ -20,6 +20,12 @@ class SearchTab : public QWidget {
   Q_OBJECT
 
 public:
+  struct RequestHeaders {
+    QString user_agent;
+    QString accept_language;
+    QString cookie_header;
+  };
+
   using QuerySnapshotsFn = std::function<std::vector<pfd::core::TaskSnapshot>()>;
   using QueryRssItemsFn = std::function<std::vector<std::pair<QString, QString>>(const QString&)>;
 
@@ -27,6 +33,7 @@ public:
 
   void setQuerySnapshotsFn(QuerySnapshotsFn fn);
   void setQueryRssItemsFn(QueryRssItemsFn fn);
+  void setRequestHeaders(RequestHeaders headers);
 
 private:
   void buildLayout();
@@ -41,6 +48,7 @@ private:
 
   QuerySnapshotsFn querySnapshotsFn_;
   QueryRssItemsFn queryRssItemsFn_;
+  RequestHeaders requestHeaders_;
 
   struct ResultEntry {
     QString title;

@@ -8,10 +8,9 @@ TaskControlCommandUseCase::TaskControlCommandUseCase(
     SetSequentialFn setSequentialFn, SetAutoManagedFn setAutoManagedFn, LogFn logFn)
     : pauseFn_(std::move(pauseFn)), resumeFn_(std::move(resumeFn)), removeFn_(std::move(removeFn)),
       setConnectionsFn_(std::move(setConnectionsFn)), forceStartFn_(std::move(forceStartFn)),
-      forceRecheckFn_(std::move(forceRecheckFn)),
-      forceReannounceFn_(std::move(forceReannounceFn)),
-      setSequentialFn_(std::move(setSequentialFn)),
-      setAutoManagedFn_(std::move(setAutoManagedFn)), logFn_(std::move(logFn)) {}
+      forceRecheckFn_(std::move(forceRecheckFn)), forceReannounceFn_(std::move(forceReannounceFn)),
+      setSequentialFn_(std::move(setSequentialFn)), setAutoManagedFn_(std::move(setAutoManagedFn)),
+      logFn_(std::move(logFn)) {}
 
 void TaskControlCommandUseCase::pauseTask(const pfd::base::TaskId& taskId) const {
   if (pauseFn_) {
@@ -33,7 +32,8 @@ void TaskControlCommandUseCase::resumeTask(const pfd::base::TaskId& taskId) cons
   }
 }
 
-void TaskControlCommandUseCase::removeTask(const pfd::base::TaskId& taskId, bool removeFiles) const {
+void TaskControlCommandUseCase::removeTask(const pfd::base::TaskId& taskId,
+                                           bool removeFiles) const {
   if (removeFn_) {
     removeFn_(taskId, removeFiles);
   }

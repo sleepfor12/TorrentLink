@@ -68,6 +68,10 @@ void SearchTab::setQueryRssItemsFn(QueryRssItemsFn fn) {
   queryRssItemsFn_ = std::move(fn);
 }
 
+void SearchTab::setRequestHeaders(RequestHeaders headers) {
+  requestHeaders_ = std::move(headers);
+}
+
 void SearchTab::performSearch() {
   const QString keyword = queryEdit_->text().trimmed();
   if (keyword.isEmpty())
@@ -117,8 +121,12 @@ void SearchTab::performSearch() {
       results_.push_back(std::move(entry));
     }
   } else {
-    QMessageBox::information(this, QStringLiteral("提示"),
-                             QStringLiteral("在线搜索暂未支持，请使用「本地历史」或「RSS」。"));
+    QMessageBox::information(
+        this, QStringLiteral("提示"),
+        QStringLiteral(
+            "在线搜索暂未支持，请使用「本地历史」或「RSS」。\n当前请求头配置将用于后续在线搜索：\n"
+            "User-Agent: %1\nAccept-Language: %2")
+            .arg(requestHeaders_.user_agent, requestHeaders_.accept_language));
     return;
   }
 

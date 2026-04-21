@@ -73,6 +73,16 @@ struct AppSettings {
   QString timed_action{QStringLiteral("none")};
   int timed_action_delay_minutes{0};  // 0=禁用
 
+  // --- 全部任务下载完成后的动作 ---
+  // "none" | "quit_app" | "suspend" | "hibernate" | "poweroff"
+  // 当 timed_action != "none" 且 delay>0 时，此字段会被强制视为 "none"。
+  QString download_complete_action{QStringLiteral("none")};
+
+  // --- RSS/搜索请求头 ---
+  QString http_user_agent{QStringLiteral("TorrentLink/1.0")};
+  QString http_accept_language{QStringLiteral("zh-CN,zh;q=0.9,en;q=0.8")};
+  QString http_cookie_header;
+
   static QString settingsFilePath();
 
   static AppSettings load();
