@@ -1,5 +1,6 @@
 #include "ui/main_window.h"
 
+#include <QtCore/QCoreApplication>
 #include <QtCore/QTimer>
 #include <QtGui/QCloseEvent>
 #include <QtWidgets/QApplication>
@@ -79,11 +80,16 @@ void MainWindow::notifyTaskAlreadyInList(const QString& displayName) {
 
 void MainWindow::closeEvent(QCloseEvent* event) {
   saveUiState();
-  const bool wantQuit =
-      forceQuit_ || !QSystemTrayIcon::isSystemTrayAvailable() ||
-      pfd::core::ConfigService::loadAppSettings().close_behavior == QStringLiteral("quit");
+  const QString closeBehavior = pfd::core::ConfigService::loadAppSettings().close_behavior;
+  const bool wantQuit = forceQuit_ || !QSystemTrayIcon::isSystemTrayAvailable() ||
+                        closeBehavior == QStringLiteral("quit");
   if (wantQuit) {
-    QMainWindow::closeEvent(event);
+    forceQuit_ = true;
+    hide();
+    event->accept();
+    // 即使启用了托盘和 quitOnLastWindowClosed(false)，也强制结束事件循环。
+    QCoreApplication::exit(0);
+    return;
   } else {
     hide();
     event->ignore();

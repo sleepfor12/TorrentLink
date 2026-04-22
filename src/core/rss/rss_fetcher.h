@@ -23,6 +23,7 @@ public:
     QString user_agent;
     QString accept_language;
     QString cookie_header;
+    QString cookie_rules;
   };
 
   RssFetcher() = default;

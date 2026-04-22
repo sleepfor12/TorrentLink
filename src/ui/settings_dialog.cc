@@ -224,6 +224,7 @@ pfd::core::AppSettings SettingsDialog::currentSettings() const {
                                : QStringLiteral("zh-CN,zh;q=0.9,en;q=0.8");
   s.http_cookie_header =
       httpCookieHeaderEdit_ != nullptr ? httpCookieHeaderEdit_->toPlainText().trimmed() : QString();
+  s.http_cookie_rules = httpCookieRules_;
   return s;
 }
 
@@ -482,6 +483,7 @@ void SettingsDialog::setSettings(const pfd::core::AppSettings& s) {
   if (httpCookieHeaderEdit_ != nullptr) {
     httpCookieHeaderEdit_->setPlainText(s.http_cookie_header);
   }
+  httpCookieRules_ = s.http_cookie_rules;
   syncDownloadCompleteActionAvailability();
 }
 

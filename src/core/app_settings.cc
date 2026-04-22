@@ -162,6 +162,7 @@ AppSettings AppSettings::load() {
           .toString()
           .trimmed();
   out.http_cookie_header = s.value(QStringLiteral("http/cookie_header"), QString()).toString();
+  out.http_cookie_rules = s.value(QStringLiteral("http/cookie_rules"), QString()).toString();
 
   if (out.default_download_dir.isEmpty()) {
     out.default_download_dir = QStandardPaths::writableLocation(QStandardPaths::DownloadLocation);
@@ -239,6 +240,7 @@ void AppSettings::save(const AppSettings& in) {
   s.setValue(QStringLiteral("http/user_agent"), in.http_user_agent.trimmed());
   s.setValue(QStringLiteral("http/accept_language"), in.http_accept_language.trimmed());
   s.setValue(QStringLiteral("http/cookie_header"), in.http_cookie_header);
+  s.setValue(QStringLiteral("http/cookie_rules"), in.http_cookie_rules);
 }
 
 }  // namespace pfd::core

@@ -52,19 +52,16 @@ AppController::AppController(QApplication* app, pfd::ui::MainWindow* window,
 AppController::~AppController() {
   shuttingDown_.store(true);
   builtinHttpTracker_.reset();
+  constexpr auto kWaitBudgetPerTask = std::chrono::milliseconds(120);
   std::vector<std::future<void>> tasks;
   {
     std::lock_guard<std::mutex> lk(magnetTasksMu_);
     tasks.swap(magnetTasks_);
   }
   for (auto& f : tasks) {
-    if (f.valid()) {
-      f.wait();
-    }
+    waitFutureAtMost(f, kWaitBudgetPerTask);
   }
-  if (taskPersistenceCoordinator_) {
-    taskPersistenceCoordinator_->saveNow();
-  }
+  waitFutureAtMost(statusTask_, kWaitBudgetPerTask);
   saveSettings();
 }
 
@@ -165,7 +162,8 @@ void AppController::initialize() {
   QObject::connect(app_, &QApplication::aboutToQuit, static_cast<QObject*>(app_), [this]() {
     shuttingDown_.store(true);
     if (taskPersistenceCoordinator_) {
-      taskPersistenceCoordinator_->saveNow();
+      // 快速退出：优先保存任务元数据，跳过耗时 resume 全量写盘。
+      taskPersistenceCoordinator_->saveTasksNow();
     }
     if (rssService_)
       rssService_->saveState();
@@ -211,6 +209,16 @@ void AppController::initialize() {
 void AppController::schedulePersistedTasksAutoSave() {
   taskPersistenceCoordinator_->setAutoSaveIntervalMs(taskAutoSaveMs_);
   taskPersistenceCoordinator_->startAutoSave();
+}
+
+void AppController::waitFutureAtMost(std::future<void>& fut,
+                                     std::chrono::milliseconds timeout) const {
+  if (!fut.valid()) {
+    return;
+  }
+  if (fut.wait_for(timeout) == std::future_status::ready) {
+    fut.wait();
+  }
 }
 
 void AppController::scheduleTimedAction() {
@@ -362,7 +370,7 @@ void AppController::applyRuntimeSettingsFromConfig(const pfd::core::AppSettings*
   applyBuiltinHttpTrackerFromSettings(s);
   if (rssService_ != nullptr) {
     rssService_->setRequestHeaders(pfd::core::rss::RssFetcher::RequestHeaders{
-        s.http_user_agent, s.http_accept_language, s.http_cookie_header});
+        s.http_user_agent, s.http_accept_language, s.http_cookie_header, s.http_cookie_rules});
   }
   if (window_ != nullptr) {
     window_->setSearchRequestHeaders(pfd::ui::SearchTab::RequestHeaders{
@@ -683,7 +691,7 @@ void AppController::startOneRssTorrentUrlOnUi(
 
   const auto requestHeaders = pfd::core::rss::RssFetcher::RequestHeaders{
       cachedAppSettings_.http_user_agent, cachedAppSettings_.http_accept_language,
-      cachedAppSettings_.http_cookie_header};
+      cachedAppSettings_.http_cookie_header, cachedAppSettings_.http_cookie_rules};
   auto fut = std::async(std::launch::async, [this, windowGuard, workerPtr, url, referer,
                                              resolvedSavePath, useDefaultTrackers,
                                              defaultTrackersCopy, rssS, requestHeaders]() {
@@ -1542,7 +1550,7 @@ void AppController::initializeRss() {
   rssService_->loadState();
   rssService_->setRequestHeaders(pfd::core::rss::RssFetcher::RequestHeaders{
       cachedAppSettings_.http_user_agent, cachedAppSettings_.http_accept_language,
-      cachedAppSettings_.http_cookie_header});
+      cachedAppSettings_.http_cookie_header, cachedAppSettings_.http_cookie_rules});
 
   rssService_->setDownloadRequestCallback([this](const pfd::core::rss::AutoDownloadRequest& req) {
     if (shuttingDown_.load())

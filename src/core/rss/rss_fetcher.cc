@@ -17,6 +17,36 @@ bool isAllowedScheme(const QString& scheme) {
   return scheme == QStringLiteral("http") || scheme == QStringLiteral("https");
 }
 
+QString cookieFromRules(const QString& rulesText, const QString& host) {
+  if (rulesText.trimmed().isEmpty() || host.trimmed().isEmpty()) {
+    return {};
+  }
+  QStringList pairs;
+  const QString hostLower = host.trimmed().toLower();
+  for (const QString& raw : rulesText.split('\n', Qt::SkipEmptyParts)) {
+    const QString line = raw.trimmed();
+    if (line.isEmpty()) {
+      continue;
+    }
+    const int sep = line.indexOf('\t');
+    if (sep <= 0 || sep >= line.size() - 1) {
+      continue;
+    }
+    const QString domain = line.left(sep).trimmed().toLower();
+    const QString cookiePair = line.mid(sep + 1).trimmed();
+    if (cookiePair.isEmpty()) {
+      continue;
+    }
+    const bool matched =
+        domain == QStringLiteral("*") || domain == hostLower ||
+        (hostLower.size() > domain.size() && hostLower.endsWith(QStringLiteral(".") + domain));
+    if (matched) {
+      pairs.push_back(cookiePair);
+    }
+  }
+  return pairs.join(QStringLiteral("; "));
+}
+
 }  // namespace
 
 void RssFetcher::setRequestHeaders(RequestHeaders headers) {
@@ -52,6 +82,14 @@ FetchResult RssFetcher::fetch(const QString& url, const QString& referer) const 
     }
     if (!headers_.cookie_header.trimmed().isEmpty()) {
       req.setRawHeader(QByteArrayLiteral("Cookie"), headers_.cookie_header.trimmed().toUtf8());
+    }
+    const QString ruleCookies = cookieFromRules(headers_.cookie_rules, parsed.host());
+    if (!ruleCookies.isEmpty()) {
+      const QString mergedCookies =
+          headers_.cookie_header.trimmed().isEmpty()
+              ? ruleCookies
+              : QStringLiteral("%1; %2").arg(headers_.cookie_header.trimmed(), ruleCookies);
+      req.setRawHeader(QByteArrayLiteral("Cookie"), mergedCookies.toUtf8());
     }
     if (!refTrim.isEmpty()) {
       req.setRawHeader(QByteArrayLiteral("Referer"), refTrim.toUtf8());

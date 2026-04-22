@@ -115,6 +115,7 @@ private:
   QLineEdit* httpUserAgentEdit_{nullptr};
   QLineEdit* httpAcceptLanguageEdit_{nullptr};
   QPlainTextEdit* httpCookieHeaderEdit_{nullptr};
+  QString httpCookieRules_;
 };
 
 }  // namespace pfd::ui

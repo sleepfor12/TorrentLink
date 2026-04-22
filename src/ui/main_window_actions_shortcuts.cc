@@ -1,12 +1,21 @@
 #include <QtCore/QDateTime>
 #include <QtCore/QDir>
 #include <QtCore/QEvent>
+#include <QtCore/QFile>
 #include <QtCore/QFileInfo>
+#include <QtCore/QHash>
+#include <QtCore/QMetaObject>
 #include <QtCore/QPoint>
+#include <QtCore/QPointer>
+#include <QtCore/QSet>
+#include <QtCore/QSignalBlocker>
 #include <QtCore/QStandardPaths>
 #include <QtCore/QUrl>
 #include <QtCore/QUuid>
+#include <QtCore/QVector>
+#include <QtGui/QBrush>
 #include <QtGui/QClipboard>
+#include <QtGui/QColor>
 #include <QtGui/QDesktopServices>
 #include <QtGui/QMouseEvent>
 #include <QtGui/QShortcut>
@@ -28,12 +37,17 @@
 #include <QtWidgets/QProgressBar>
 #include <QtWidgets/QPushButton>
 #include <QtWidgets/QTableWidget>
+#include <QtWidgets/QTableWidgetItem>
 #include <QtWidgets/QTextEdit>
 #include <QtWidgets/QVBoxLayout>
+
+#include <algorithm>
+#include <thread>
 
 #include "base/types.h"
 #include "core/config_service.h"
 #include "core/logger.h"
+#include "core/torrent_creator.h"
 #include "ui/main_window.h"
 
 namespace pfd::ui {
@@ -66,10 +80,6 @@ void MainWindow::bindSignals() {
   if (manageCookiesAction_ != nullptr) {
     connect(manageCookiesAction_, &QAction::triggered, this,
             [this]() { openCookieManagerDialog(); });
-  }
-  if (postDownloadActionsAction_ != nullptr) {
-    connect(postDownloadActionsAction_, &QAction::triggered, this,
-            [this]() { openPostDownloadActionsDialog(); });
   }
   if (showLogAction_ != nullptr) {
     connect(showLogAction_, &QAction::triggered, this, [this]() { openLogCenter(); });
@@ -179,43 +189,143 @@ void MainWindow::openCreateTorrentDialog() {
 
   auto* sourceGroup = new QGroupBox(QStringLiteral("选择要共享的文件/文件夹"), &dlg);
   auto* sourceForm = new QFormLayout(sourceGroup);
-  auto* sourcePath = new QLineEdit(QDir::homePath(), sourceGroup);
-  sourceForm->addRow(QStringLiteral("路径："), sourcePath);
+  auto* sourceRow = new QWidget(sourceGroup);
+  auto* sourceRowLayout = new QHBoxLayout(sourceRow);
+  sourceRowLayout->setContentsMargins(0, 0, 0, 0);
+  sourceRowLayout->setSpacing(8);
+  auto* sourcePath = new QLineEdit(QDir::homePath(), sourceRow);
+  auto* selectFileBtn = new QPushButton(QStringLiteral("选择文件"), sourceRow);
+  auto* selectDirBtn = new QPushButton(QStringLiteral("选择文件夹"), sourceRow);
+  sourceRowLayout->addWidget(sourcePath, 1);
+  sourceRowLayout->addWidget(selectFileBtn);
+  sourceRowLayout->addWidget(selectDirBtn);
+  sourceForm->addRow(QStringLiteral("路径："), sourceRow);
   root->addWidget(sourceGroup);
 
   auto* settingsGroup = new QGroupBox(QStringLiteral("设置"), &dlg);
   auto* settingsForm = new QFormLayout(settingsGroup);
   auto* pieceSize = new QComboBox(settingsGroup);
   pieceSize->addItem(QStringLiteral("自动"), 0);
+  pieceSize->addItem(QStringLiteral("128 KiB"), 128 * 1024);
   pieceSize->addItem(QStringLiteral("256 KiB"), 256 * 1024);
   pieceSize->addItem(QStringLiteral("512 KiB"), 512 * 1024);
+  pieceSize->addItem(QStringLiteral("1 MiB"), 1024 * 1024);
+  pieceSize->addItem(QStringLiteral("2 MiB"), 2 * 1024 * 1024);
+  pieceSize->addItem(QStringLiteral("4 MiB"), 4 * 1024 * 1024);
   settingsForm->addRow(QStringLiteral("分块大小："), pieceSize);
-  settingsForm->addRow(
-      QString(),
-      new QCheckBox(QStringLiteral("私有 torrent（不在 DHT 网络上分发）"), settingsGroup));
-  settingsForm->addRow(QString(), new QCheckBox(QStringLiteral("完成后开始做种"), settingsGroup));
+  auto* privateTorrentCheck =
+      new QCheckBox(QStringLiteral("私有 torrent（不在 DHT 网络上分发）"), settingsGroup);
+  settingsForm->addRow(QString(), privateTorrentCheck);
   root->addWidget(settingsGroup);
 
   auto* fieldsGroup = new QGroupBox(QStringLiteral("字段"), &dlg);
   auto* fieldsForm = new QFormLayout(fieldsGroup);
-  fieldsForm->addRow(QStringLiteral("Tracker URL："), new QTextEdit(fieldsGroup));
-  fieldsForm->addRow(QStringLiteral("Web 种子 URL："), new QTextEdit(fieldsGroup));
-  fieldsForm->addRow(QStringLiteral("注释："), new QTextEdit(fieldsGroup));
-  fieldsForm->addRow(QStringLiteral("源："), new QLineEdit(fieldsGroup));
+  auto* trackersEdit = new QTextEdit(fieldsGroup);
+  auto* webSeedsEdit = new QTextEdit(fieldsGroup);
+  auto* commentEdit = new QTextEdit(fieldsGroup);
+  auto* sourceEdit = new QLineEdit(fieldsGroup);
+  trackersEdit->setPlaceholderText(QStringLiteral("每行一个 Tracker URL"));
+  webSeedsEdit->setPlaceholderText(QStringLiteral("每行一个 Web 种子 URL"));
+  fieldsForm->addRow(QStringLiteral("Tracker URL："), trackersEdit);
+  fieldsForm->addRow(QStringLiteral("Web 种子 URL："), webSeedsEdit);
+  fieldsForm->addRow(QStringLiteral("注释："), commentEdit);
+  fieldsForm->addRow(QStringLiteral("源："), sourceEdit);
   root->addWidget(fieldsGroup, 1);
 
   auto* progress = new QProgressBar(&dlg);
   progress->setRange(0, 100);
   progress->setValue(0);
   root->addWidget(progress);
+  auto* progressText = new QLabel(QStringLiteral("进度：0%"), &dlg);
+  root->addWidget(progressText);
+  auto* openOutputDirCheck = new QCheckBox(QStringLiteral("完成后打开输出目录"), &dlg);
+  openOutputDirCheck->setChecked(true);
+  root->addWidget(openOutputDirCheck);
 
   auto* buttons = new QDialogButtonBox(QDialogButtonBox::Close, &dlg);
   auto* createBtn = new QPushButton(QStringLiteral("制作 Torrent"), &dlg);
   buttons->addButton(createBtn, QDialogButtonBox::AcceptRole);
-  connect(createBtn, &QPushButton::clicked, &dlg, [this]() {
-    QMessageBox::information(this, QStringLiteral("生成 Torrent"),
-                             QStringLiteral("Torrent 生成能力将在下一步接入底层实现。"));
+  connect(selectFileBtn, &QPushButton::clicked, &dlg, [sourcePath, &dlg]() {
+    const QString path =
+        QFileDialog::getOpenFileName(&dlg, QStringLiteral("选择文件"), sourcePath->text());
+    if (!path.isEmpty()) {
+      sourcePath->setText(path);
+    }
   });
+  connect(selectDirBtn, &QPushButton::clicked, &dlg, [sourcePath, &dlg]() {
+    const QString path =
+        QFileDialog::getExistingDirectory(&dlg, QStringLiteral("选择文件夹"), sourcePath->text());
+    if (!path.isEmpty()) {
+      sourcePath->setText(path);
+    }
+  });
+  connect(
+      createBtn, &QPushButton::clicked, &dlg,
+      [this, &dlg, sourcePath, pieceSize, privateTorrentCheck, trackersEdit, webSeedsEdit,
+       commentEdit, sourceEdit, progress, progressText, openOutputDirCheck, createBtn]() {
+        const QString src = sourcePath->text().trimmed();
+        if (src.isEmpty() || !QFileInfo::exists(src)) {
+          QMessageBox::warning(&dlg, QStringLiteral("生成 Torrent"),
+                               QStringLiteral("请选择有效的源路径。"));
+          return;
+        }
+        const QString outputPath = QFileDialog::getSaveFileName(
+            &dlg, QStringLiteral("保存 Torrent 文件"),
+            QFileInfo(src).dir().filePath(QFileInfo(src).baseName() + QStringLiteral(".torrent")),
+            QStringLiteral("Torrent 文件 (*.torrent)"));
+        if (outputPath.isEmpty()) {
+          return;
+        }
+        progress->setValue(0);
+        progressText->setText(QStringLiteral("进度：0%"));
+        pfd::core::CreateTorrentRequest req;
+        req.source_path = src;
+        req.output_torrent_path = outputPath;
+        req.piece_size_bytes = pieceSize->currentData().toInt();
+        req.private_torrent = privateTorrentCheck->isChecked();
+        req.trackers_text = trackersEdit->toPlainText();
+        req.web_seeds_text = webSeedsEdit->toPlainText();
+        req.comment = commentEdit->toPlainText();
+        req.source = sourceEdit->text();
+        createBtn->setEnabled(false);
+        progressText->setText(QStringLiteral("进度：准备生成..."));
+        const bool openDirAfter = openOutputDirCheck->isChecked();
+        const QPointer<QDialog> dlgGuard(&dlg);
+        const QPointer<MainWindow> selfGuard(this);
+        std::thread([selfGuard, req, outputPath, progress, progressText, createBtn, openDirAfter,
+                     dlgGuard]() {
+          const auto result =
+              pfd::core::TorrentCreator::create(req, [progress, progressText](int value) {
+                const int p = std::clamp(value, 0, 100);
+                QMetaObject::invokeMethod(progress, [progress, progressText, p]() {
+                  progress->setValue(p);
+                  progressText->setText(QStringLiteral("进度：%1%").arg(p));
+                });
+              });
+          QMetaObject::invokeMethod(progress, [selfGuard, result, outputPath, progressText,
+                                               createBtn, openDirAfter, dlgGuard]() {
+            if (selfGuard.isNull()) {
+              return;
+            }
+            createBtn->setEnabled(true);
+            if (dlgGuard.isNull()) {
+              return;
+            }
+            if (!result.ok) {
+              QMessageBox::warning(dlgGuard.data(), QStringLiteral("生成失败"), result.error);
+              selfGuard->appendLog(QStringLiteral("生成 Torrent 失败：%1").arg(result.error));
+              return;
+            }
+            progressText->setText(QStringLiteral("进度：100%（完成）"));
+            QMessageBox::information(dlgGuard.data(), QStringLiteral("生成成功"),
+                                     QStringLiteral("已生成 Torrent：%1").arg(outputPath));
+            selfGuard->appendLog(QStringLiteral("已生成 Torrent：%1").arg(outputPath));
+            if (openDirAfter) {
+              QDesktopServices::openUrl(QUrl::fromLocalFile(QFileInfo(outputPath).absolutePath()));
+            }
+          });
+        }).detach();
+      });
   connect(buttons, &QDialogButtonBox::rejected, &dlg, &QDialog::reject);
   root->addWidget(buttons);
   dlg.exec();
@@ -225,26 +335,262 @@ void MainWindow::openCookieManagerDialog() {
   QDialog dlg(this);
   dlg.setWindowTitle(QStringLiteral("管理 Cookies"));
   dlg.setModal(true);
-  dlg.resize(700, 460);
+  dlg.resize(760, 520);
   auto* root = new QVBoxLayout(&dlg);
   auto* table = new QTableWidget(0, 3, &dlg);
   table->setHorizontalHeaderLabels(
-      {QStringLiteral("域名"), QStringLiteral("Cookie 名"), QStringLiteral("值")});
+      {QStringLiteral("域名（* 表示全局）"), QStringLiteral("Cookie 名"), QStringLiteral("值")});
   table->horizontalHeader()->setStretchLastSection(true);
   root->addWidget(table, 1);
-  root->addWidget(new QLabel(
-      QStringLiteral("提示：Cookies 将用于 RSS 与搜索请求头，完整编辑功能下一步完善。"), &dlg));
-  auto* buttons = new QDialogButtonBox(QDialogButtonBox::Close, &dlg);
+
+  auto* filterRow = new QHBoxLayout();
+  auto* filterEdit = new QLineEdit(&dlg);
+  filterEdit->setPlaceholderText(QStringLiteral("筛选域名/Cookie 名/值"));
+  filterRow->addWidget(new QLabel(QStringLiteral("筛选："), &dlg));
+  filterRow->addWidget(filterEdit, 1);
+  root->addLayout(filterRow);
+  auto* duplicateHint = new QLabel(QString(), &dlg);
+  duplicateHint->setProperty("class", QStringLiteral("sectionHint"));
+  root->addWidget(duplicateHint);
+
+  const auto initial = pfd::core::ConfigService::loadAppSettings();
+  auto appendCookieRow = [table](const QString& domain, const QString& pairText) {
+    const int pos = pairText.indexOf('=');
+    if (pos <= 0)
+      return;
+    const int row = table->rowCount();
+    table->insertRow(row);
+    table->setItem(row, 0, new QTableWidgetItem(domain));
+    table->setItem(row, 1, new QTableWidgetItem(pairText.left(pos).trimmed()));
+    table->setItem(row, 2, new QTableWidgetItem(pairText.mid(pos + 1).trimmed()));
+  };
+  for (const QString& entryRaw : initial.http_cookie_header.split(';', Qt::SkipEmptyParts)) {
+    appendCookieRow(QStringLiteral("*"), entryRaw.trimmed());
+  }
+  for (const QString& lineRaw : initial.http_cookie_rules.split('\n', Qt::SkipEmptyParts)) {
+    const QString line = lineRaw.trimmed();
+    const int tabPos = line.indexOf('\t');
+    if (tabPos <= 0 || tabPos >= line.size() - 1) {
+      continue;
+    }
+    appendCookieRow(line.left(tabPos).trimmed(), line.mid(tabPos + 1).trimmed());
+  }
+
+  auto* actionRow = new QHBoxLayout();
+  auto* addBtn = new QPushButton(QStringLiteral("新增"), &dlg);
+  auto* removeBtn = new QPushButton(QStringLiteral("删除选中"), &dlg);
+  auto* importBtn = new QPushButton(QStringLiteral("导入"), &dlg);
+  auto* exportBtn = new QPushButton(QStringLiteral("导出"), &dlg);
+  actionRow->addWidget(addBtn);
+  actionRow->addWidget(removeBtn);
+  actionRow->addWidget(importBtn);
+  actionRow->addWidget(exportBtn);
+  actionRow->addStretch(1);
+  root->addLayout(actionRow);
+  auto refreshDuplicateHighlight = [table, duplicateHint]() {
+    QSignalBlocker blocker(table);
+    for (int row = 0; row < table->rowCount(); ++row) {
+      for (int col = 0; col < table->columnCount(); ++col) {
+        if (table->item(row, col) == nullptr) {
+          table->setItem(row, col, new QTableWidgetItem());
+        }
+        table->item(row, col)->setBackground(QBrush());
+      }
+    }
+    QHash<QString, QVector<int>> keyRows;
+    for (int row = 0; row < table->rowCount(); ++row) {
+      const QString domain = table->item(row, 0) != nullptr
+                                 ? table->item(row, 0)->text().trimmed().toLower()
+                                 : QStringLiteral("*");
+      const QString name = table->item(row, 1) != nullptr
+                               ? table->item(row, 1)->text().trimmed().toLower()
+                               : QString();
+      if (name.isEmpty()) {
+        continue;
+      }
+      keyRows[QStringLiteral("%1|%2").arg(domain.isEmpty() ? QStringLiteral("*") : domain, name)]
+          .push_back(row);
+    }
+    int duplicateCount = 0;
+    const QColor duplicateColor(255, 234, 234);
+    for (auto it = keyRows.constBegin(); it != keyRows.constEnd(); ++it) {
+      if (it.value().size() <= 1) {
+        continue;
+      }
+      duplicateCount += it.value().size();
+      for (const int row : it.value()) {
+        for (int col = 0; col < table->columnCount(); ++col) {
+          table->item(row, col)->setBackground(duplicateColor);
+        }
+      }
+    }
+    if (duplicateCount > 0) {
+      duplicateHint->setText(
+          QStringLiteral("检测到 %1 行重复项（相同域名 + Cookie 名），保存将被阻止。")
+              .arg(duplicateCount));
+    } else {
+      duplicateHint->setText(QStringLiteral("未检测到重复项。"));
+    }
+  };
+  QObject::connect(table, &QTableWidget::itemChanged, &dlg,
+                   [refreshDuplicateHighlight](QTableWidgetItem*) { refreshDuplicateHighlight(); });
+  connect(addBtn, &QPushButton::clicked, &dlg, [table]() {
+    const int row = table->rowCount();
+    table->insertRow(row);
+    table->setItem(row, 0, new QTableWidgetItem(QStringLiteral("*")));
+    table->setItem(row, 1, new QTableWidgetItem());
+    table->setItem(row, 2, new QTableWidgetItem());
+    table->setCurrentCell(row, 1);
+  });
+  connect(removeBtn, &QPushButton::clicked, &dlg, [table]() {
+    const auto rows = table->selectionModel()->selectedRows();
+    for (int i = rows.size() - 1; i >= 0; --i) {
+      table->removeRow(rows.at(i).row());
+    }
+  });
+  connect(filterEdit, &QLineEdit::textChanged, &dlg, [table](const QString& text) {
+    const QString key = text.trimmed().toLower();
+    for (int row = 0; row < table->rowCount(); ++row) {
+      const QString domain =
+          table->item(row, 0) != nullptr ? table->item(row, 0)->text().toLower() : QString();
+      const QString name =
+          table->item(row, 1) != nullptr ? table->item(row, 1)->text().toLower() : QString();
+      const QString value =
+          table->item(row, 2) != nullptr ? table->item(row, 2)->text().toLower() : QString();
+      const bool visible =
+          key.isEmpty() || domain.contains(key) || name.contains(key) || value.contains(key);
+      table->setRowHidden(row, !visible);
+    }
+  });
+  connect(importBtn, &QPushButton::clicked, &dlg, [table, &dlg]() {
+    const QString path =
+        QFileDialog::getOpenFileName(&dlg, QStringLiteral("导入 Cookies"), QString(),
+                                     QStringLiteral("文本文件 (*.txt *.tsv);;所有文件 (*)"));
+    if (path.isEmpty()) {
+      return;
+    }
+    QFile f(path);
+    if (!f.open(QIODevice::ReadOnly | QIODevice::Text)) {
+      QMessageBox::warning(&dlg, QStringLiteral("导入失败"),
+                           QStringLiteral("无法读取文件：%1").arg(path));
+      return;
+    }
+    const QString content = QString::fromUtf8(f.readAll());
+    f.close();
+    for (const QString& raw : content.split('\n', Qt::SkipEmptyParts)) {
+      const QString line = raw.trimmed();
+      if (line.isEmpty() || line.startsWith('#')) {
+        continue;
+      }
+      QString domain = QStringLiteral("*");
+      QString name;
+      QString value;
+      const QStringList cols = line.split('\t');
+      if (cols.size() >= 3) {
+        domain = cols[0].trimmed();
+        name = cols[1].trimmed();
+        value = cols[2].trimmed();
+      } else {
+        const int eq = line.indexOf('=');
+        if (eq <= 0) {
+          continue;
+        }
+        name = line.left(eq).trimmed();
+        value = line.mid(eq + 1).trimmed();
+      }
+      if (name.isEmpty()) {
+        continue;
+      }
+      const int row = table->rowCount();
+      table->insertRow(row);
+      table->setItem(row, 0, new QTableWidgetItem(domain.isEmpty() ? QStringLiteral("*") : domain));
+      table->setItem(row, 1, new QTableWidgetItem(name));
+      table->setItem(row, 2, new QTableWidgetItem(value));
+    }
+  });
+  connect(exportBtn, &QPushButton::clicked, &dlg, [table, &dlg]() {
+    const QString path = QFileDialog::getSaveFileName(
+        &dlg, QStringLiteral("导出 Cookies"), QStringLiteral("cookies.tsv"),
+        QStringLiteral("TSV 文件 (*.tsv);;文本文件 (*.txt)"));
+    if (path.isEmpty()) {
+      return;
+    }
+    QStringList lines;
+    lines.push_back(QStringLiteral("# domain<TAB>name<TAB>value"));
+    for (int row = 0; row < table->rowCount(); ++row) {
+      const QString domain = table->item(row, 0) != nullptr ? table->item(row, 0)->text().trimmed()
+                                                            : QStringLiteral("*");
+      const QString name =
+          table->item(row, 1) != nullptr ? table->item(row, 1)->text().trimmed() : QString();
+      const QString value =
+          table->item(row, 2) != nullptr ? table->item(row, 2)->text().trimmed() : QString();
+      if (name.isEmpty()) {
+        continue;
+      }
+      lines.push_back(QStringLiteral("%1\t%2\t%3")
+                          .arg(domain.isEmpty() ? QStringLiteral("*") : domain, name, value));
+    }
+    QFile f(path);
+    if (!f.open(QIODevice::WriteOnly | QIODevice::Truncate | QIODevice::Text)) {
+      QMessageBox::warning(&dlg, QStringLiteral("导出失败"),
+                           QStringLiteral("无法写入文件：%1").arg(path));
+      return;
+    }
+    f.write(lines.join('\n').toUtf8());
+    f.close();
+  });
+  refreshDuplicateHighlight();
+
+  root->addWidget(new QLabel(QStringLiteral("提示：域名可填写 example.com；* 表示全局。"), &dlg));
+  auto* buttons = new QDialogButtonBox(QDialogButtonBox::Save | QDialogButtonBox::Close, &dlg);
+  connect(buttons, &QDialogButtonBox::accepted, &dlg, [this, table, &dlg]() {
+    QStringList globalPairs;
+    QStringList domainRules;
+    QSet<QString> dedupKeys;
+    for (int row = 0; row < table->rowCount(); ++row) {
+      const QString domain = table->item(row, 0) != nullptr ? table->item(row, 0)->text().trimmed()
+                                                            : QStringLiteral("*");
+      const QString name =
+          table->item(row, 1) != nullptr ? table->item(row, 1)->text().trimmed() : QString();
+      const QString value =
+          table->item(row, 2) != nullptr ? table->item(row, 2)->text().trimmed() : QString();
+      if (name.isEmpty()) {
+        continue;
+      }
+      const QString dedupKey = QStringLiteral("%1|%2").arg(domain.toLower(), name.toLower());
+      if (dedupKeys.contains(dedupKey)) {
+        QMessageBox::warning(
+            &dlg, QStringLiteral("保存失败"),
+            QStringLiteral("检测到重复项：域名=%1，Cookie 名=%2").arg(domain, name));
+        return;
+      }
+      dedupKeys.insert(dedupKey);
+      const QString pair = QStringLiteral("%1=%2").arg(name, value);
+      if (domain.isEmpty() || domain == QStringLiteral("*")) {
+        globalPairs.push_back(pair);
+      } else {
+        domainRules.push_back(QStringLiteral("%1\t%2").arg(domain.toLower(), pair));
+      }
+    }
+
+    auto combined = pfd::core::ConfigService::loadCombinedSettings();
+    combined.app.http_cookie_header = globalPairs.join(QStringLiteral("; "));
+    combined.app.http_cookie_rules = domainRules.join('\n');
+    const auto result = pfd::core::ConfigService::saveCombinedSettings(combined);
+    if (!result.ok) {
+      QMessageBox::warning(&dlg, QStringLiteral("保存失败"),
+                           QStringLiteral("Cookies 保存失败：%1").arg(result.message));
+      return;
+    }
+    appendLog(QStringLiteral("Cookies 已更新：全局 %1 条，域名规则 %2 条")
+                  .arg(globalPairs.size())
+                  .arg(domainRules.size()));
+    emit settingsChanged();
+    dlg.accept();
+  });
   connect(buttons, &QDialogButtonBox::rejected, &dlg, &QDialog::reject);
   root->addWidget(buttons);
   dlg.exec();
-}
-
-void MainWindow::openPostDownloadActionsDialog() {
-  QMessageBox::information(
-      this, QStringLiteral("下载完成后的操作"),
-      QStringLiteral(
-          "请在首选项中配置“下载完成后”动作。\n若启用定时动作，则该项自动禁用并强制不执行。"));
 }
 
 void MainWindow::setOnAddMagnet(std::function<void(const QString&, const QString&)> onAddMagnet) {

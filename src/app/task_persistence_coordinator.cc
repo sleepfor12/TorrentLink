@@ -34,4 +34,10 @@ void TaskPersistenceCoordinator::saveNow() const {
   }
 }
 
+void TaskPersistenceCoordinator::saveTasksNow() const {
+  if (saveTasksFn_) {
+    saveTasksFn_();
+  }
+}
+
 }  // namespace pfd::app

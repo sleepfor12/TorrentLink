@@ -159,7 +159,6 @@ private:
   void openTorrentLinksFromMenu();
   void openCreateTorrentDialog();
   void openCookieManagerDialog();
-  void openPostDownloadActionsDialog();
   void showTaskContextMenu(const QPoint& pos);
   void syncContentHandlers();
   void syncTrackerHandlers();
@@ -186,7 +185,6 @@ private:
   QAction* openTorrentLinksAction_{nullptr};
   QAction* createTorrentAction_{nullptr};
   QAction* manageCookiesAction_{nullptr};
-  QAction* postDownloadActionsAction_{nullptr};
   QAction* exitAction_{nullptr};
   std::vector<pfd::core::TaskSnapshot> snapshots_;
   std::vector<pfd::core::TaskSnapshot> displayedSnapshots_;

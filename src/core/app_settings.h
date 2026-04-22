@@ -82,6 +82,8 @@ struct AppSettings {
   QString http_user_agent{QStringLiteral("TorrentLink/1.0")};
   QString http_accept_language{QStringLiteral("zh-CN,zh;q=0.9,en;q=0.8")};
   QString http_cookie_header;
+  // 每行一条规则：domain<TAB>name=value
+  QString http_cookie_rules;
 
   static QString settingsFilePath();
 

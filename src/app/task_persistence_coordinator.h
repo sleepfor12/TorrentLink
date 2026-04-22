@@ -19,6 +19,7 @@ public:
   void setAutoSaveIntervalMs(int intervalMs);
   void startAutoSave();
   void saveNow() const;
+  void saveTasksNow() const;
 
 private:
   QObject* owner_{nullptr};

@@ -5,6 +5,7 @@
 #include <QtCore/QStringList>
 
 #include <atomic>
+#include <chrono>
 #include <deque>
 #include <future>
 #include <memory>
@@ -65,6 +66,7 @@ private:
   void bindWorkerCallbacks();
   void scheduleTimedAction();
   void executeTimedAction();
+  void waitFutureAtMost(std::future<void>& fut, std::chrono::milliseconds timeout) const;
   void maybeRunPostDownloadAction(const std::vector<pfd::core::TaskSnapshot>& snapshots);
   void executePostDownloadAction(const QString& action);
   void applySeedingPolicy(const std::vector<pfd::core::TaskSnapshot>& snapshots);
