@@ -60,6 +60,8 @@ target_link_libraries(torrentlink_core
     Qt6::Gui
     Qt6::Network
     torrentlink_base
+  PRIVATE
+    ${PFD_LIBTORRENT_TARGET}
 )
 
 target_compile_features(torrentlink_core PUBLIC cxx_std_17)

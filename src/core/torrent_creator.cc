@@ -4,7 +4,6 @@
 #include <QtCore/QFileInfo>
 #include <QtCore/QStringList>
 
-#include <libtorrent/add_torrent_params.hpp>
 #include <libtorrent/bencode.hpp>
 #include <libtorrent/create_torrent.hpp>
 #include <libtorrent/error_code.hpp>
