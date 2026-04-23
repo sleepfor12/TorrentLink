@@ -382,14 +382,14 @@ void Logger::logFatal(const QString& message, const char* file, int line, const 
   }
 
   if (!p.isEmpty()) {
-    const QString line = formatLine(entry);
-    const bool queued = tryEnqueueLineToFile(line, p, true);
+    const QString logLine = formatLine(entry);
+    const bool queued = tryEnqueueLineToFile(logLine, p, true);
     if (!queued) {
       std::lock_guard<std::mutex> fl(file_mutex_);
       if (p != log_file_path_) {
         reopenFileUnlocked(p);
       }
-      writeTextLineUnlocked(line, /*flush_disk=*/true);
+      writeTextLineUnlocked(logLine, /*flush_disk=*/true);
     }
     waitUntilWriterIdle();
   }

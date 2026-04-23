@@ -59,11 +59,12 @@ target_link_libraries(torrentlink_ui
   PUBLIC
     Qt6::Core
     Qt6::Widgets
+    torrentlink_core
+  PRIVATE
     Qt6::Network
     Qt6::Qml
     Qt6::Quick
     Qt6::QuickWidgets
-    torrentlink_core
     torrentlink_lt
 )
 

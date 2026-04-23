@@ -101,7 +101,7 @@ struct SessionWorker::Impl {
   std::shared_ptr<std::promise<SessionWorker::SessionStats>> pendingSessionStats_;
 
   void enqueue(Cmd cmd) {
-    const auto describeCmd = [](const Cmd& c) -> const char* {
+    [[maybe_unused]] const auto describeCmd = [](const Cmd& c) -> const char* {
       if (std::holds_alternative<AddMagnetCmd>(c)) {
         return "AddMagnet";
       }
@@ -220,7 +220,7 @@ struct SessionWorker::Impl {
     };
     {
       std::lock_guard<std::mutex> lk(mu);
-      const auto queueSize = cmds.size() + 1;
+      [[maybe_unused]] const auto queueSize = cmds.size() + 1;
       LOG_DEBUG(QStringLiteral("[lt.worker] Enqueue cmd=%1 queue=%2")
                     .arg(QString::fromLatin1(describeCmd(cmd)))
                     .arg(queueSize));

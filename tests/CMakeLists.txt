@@ -42,9 +42,6 @@ add_executable(torrentlink_tests
   test_task_query_mapper.cc
   test_task_control_command_use_case.cc
   test_task_meta_command_use_case.cc
-  ../src/app/task_query_mapper.cc
-  ../src/app/task_control_command_use_case.cc
-  ../src/app/task_meta_command_use_case.cc
 )
 
 target_link_libraries(torrentlink_tests
@@ -54,6 +51,7 @@ target_link_libraries(torrentlink_tests
     torrentlink_base
     torrentlink_core
     torrentlink_lt
+    torrentlink_app
 )
 
 pfd_set_target_warnings(torrentlink_tests)

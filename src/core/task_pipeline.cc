@@ -6,7 +6,7 @@ namespace pfd::core {
 
 namespace {
 
-const char* eventTypeToText(TaskEventType t) {
+[[maybe_unused]] const char* eventTypeToText(TaskEventType t) {
   switch (t) {
     case TaskEventType::kUpsertMeta:
       return "upsert_meta";

@@ -828,7 +828,7 @@ void MainWindow::syncTrackerHandlers() {
 }
 
 void MainWindow::appendLog(const QString& msg) {
-  LOG_INFO(QStringLiteral("[UI] %1").arg(msg));
+  LOG_INFO(QStringLiteral("[ui] %1").arg(msg));
   if (logView_ != nullptr) {
     const auto ts = QDateTime::currentDateTime().toString(QStringLiteral("HH:mm:ss"));
     logView_->append(QStringLiteral("[%1] %2").arg(ts, msg));

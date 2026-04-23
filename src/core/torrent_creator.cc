@@ -32,7 +32,8 @@ CreateTorrentResult TorrentCreator::create(const CreateTorrentRequest& request,
   }
 
   libtorrent::error_code ec;
-  libtorrent::create_torrent torrent(fs, request.piece_size_bytes > 0 ? request.piece_size_bytes : 0);
+  libtorrent::create_torrent torrent(fs,
+                                     request.piece_size_bytes > 0 ? request.piece_size_bytes : 0);
   if (request.private_torrent) {
     torrent.set_priv(true);
   }
@@ -55,8 +56,8 @@ CreateTorrentResult TorrentCreator::create(const CreateTorrentRequest& request,
     }
   }
 
-  const QString hashRoot = sourceInfo.isDir() ? sourceInfo.absoluteFilePath()
-                                              : sourceInfo.absolutePath();
+  const QString hashRoot =
+      sourceInfo.isDir() ? sourceInfo.absoluteFilePath() : sourceInfo.absolutePath();
   libtorrent::set_piece_hashes(
       torrent, hashRoot.toStdString(),
       [&](int progress) {
@@ -66,7 +67,8 @@ CreateTorrentResult TorrentCreator::create(const CreateTorrentRequest& request,
       },
       ec);
   if (ec) {
-    return {false, QStringLiteral("计算分块哈希失败：%1").arg(QString::fromStdString(ec.message()))};
+    return {false,
+            QStringLiteral("计算分块哈希失败：%1").arg(QString::fromStdString(ec.message()))};
   }
 
   const libtorrent::entry generated = torrent.generate();

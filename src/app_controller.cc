@@ -1533,13 +1533,11 @@ void AppController::injectTransitionalStatus(const pfd::base::TaskId& taskId,
 }
 
 void AppController::logInfo(const QString& msg) const {
-  window_->appendLog(msg);
-  LOG_INFO(QStringLiteral("[main] %1").arg(msg));
+  LOG_INFO(QStringLiteral("[app] %1").arg(msg));
 }
 
 void AppController::logError(const QString& msg) const {
-  window_->appendLog(msg);
-  LOG_ERROR(QStringLiteral("[main] %1").arg(msg));
+  LOG_ERROR(QStringLiteral("[app] %1").arg(msg));
 }
 
 void AppController::initializeRss() {

@@ -5,8 +5,15 @@ project(torrentlink
   LANGUAGES CXX
 )
 
+include(GNUInstallDirs)
+
 if(WIN32)
   message(STATUS "Windows build is enabled (feature parity is in progress).")
+  add_compile_definitions(
+    _WIN32_WINNT=0x0601
+    WINVER=0x0601
+    NOMINMAX
+  )
 elseif(APPLE)
   message(FATAL_ERROR "macOS is not supported currently.")
 endif()
@@ -14,6 +21,10 @@ endif()
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
+option(PFD_WARNINGS_AS_ERRORS "Treat warnings as errors" OFF)
+option(PFD_ENABLE_LTO "Enable link time optimization (IPO/LTO)" OFF)
 
 if(UNIX AND NOT APPLE AND CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
   add_compile_options(-stdlib=libstdc++)
@@ -22,11 +33,27 @@ endif()
 
 function(pfd_set_target_warnings target_name)
   if(MSVC)
-    target_compile_options(${target_name} PRIVATE /W4)
+    target_compile_options(${target_name} PRIVATE /W4 /wd4324)
+    if(PFD_WARNINGS_AS_ERRORS)
+      target_compile_options(${target_name} PRIVATE /WX)
+    endif()
   else()
     target_compile_options(${target_name} PRIVATE -Wall -Wextra -Wpedantic)
+    if(PFD_WARNINGS_AS_ERRORS)
+      target_compile_options(${target_name} PRIVATE -Werror)
+    endif()
   endif()
 endfunction()
+
+if(PFD_ENABLE_LTO)
+  include(CheckIPOSupported)
+  check_ipo_supported(RESULT pfd_ipo_supported OUTPUT pfd_ipo_error)
+  if(pfd_ipo_supported)
+    set(CMAKE_INTERPROCEDURAL_OPTIMIZATION ON)
+  else()
+    message(WARNING "PFD_ENABLE_LTO=ON but IPO is not supported: ${pfd_ipo_error}")
+  endif()
+endif()
 
 # Testing
 include(CTest)
@@ -79,26 +106,9 @@ add_subdirectory(src/base)
 add_subdirectory(src/core)
 add_subdirectory(src/lt)
 add_subdirectory(src/ui)
+add_subdirectory(src/app)
 
 add_executable(torrentlink
-  src/app/task_batch_use_case.h
-  src/app/task_batch_use_case.cc
-  src/app/rss_download_pipeline.h
-  src/app/rss_download_pipeline.cc
-  src/app/event_ingest_orchestrator.h
-  src/app/event_ingest_orchestrator.cc
-  src/app/refresh_scheduler.h
-  src/app/refresh_scheduler.cc
-  src/app/task_persistence_coordinator.h
-  src/app/task_persistence_coordinator.cc
-  src/app/task_query_mapper.h
-  src/app/task_query_mapper.cc
-  src/app/task_detail_query_use_case.h
-  src/app/task_detail_query_use_case.cc
-  src/app/task_control_command_use_case.h
-  src/app/task_control_command_use_case.cc
-  src/app/task_meta_command_use_case.h
-  src/app/task_meta_command_use_case.cc
   src/app_controller.h
   src/app_controller.cc
   src/main.cc
@@ -118,12 +128,17 @@ target_link_libraries(torrentlink
     torrentlink_core
     torrentlink_lt
     torrentlink_ui
+    torrentlink_app
 )
 
 pfd_set_target_warnings(torrentlink)
 
 target_compile_definitions(torrentlink PRIVATE
   QT_NO_KEYWORDS
+)
+
+install(TARGETS torrentlink
+  RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
 )
 
 if(BUILD_TESTING)
