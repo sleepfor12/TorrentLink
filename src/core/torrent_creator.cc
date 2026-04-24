@@ -8,6 +8,7 @@
 #include <libtorrent/create_torrent.hpp>
 #include <libtorrent/error_code.hpp>
 
+#include <algorithm>
 #include <vector>
 
 namespace pfd::core {
@@ -57,12 +58,17 @@ CreateTorrentResult TorrentCreator::create(const CreateTorrentRequest& request,
 
   const QString hashRoot =
       sourceInfo.isDir() ? sourceInfo.absoluteFilePath() : sourceInfo.absolutePath();
+  const int numPieces = torrent.num_pieces();
   libtorrent::set_piece_hashes(
       torrent, hashRoot.toStdString(),
-      [&](int progress) {
-        if (on_progress) {
-          on_progress(progress);
+      [&](libtorrent::piece_index_t piece) {
+        if (!on_progress || numPieces <= 0) {
+          return;
         }
+        const int idx =
+            static_cast<int>(static_cast<libtorrent::piece_index_t::underlying_type>(piece));
+        const int pct = (idx + 1) * 100 / numPieces;
+        on_progress(std::min(pct, 100));
       },
       ec);
   if (ec) {
