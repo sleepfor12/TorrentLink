@@ -13,13 +13,23 @@ Parts of the UI design reference qBittorrent.
 - Multi-tag/category management and tag filtering
 - File priority and content tree
 - Tracker management (add/edit/remove/force reannounce)
-- Peer list and HTTP source list
+- Peer list
 - RSS subscription with auto-download
-- Search (local history / RSS entry search)
+- Search backend capability (UI entry is temporarily hidden)
 - System tray, download completion notifications, speed chart, and log center
 - Persistence and resume data support
+- Create `.torrent` from file/folder
+- Cookie manager and request-header injection for RSS/search requests
+- Post-download action with timed-action priority protection
 - Cross-platform CMake project layout (Linux `pkg-config` fallback, Windows prefers CMake/vcpkg)
-- GoogleTest unit tests
+- GoogleTest tests (split into core tests + UI tests)
+
+## Current Progress
+
+- Architecture refactor (app/use-case/pipeline boundary cleanup) is completed in phases.
+- `AppController` is being continuously slimmed down; exit coordination and RSS queue orchestration are extracted.
+- Windows CI build + test is included and kept green as a first-class target.
+- Search tab and HTTP source tab are intentionally hidden in the current UI while backend capability is retained.
 
 ## Development Environment
 
@@ -33,6 +43,44 @@ Parts of the UI design reference qBittorrent.
 
 Notice: [NOTICE](NOTICE)
 
+## Dependencies Installation (Linux/Windows)
+
+### Linux (Ubuntu/Debian)
+
+```bash
+sudo apt-get update
+sudo apt-get install -y \
+  build-essential \
+  cmake \
+  pkg-config \
+  qt6-base-dev \
+  qt6-declarative-dev \
+  libtorrent-rasterbar-dev
+```
+
+### Windows (MSVC + vcpkg)
+
+1. Install Qt 6 desktop kit (same toolchain as your CMake generator).
+2. Bootstrap vcpkg and install dependencies from manifest:
+
+```powershell
+git clone https://github.com/microsoft/vcpkg.git C:/vcpkg
+C:/vcpkg/bootstrap-vcpkg.bat -disableMetrics
+cd <repo-root>
+C:/vcpkg/vcpkg.exe install --triplet x64-windows
+```
+
+3. Configure CMake with vcpkg toolchain and Qt path:
+
+```powershell
+cmake -S . -B build-win `
+  -DCMAKE_BUILD_TYPE=Release `
+  -DBUILD_TESTING=ON `
+  -DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake `
+  -DVCPKG_TARGET_TRIPLET=x64-windows `
+  -DCMAKE_PREFIX_PATH="<your-qt-root>"
+```
+
 ## Quick Build and Run
 
 ### Build (with tests)
@@ -42,6 +90,11 @@ cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug -DBUILD_TESTING=ON
 cmake --build build -j
 ctest --test-dir build --output-on-failure
 ```
+
+### Build tests separately
+
+- Core/non-UI tests: `torrentlink_tests`
+- UI tests: `torrentlink_ui_tests`
 
 ## Development Helper Scripts
 
@@ -53,7 +106,7 @@ ctest --test-dir build --output-on-failure
 
 - For regular bugs: please submit a GitHub Issue and include reproduction steps, expected behavior, and actual behavior.
 - For security vulnerabilities: please **do not** submit a public Issue.
-- Please report vulnerabilities privately via email: `zbysleepallday@outloo.com`.
+- Please report vulnerabilities privately via email: `zbysleepallday@outlook.com`.
 - It is recommended to include affected version/commit, impact scope, and a minimal reproduction or PoC.
 
 ## Windows Adaptation Status

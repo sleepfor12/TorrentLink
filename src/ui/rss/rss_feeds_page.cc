@@ -52,10 +52,16 @@ void RssFeedsPage::refreshTable() {
         new QTableWidgetItem(f.last_refreshed_at.isValid()
                                  ? f.last_refreshed_at.toString(QStringLiteral("yyyy-MM-dd HH:mm"))
                                  : QStringLiteral("从未")));
-    feedTable_->setItem(i, 4,
+    feedTable_->setItem(
+        i, 4,
+        new QTableWidgetItem(f.last_success_refreshed_at.isValid()
+                                 ? f.last_success_refreshed_at.toString(
+                                       QStringLiteral("yyyy-MM-dd HH:mm"))
+                                 : QStringLiteral("从未")));
+    feedTable_->setItem(i, 5,
                         new QTableWidgetItem(f.auto_download_enabled ? QStringLiteral("已开启")
                                                                      : QStringLiteral("关闭")));
-    feedTable_->setItem(i, 5, new QTableWidgetItem(f.last_error));
+    feedTable_->setItem(i, 6, new QTableWidgetItem(f.last_error));
     feedTable_->item(i, 0)->setData(Qt::UserRole, f.id);
   }
 }
@@ -84,10 +90,11 @@ void RssFeedsPage::buildLayout() {
   root->addLayout(row);
 
   feedTable_ = new QTableWidget(this);
-  feedTable_->setColumnCount(6);
+  feedTable_->setColumnCount(7);
   feedTable_->setHorizontalHeaderLabels({QStringLiteral("名称"), QStringLiteral("URL"),
                                          QStringLiteral("状态"), QStringLiteral("上次刷新"),
-                                         QStringLiteral("自动下载"), QStringLiteral("错误")});
+                                         QStringLiteral("最近成功"), QStringLiteral("自动下载"),
+                                         QStringLiteral("错误")});
   feedTable_->horizontalHeader()->setStretchLastSection(true);
   feedTable_->horizontalHeader()->setSectionResizeMode(QHeaderView::Interactive);
   feedTable_->setSelectionBehavior(QAbstractItemView::SelectRows);

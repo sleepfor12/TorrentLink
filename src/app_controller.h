@@ -5,8 +5,6 @@
 #include <QtCore/QStringList>
 
 #include <atomic>
-#include <chrono>
-#include <deque>
 #include <future>
 #include <memory>
 #include <mutex>
@@ -21,7 +19,9 @@ class BuiltinHttpTracker;
 }
 
 #include "app/event_ingest_orchestrator.h"
+#include "app/exit_coordinator.h"
 #include "app/refresh_scheduler.h"
+#include "app/rss_download_orchestrator.h"
 #include "app/rss_download_pipeline.h"
 #include "app/task_batch_use_case.h"
 #include "app/task_control_command_use_case.h"
@@ -66,7 +66,6 @@ private:
   void bindWorkerCallbacks();
   void scheduleTimedAction();
   void executeTimedAction();
-  void waitFutureAtMost(std::future<void>& fut, std::chrono::milliseconds timeout) const;
   void maybeRunPostDownloadAction(const std::vector<pfd::core::TaskSnapshot>& snapshots);
   void executePostDownloadAction(const QString& action);
   void applySeedingPolicy(const std::vector<pfd::core::TaskSnapshot>& snapshots);
@@ -144,8 +143,9 @@ private:
   std::unique_ptr<pfd::app::TaskControlCommandUseCase> taskControlCommandUseCase_;
   std::unique_ptr<pfd::app::TaskDetailQueryUseCase> taskDetailQueryUseCase_;
   std::unique_ptr<pfd::app::TaskMetaCommandUseCase> taskMetaCommandUseCase_;
-  std::unique_ptr<pfd::app::RssDownloadPipeline> rssDownloadPipeline_;
+  std::unique_ptr<pfd::app::RssDownloadOrchestrator> rssDownloadOrchestrator_;
   std::unique_ptr<pfd::app::TaskPersistenceCoordinator> taskPersistenceCoordinator_;
+  pfd::app::ExitCoordinator exitCoordinator_;
 
   std::unique_ptr<pfd::app::EventIngestOrchestrator> eventIngestOrchestrator_;
 };

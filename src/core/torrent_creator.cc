@@ -11,6 +11,8 @@
 #include <algorithm>
 #include <vector>
 
+#include "core/libtorrent_compat.h"
+
 namespace pfd::core {
 
 CreateTorrentResult TorrentCreator::create(const CreateTorrentRequest& request,
@@ -58,16 +60,13 @@ CreateTorrentResult TorrentCreator::create(const CreateTorrentRequest& request,
 
   const QString hashRoot =
       sourceInfo.isDir() ? sourceInfo.absoluteFilePath() : sourceInfo.absolutePath();
-  const int numPieces = torrent.num_pieces();
-  libtorrent::set_piece_hashes(
+  pfd::core::ltcompat::setPieceHashes(
       torrent, hashRoot.toStdString(),
-      [&](libtorrent::piece_index_t piece) {
-        if (!on_progress || numPieces <= 0) {
+      [&](int current, int total) {
+        if (!on_progress || total <= 0) {
           return;
         }
-        const int idx =
-            static_cast<int>(static_cast<libtorrent::piece_index_t::underlying_type>(piece));
-        const int pct = (idx + 1) * 100 / numPieces;
+        const int pct = current * 100 / total;
         on_progress(std::min(pct, 100));
       },
       ec);

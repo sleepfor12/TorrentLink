@@ -70,6 +70,8 @@ void TaskDetailPanel::buildLayout() {
     tabLayout->addWidget(tabButtons_[i]);
     connect(tabButtons_[i], &QPushButton::clicked, this, [this, i]() { switchTab(i); });
   }
+  // 临时隐藏 HTTP 源页入口，底层能力与数据刷新仍保留。
+  tabButtons_[3]->setVisible(false);
   tabLayout->addStretch(1);
   root->addWidget(tabBar);
 

@@ -129,6 +129,23 @@ QString taskProgressCellText(const pfd::core::TaskSnapshot& s) {
   return st;
 }
 
+QString decisionToText(const pfd::core::rss::RssItem& it) {
+  using pfd::core::rss::AutoDownloadDecision;
+  switch (it.last_auto_decision) {
+    case AutoDownloadDecision::kQueued:
+      return QStringLiteral("已排队");
+    case AutoDownloadDecision::kSkipped:
+      return QStringLiteral("已跳过");
+    case AutoDownloadDecision::kSucceeded:
+      return QStringLiteral("已接受");
+    case AutoDownloadDecision::kFailed:
+      return QStringLiteral("失败");
+    case AutoDownloadDecision::kUnknown:
+    default:
+      return QStringLiteral("-");
+  }
+}
+
 QString formatRssTaskDetailHtml(const pfd::core::TaskSnapshot& s) {
   using pfd::base::TaskStatus;
   QString h;
@@ -333,8 +350,9 @@ void RssItemsPage::refreshTable() {
     }
     itemTable_->setItem(
         i, 5, new QTableWidgetItem(seriesHit.isEmpty() ? QStringLiteral("-") : seriesHit));
+    itemTable_->setItem(i, 6, new QTableWidgetItem(decisionToText(*it)));
     itemTable_->setItem(
-        i, 6,
+        i, 7,
         new QTableWidgetItem(it->downloaded ? QStringLiteral("已下载") : QStringLiteral("-")));
   }
 
@@ -401,10 +419,11 @@ void RssItemsPage::buildLayout() {
 
   auto* splitter = new QSplitter(Qt::Horizontal, this);
   itemTable_ = new QTableWidget(splitter);
-  itemTable_->setColumnCount(8);
+  itemTable_->setColumnCount(9);
   itemTable_->setHorizontalHeaderLabels({QStringLiteral("标题"), QStringLiteral("来源"),
                                          QStringLiteral("发布时间"), QStringLiteral("资源"),
                                          QStringLiteral("规则命中"), QStringLiteral("剧集"),
+                                         QStringLiteral("自动下载诊断"),
                                          QStringLiteral("下载状态"), QStringLiteral("任务进度")});
   itemTable_->horizontalHeader()->setStretchLastSection(true);
   itemTable_->horizontalHeader()->setSectionResizeMode(QHeaderView::Interactive);
@@ -500,6 +519,22 @@ void RssItemsPage::onSelectionChanged() {
 
     if (!it.summary.isEmpty()) {
       html += QStringLiteral("<hr/><p>%1</p>").arg(it.summary.toHtmlEscaped());
+    }
+    if (!it.last_auto_reason_code.isEmpty() || !it.last_auto_reason_text.isEmpty()) {
+      html += QStringLiteral("<hr/><p><b>自动下载诊断</b></p>");
+      html += QStringLiteral("<p><b>决策</b>：%1</p>").arg(decisionToText(it).toHtmlEscaped());
+      if (!it.last_auto_reason_code.isEmpty()) {
+        html += QStringLiteral("<p><b>原因码</b>：<code>%1</code></p>")
+                    .arg(it.last_auto_reason_code.toHtmlEscaped());
+      }
+      if (!it.last_auto_reason_text.isEmpty()) {
+        html += QStringLiteral("<p><b>说明</b>：%1</p>").arg(it.last_auto_reason_text.toHtmlEscaped());
+      }
+      if (it.last_attempt_at.isValid()) {
+        html += QStringLiteral("<p><b>最近尝试</b>：%1</p>")
+                    .arg(it.last_attempt_at.toString(QStringLiteral("yyyy-MM-dd HH:mm:ss")));
+      }
+      html += QStringLiteral("<p><b>重试次数</b>：%1</p>").arg(it.retry_count);
     }
 
     const auto matches = service_->evaluateItem(it);
@@ -736,15 +771,15 @@ bool RssItemsPage::eventFilter(QObject* watched, QEvent* event) {
 }
 
 void RssItemsPage::refreshTaskProgressCells() {
-  if (!itemTable_ || itemTable_->columnCount() < 8) {
+  if (!itemTable_ || itemTable_->columnCount() < 9) {
     return;
   }
   if (!static_cast<bool>(taskSnapshots_)) {
     for (int i = 0; i < itemTable_->rowCount(); ++i) {
-      QTableWidgetItem* progCell = itemTable_->item(i, 7);
+      QTableWidgetItem* progCell = itemTable_->item(i, 8);
       if (!progCell) {
         progCell = new QTableWidgetItem(QStringLiteral("—"));
-        itemTable_->setItem(i, 7, progCell);
+        itemTable_->setItem(i, 8, progCell);
       } else {
         progCell->setText(QStringLiteral("—"));
       }
@@ -766,10 +801,10 @@ void RssItemsPage::refreshTaskProgressCells() {
         text = taskProgressCellText(*snap);
       }
     }
-    QTableWidgetItem* progCell = itemTable_->item(i, 7);
+    QTableWidgetItem* progCell = itemTable_->item(i, 8);
     if (!progCell) {
       progCell = new QTableWidgetItem(text);
-      itemTable_->setItem(i, 7, progCell);
+      itemTable_->setItem(i, 8, progCell);
     } else {
       progCell->setText(text);
     }

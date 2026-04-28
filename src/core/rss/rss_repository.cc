@@ -26,6 +26,7 @@ QJsonObject feedToJson(const RssFeed& f) {
   o[QStringLiteral("enabled")] = f.enabled;
   o[QStringLiteral("auto_download_enabled")] = f.auto_download_enabled;
   o[QStringLiteral("last_refreshed_at")] = f.last_refreshed_at.toString(Qt::ISODate);
+  o[QStringLiteral("last_success_refreshed_at")] = f.last_success_refreshed_at.toString(Qt::ISODate);
   o[QStringLiteral("last_error")] = f.last_error;
   return o;
 }
@@ -39,6 +40,8 @@ RssFeed feedFromJson(const QJsonObject& o) {
   f.auto_download_enabled = o[QStringLiteral("auto_download_enabled")].toBool(false);
   f.last_refreshed_at =
       QDateTime::fromString(o[QStringLiteral("last_refreshed_at")].toString(), Qt::ISODate);
+  f.last_success_refreshed_at = QDateTime::fromString(
+      o[QStringLiteral("last_success_refreshed_at")].toString(), Qt::ISODate);
   f.last_error = o[QStringLiteral("last_error")].toString();
   return f;
 }
@@ -59,6 +62,13 @@ QJsonObject itemToJson(const RssItem& it) {
   o[QStringLiteral("read")] = it.read;
   o[QStringLiteral("ignored")] = it.ignored;
   o[QStringLiteral("downloaded")] = it.downloaded;
+  o[QStringLiteral("accepted")] = it.accepted;
+  o[QStringLiteral("last_auto_decision")] = static_cast<int>(it.last_auto_decision);
+  o[QStringLiteral("last_auto_reason_code")] = it.last_auto_reason_code;
+  o[QStringLiteral("last_auto_reason_text")] = it.last_auto_reason_text;
+  o[QStringLiteral("last_attempt_at")] = it.last_attempt_at.toString(Qt::ISODate);
+  o[QStringLiteral("last_success_at")] = it.last_success_at.toString(Qt::ISODate);
+  o[QStringLiteral("retry_count")] = it.retry_count;
   if (!it.download_save_path.isEmpty())
     o[QStringLiteral("download_save_path")] = it.download_save_path;
   return o;
@@ -79,6 +89,18 @@ RssItem itemFromJson(const QJsonObject& o) {
   it.read = o[QStringLiteral("read")].toBool(false);
   it.ignored = o[QStringLiteral("ignored")].toBool(false);
   it.downloaded = o[QStringLiteral("downloaded")].toBool(false);
+  it.accepted = o[QStringLiteral("accepted")].toBool(false);
+  // queued is a runtime-only transient state, never restore it from disk.
+  it.queued = false;
+  it.last_auto_decision =
+      static_cast<AutoDownloadDecision>(o[QStringLiteral("last_auto_decision")].toInt(0));
+  it.last_auto_reason_code = o[QStringLiteral("last_auto_reason_code")].toString();
+  it.last_auto_reason_text = o[QStringLiteral("last_auto_reason_text")].toString();
+  it.last_attempt_at =
+      QDateTime::fromString(o[QStringLiteral("last_attempt_at")].toString(), Qt::ISODate);
+  it.last_success_at =
+      QDateTime::fromString(o[QStringLiteral("last_success_at")].toString(), Qt::ISODate);
+  it.retry_count = o[QStringLiteral("retry_count")].toInt(0);
   it.download_save_path = o[QStringLiteral("download_save_path")].toString();
   return it;
 }

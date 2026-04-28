@@ -86,6 +86,21 @@ void LogCenterDialog::buildLayout() {
   keywordFilter_ = new QLineEdit(this);
   keywordFilter_->setPlaceholderText(QStringLiteral("输入关键字过滤 message/detail"));
   bar->addWidget(keywordFilter_, 1);
+  bar->addWidget(new QLabel(QStringLiteral("feed"), this));
+  rssFeedFilter_ = new QLineEdit(this);
+  rssFeedFilter_->setPlaceholderText(QStringLiteral("feed_id"));
+  rssFeedFilter_->setFixedWidth(100);
+  bar->addWidget(rssFeedFilter_);
+  bar->addWidget(new QLabel(QStringLiteral("item"), this));
+  rssItemFilter_ = new QLineEdit(this);
+  rssItemFilter_->setPlaceholderText(QStringLiteral("item_id"));
+  rssItemFilter_->setFixedWidth(100);
+  bar->addWidget(rssItemFilter_);
+  bar->addWidget(new QLabel(QStringLiteral("rule"), this));
+  rssRuleFilter_ = new QLineEdit(this);
+  rssRuleFilter_->setPlaceholderText(QStringLiteral("rule_id"));
+  rssRuleFilter_->setFixedWidth(100);
+  bar->addWidget(rssRuleFilter_);
   bar->addWidget(new QLabel(QStringLiteral("最大行数"), this));
   maxRowsFilter_ = new QComboBox(this);
   maxRowsFilter_->addItem(QStringLiteral("500"), 500);
@@ -118,6 +133,9 @@ void LogCenterDialog::bindSignals() {
   connect(maxRowsFilter_, &QComboBox::currentIndexChanged, this, [this](int) { reloadLogs(); });
   connect(newestFirstCheck_, &QCheckBox::toggled, this, [this](bool) { reloadLogs(); });
   connectImeAwareLineEditApply(this, keywordFilter_, 180, [this]() { reloadLogs(); });
+  connectImeAwareLineEditApply(this, rssFeedFilter_, 180, [this]() { reloadLogs(); });
+  connectImeAwareLineEditApply(this, rssItemFilter_, 180, [this]() { reloadLogs(); });
+  connectImeAwareLineEditApply(this, rssRuleFilter_, 180, [this]() { reloadLogs(); });
   connect(refreshBtn_, &QPushButton::clicked, this, [this]() { reloadLogs(); });
   connect(exportBtn_, &QPushButton::clicked, this, [this]() { exportLogs(); });
   connect(clearBtn_, &QPushButton::clicked, this, [this]() { clearLogs(); });
@@ -142,6 +160,12 @@ QStringList LogCenterDialog::buildFilteredLines() const {
   const QString level =
       levelFilter_ != nullptr ? levelFilter_->currentData().toString() : QStringLiteral("all");
   const QString keyword = keywordFilter_ != nullptr ? keywordFilter_->text().trimmed() : QString();
+  const QString feedFilter =
+      rssFeedFilter_ != nullptr ? rssFeedFilter_->text().trimmed() : QString();
+  const QString itemFilter =
+      rssItemFilter_ != nullptr ? rssItemFilter_->text().trimmed() : QString();
+  const QString ruleFilter =
+      rssRuleFilter_ != nullptr ? rssRuleFilter_->text().trimmed() : QString();
   const int maxRows = maxRowsFilter_ != nullptr ? maxRowsFilter_->currentData().toInt() : 5000;
   const bool newestFirst = newestFirstCheck_ != nullptr && newestFirstCheck_->isChecked();
   const auto logs = pfd::core::logger::Logger::instance().globalSnapshot(
@@ -159,6 +183,18 @@ QStringList LogCenterDialog::buildFilteredLines() const {
       const QString detail = e.detail;
       if (!keyword.isEmpty() && !msg.contains(keyword, Qt::CaseInsensitive) &&
           !detail.contains(keyword, Qt::CaseInsensitive)) {
+        continue;
+      }
+      if (!feedFilter.isEmpty() && !msg.contains(feedFilter, Qt::CaseInsensitive) &&
+          !detail.contains(feedFilter, Qt::CaseInsensitive)) {
+        continue;
+      }
+      if (!itemFilter.isEmpty() && !msg.contains(itemFilter, Qt::CaseInsensitive) &&
+          !detail.contains(itemFilter, Qt::CaseInsensitive)) {
+        continue;
+      }
+      if (!ruleFilter.isEmpty() && !msg.contains(ruleFilter, Qt::CaseInsensitive) &&
+          !detail.contains(ruleFilter, Qt::CaseInsensitive)) {
         continue;
       }
       const QString ts = QDateTime::fromMSecsSinceEpoch(e.timestampMs)
@@ -179,6 +215,18 @@ QStringList LogCenterDialog::buildFilteredLines() const {
     const QString detail = e.detail;
     if (!keyword.isEmpty() && !msg.contains(keyword, Qt::CaseInsensitive) &&
         !detail.contains(keyword, Qt::CaseInsensitive)) {
+      continue;
+    }
+    if (!feedFilter.isEmpty() && !msg.contains(feedFilter, Qt::CaseInsensitive) &&
+        !detail.contains(feedFilter, Qt::CaseInsensitive)) {
+      continue;
+    }
+    if (!itemFilter.isEmpty() && !msg.contains(itemFilter, Qt::CaseInsensitive) &&
+        !detail.contains(itemFilter, Qt::CaseInsensitive)) {
+      continue;
+    }
+    if (!ruleFilter.isEmpty() && !msg.contains(ruleFilter, Qt::CaseInsensitive) &&
+        !detail.contains(ruleFilter, Qt::CaseInsensitive)) {
       continue;
     }
     const QString ts = QDateTime::fromMSecsSinceEpoch(e.timestampMs)

@@ -5,9 +5,15 @@
 #include <QtCore/QString>
 #include <QtCore/QStringList>
 
-#include <vector>
-
 namespace pfd::core::rss {
+
+enum class AutoDownloadDecision : int {
+  kUnknown = 0,
+  kQueued,
+  kSkipped,
+  kSucceeded,
+  kFailed,
+};
 
 struct RssFeed {
   QString id;
@@ -16,6 +22,7 @@ struct RssFeed {
   bool enabled{true};
   bool auto_download_enabled{false};
   QDateTime last_refreshed_at;
+  QDateTime last_success_refreshed_at;
   QString last_error;
 };
 
@@ -32,6 +39,14 @@ struct RssItem {
   bool read{false};
   bool ignored{false};
   bool downloaded{false};
+  bool accepted{false};
+  bool queued{false};
+  AutoDownloadDecision last_auto_decision{AutoDownloadDecision::kUnknown};
+  QString last_auto_reason_code;
+  QString last_auto_reason_text;
+  QDateTime last_attempt_at;
+  QDateTime last_success_at;
+  int retry_count{0};
   QString download_save_path;
 };
 

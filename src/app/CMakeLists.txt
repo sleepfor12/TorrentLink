@@ -3,6 +3,10 @@ add_library(torrentlink_app STATIC
   task_batch_use_case.cc
   rss_download_pipeline.h
   rss_download_pipeline.cc
+  rss_download_orchestrator.h
+  rss_download_orchestrator.cc
+  exit_coordinator.h
+  exit_coordinator.cc
   event_ingest_orchestrator.h
   event_ingest_orchestrator.cc
   refresh_scheduler.h

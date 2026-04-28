@@ -16,7 +16,6 @@
 #include "ui/main_window.h"
 #include "ui/pages/transfer_page.h"
 #include "ui/rss/rss_module_page.h"
-#include "ui/search_tab.h"
 #include "ui/widgets/bottom_status_bar.h"
 
 namespace pfd::ui {
@@ -100,9 +99,8 @@ void MainWindow::buildLayout() {
   rssModulePage_ = new pfd::ui::rss::RssModulePage(tabs_);
   tabs_->addTab(rssModulePage_, QStringLiteral("RSS 订阅"));
 
-  // --- Tab 3: 搜索 ---
-  searchTab_ = new SearchTab(tabs_);
-  tabs_->addTab(searchTab_, QStringLiteral("搜索"));
+  // 搜索页暂时隐藏：保留对象指针为空，避免外部调用空指针时崩溃。
+  searchTab_ = nullptr;
 
   outer->addWidget(tabs_, 1);
 

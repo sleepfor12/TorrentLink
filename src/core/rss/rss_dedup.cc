@@ -23,10 +23,15 @@ QString RssDedup::extractInfoHash(const QString& magnet) {
   return {};
 }
 
+QString RssDedup::normalizeTorrentUrl(const QString& torrentUrl) {
+  return torrentUrl.trimmed().toLower();
+}
+
 void RssDedup::buildIndex(const std::vector<RssItem>& existing) {
   known_ids_.clear();
   known_guids_.clear();
   known_links_.clear();
+  known_torrent_urls_.clear();
   known_infohashes_.clear();
   for (const auto& it : existing) {
     recordItem(it);
@@ -47,6 +52,12 @@ void RssDedup::recordItem(const RssItem& item) {
     known_guids_.insert(item.guid);
   if (!item.link.isEmpty())
     known_links_.insert(item.link);
+  if (!item.torrent_url.isEmpty()) {
+    const QString normalized = normalizeTorrentUrl(item.torrent_url);
+    if (!normalized.isEmpty()) {
+      known_torrent_urls_.insert(normalized);
+    }
+  }
   if (!item.magnet.isEmpty()) {
     const auto ih = extractInfoHash(item.magnet);
     if (!ih.isEmpty())
@@ -63,6 +74,11 @@ bool RssDedup::isDuplicate(const RssItem& item) const {
 
   if (!item.link.isEmpty() && known_links_.count(item.link) > 0)
     return true;
+  if (!item.torrent_url.isEmpty()) {
+    const QString normalized = normalizeTorrentUrl(item.torrent_url);
+    if (!normalized.isEmpty() && known_torrent_urls_.count(normalized) > 0)
+      return true;
+  }
 
   if (!item.magnet.isEmpty()) {
     const auto ih = extractInfoHash(item.magnet);

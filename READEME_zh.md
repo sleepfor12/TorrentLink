@@ -13,13 +13,23 @@ English version: [README.md](README.md)
 - 多标签/分类管理与标签过滤
 - 文件优先级与内容树
 - Tracker 管理（添加/编辑/移除/强制汇报）
-- Peer 列表与 HTTP 源列表
+- Peer 列表
 - RSS 订阅自动下载
-- 搜索（本地历史 / RSS 条目检索）
+- 搜索后端能力（UI 入口当前临时隐藏）
 - 系统托盘、下载完成通知、速度图表、日志中心
 - 持久化与 Resume Data 断点续传
+- 生成 Torrent（文件/文件夹）
+- Cookies 管理与 RSS/搜索请求头注入
+- 下载完成后动作（含“定时动作优先”保护）
 - CMake 跨平台工程（Linux `pkg-config` 回退，Windows 优先 CMake/vcpkg）
-- GoogleTest 单元测试
+- GoogleTest 自动化测试（核心测试与 UI 测试拆分）
+
+## 当前进度
+
+- 分阶段的架构解耦重构已完成主线目标（应用层/用例层/流水线边界更清晰）。
+- `AppController` 正在持续瘦身，已拆出退出协调与 RSS 队列编排。
+- Windows 已纳入 CI 的构建与测试闭环，并持续做兼容修复。
+- 当前版本中“搜索页”和“HTTP 源页”入口是有意隐藏，后端能力仍保留。
 
 ## 开发环境
 
@@ -33,6 +43,44 @@ English version: [README.md](README.md)
 
 声明: [NOTICE](NOTICE)
 
+## 依赖
+
+### Linux（Ubuntu/Debian）
+
+```bash
+sudo apt-get update
+sudo apt-get install -y \
+  build-essential \
+  cmake \
+  pkg-config \
+  qt6-base-dev \
+  qt6-declarative-dev \
+  libtorrent-rasterbar-dev
+```
+
+### Windows（MSVC + vcpkg）
+
+1. 安装 Qt 6 Desktop 套件（与本地 CMake 生成器/编译器匹配）。
+2. 初始化 vcpkg 并按仓库 manifest 安装依赖：
+
+```powershell
+git clone https://github.com/microsoft/vcpkg.git C:/vcpkg
+C:/vcpkg/bootstrap-vcpkg.bat -disableMetrics
+cd <repo-root>
+C:/vcpkg/vcpkg.exe install --triplet x64-windows
+```
+
+3. 通过 vcpkg 工具链与 Qt 路径配置 CMake：
+
+```powershell
+cmake -S . -B build-win `
+  -DCMAKE_BUILD_TYPE=Release `
+  -DBUILD_TESTING=ON `
+  -DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake `
+  -DVCPKG_TARGET_TRIPLET=x64-windows `
+  -DCMAKE_PREFIX_PATH="<your-qt-root>"
+```
+
 ## 快速构建与运行
 
 ### 构建（含测试）
@@ -42,6 +90,11 @@ cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug -DBUILD_TESTING=ON
 cmake --build build -j
 ctest --test-dir build --output-on-failure
 ```
+
+### 测试目标拆分
+
+- 核心/非 UI 测试：`torrentlink_tests`
+- UI 测试：`torrentlink_ui_tests`
 
 ## 开发辅助脚本
 
@@ -53,7 +106,7 @@ ctest --test-dir build --output-on-failure
 
 - 普通 Bug：请通过 GitHub Issue 提交，并附上复现步骤、预期行为、实际行为。
 - 安全漏洞：请 **不要** 公开提交 Issue。
-- 请通过邮箱私下报告：`zbysleepallday@outloo.com`。
+- 请通过邮箱私下报告：`zbysleepallday@outlook.com`。
 - 建议附上受影响版本/commit、影响范围、最小复现或 PoC。
 
 ## Windows 适配状态

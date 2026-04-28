@@ -244,6 +244,71 @@ TEST(RssService, ApplyRssDownloadSettlementUsesOverridePath) {
   EXPECT_EQ(svc.items()[0].download_save_path, QStringLiteral("/user_chose"));
 }
 
+TEST(RssService, SettlementFailureIncrementsRetryAndKeepsNotDownloaded) {
+  const QString dir = makeTempServiceDir();
+  pfd::core::rss::RssRepository repo(dir);
+  pfd::core::rss::RssItem item;
+  item.id = QStringLiteral("f1");
+  item.feed_id = QStringLiteral("feed");
+  item.title = QStringLiteral("FailItem");
+  item.magnet = QStringLiteral("magnet:?xt=urn:btih:abc");
+  item.queued = true;
+  ASSERT_TRUE(repo.saveItems({item}));
+
+  pfd::core::rss::RssService svc(dir);
+  svc.loadState();
+  pfd::core::rss::RssDownloadSettlement s;
+  s.item_id = item.id;
+  svc.applyRssDownloadSettlement(s, false);
+  ASSERT_EQ(svc.items().size(), 1u);
+  EXPECT_FALSE(svc.items()[0].downloaded);
+  EXPECT_FALSE(svc.items()[0].queued);
+  EXPECT_EQ(svc.items()[0].retry_count, 1);
+  EXPECT_EQ(svc.items()[0].last_auto_reason_code, QStringLiteral("settlement_failed"));
+}
+
+TEST(RssService, DownloadItemSkipsWhenAlreadyQueued) {
+  const QString dir = makeTempServiceDir();
+  pfd::core::rss::RssRepository repo(dir);
+  pfd::core::rss::RssItem item;
+  item.id = QStringLiteral("q1");
+  item.feed_id = QStringLiteral("feed");
+  item.title = QStringLiteral("Queued");
+  item.magnet = QStringLiteral("magnet:?xt=urn:btih:abc");
+  item.queued = true;
+  ASSERT_TRUE(repo.saveItems({item}));
+
+  pfd::core::rss::RssService svc(dir);
+  svc.loadState();
+  int calls = 0;
+  svc.setDownloadRequestCallback([&](const pfd::core::rss::AutoDownloadRequest&) { ++calls; });
+  // queued is transient and reset on load, so manual click should dispatch once.
+  EXPECT_TRUE(svc.downloadItem(item.id));
+  EXPECT_EQ(calls, 1);
+}
+
+TEST(RssService, QueuedStateIsResetAfterReload) {
+  const QString dir = makeTempServiceDir();
+  pfd::core::rss::RssRepository repo(dir);
+  pfd::core::rss::RssItem item;
+  item.id = QStringLiteral("q2");
+  item.feed_id = QStringLiteral("feed");
+  item.title = QStringLiteral("Reload");
+  item.magnet = QStringLiteral("magnet:?xt=urn:btih:abc");
+  item.queued = true;
+  ASSERT_TRUE(repo.saveItems({item}));
+
+  pfd::core::rss::RssService svc(dir);
+  svc.loadState();
+  ASSERT_EQ(svc.items().size(), 1u);
+  EXPECT_FALSE(svc.items()[0].queued);
+
+  int calls = 0;
+  svc.setDownloadRequestCallback([&](const pfd::core::rss::AutoDownloadRequest&) { ++calls; });
+  EXPECT_TRUE(svc.downloadItem(item.id));
+  EXPECT_EQ(calls, 1);
+}
+
 TEST(RssService, ClearItemsForFeedRemovesOnlyThatFeed) {
   const QString dir = makeTempServiceDir();
   pfd::core::rss::RssRepository repo(dir);

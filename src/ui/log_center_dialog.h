@@ -31,6 +31,9 @@ private:
   QComboBox* maxRowsFilter_{nullptr};
   QCheckBox* newestFirstCheck_{nullptr};
   QLineEdit* keywordFilter_{nullptr};
+  QLineEdit* rssFeedFilter_{nullptr};
+  QLineEdit* rssItemFilter_{nullptr};
+  QLineEdit* rssRuleFilter_{nullptr};
   QPlainTextEdit* contentView_{nullptr};
   QPushButton* refreshBtn_{nullptr};
   QPushButton* exportBtn_{nullptr};

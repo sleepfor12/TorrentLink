@@ -136,31 +136,10 @@ void TransferPage::buildLayout() {
   v->setContentsMargins(0, 0, 0, 0);
   v->setSpacing(12);
 
-  auto* title = new QLabel(QStringLiteral("下载任务"), mainPanel);
-  title->setStyleSheet(QStringLiteral("font-size:22px;font-weight:700;color:#1f2d3d;"));
-  v->addWidget(title);
-
-  auto* statRow = new QHBoxLayout();
-  statRow->setSpacing(8);
-  const auto makeCard = [mainPanel](const QString& title, QLabel** outValue) {
-    auto* card = new QWidget(mainPanel);
-    card->setObjectName(QStringLiteral("StatCard"));
-    auto* layout = new QVBoxLayout(card);
-    layout->setContentsMargins(12, 10, 12, 10);
-    auto* t = new QLabel(title, card);
-    t->setObjectName(QStringLiteral("StatTitle"));
-    auto* vlabel = new QLabel(QStringLiteral("0"), card);
-    vlabel->setObjectName(QStringLiteral("StatValue"));
-    layout->addWidget(t);
-    layout->addWidget(vlabel);
-    *outValue = vlabel;
-    return card;
-  };
-  statRow->addWidget(makeCard(QStringLiteral("总任务"), &totalStatLabel_));
-  statRow->addWidget(makeCard(QStringLiteral("下载中"), &downloadingStatLabel_));
-  statRow->addWidget(makeCard(QStringLiteral("已完成"), &finishedStatLabel_));
-  statRow->addWidget(makeCard(QStringLiteral("错误"), &errorStatLabel_));
-  v->addLayout(statRow);
+  totalStatLabel_ = nullptr;
+  downloadingStatLabel_ = nullptr;
+  finishedStatLabel_ = nullptr;
+  errorStatLabel_ = nullptr;
 
   nameSearchEdit_ = new QLineEdit(mainPanel);
   nameSearchEdit_->setPlaceholderText(QStringLiteral("按任务名搜索..."));

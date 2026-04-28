@@ -3,15 +3,13 @@
 #include <libtorrent/add_torrent_params.hpp>
 #include <libtorrent/download_priority.hpp>
 #include <libtorrent/info_hash.hpp>
-#include <libtorrent/magnet_uri.hpp>
 #include <libtorrent/read_resume_data.hpp>
 #include <libtorrent/session.hpp>
 #include <libtorrent/torrent_flags.hpp>
 #include <libtorrent/torrent_info.hpp>
 
-#include <algorithm>
-
 #include "base/input_sanitizer.h"
+#include "core/libtorrent_compat.h"
 #include "core/logger.h"
 #include "lt/add_torrent_torrent_info_ptr.h"
 #include "lt/session_ids.h"
@@ -49,7 +47,8 @@ bool handleOne(libtorrent::session& ses, Context& ctx, const session_cmds::AddMa
     return true;
   }
   libtorrent::error_code ec;
-  libtorrent::add_torrent_params atp = libtorrent::parse_magnet_uri(trimmed.toStdString(), ec);
+  libtorrent::add_torrent_params atp =
+      pfd::core::ltcompat::parseMagnetUri(trimmed.toStdString(), ec);
   if (ec) {
     LOG_ERROR(QString("SessionWorker parse_magnet_uri failed: %1")
                   .arg(QString::fromStdString(ec.message())));
@@ -83,7 +82,8 @@ bool handleOne(libtorrent::session& ses, Context& ctx,
     return true;
   }
   libtorrent::error_code ec;
-  libtorrent::add_torrent_params atp = libtorrent::parse_magnet_uri(trimmed.toStdString(), ec);
+  libtorrent::add_torrent_params atp =
+      pfd::core::ltcompat::parseMagnetUri(trimmed.toStdString(), ec);
   if (ec) {
     c.done->set_value(std::nullopt);
     return true;

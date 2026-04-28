@@ -26,7 +26,6 @@
 
 #include <algorithm>
 #include <future>
-#include <thread>
 
 #include "app/task_query_mapper.h"
 #include "base/input_sanitizer.h"
@@ -34,6 +33,7 @@
 #include "base/paths.h"
 #include "core/builtin_http_tracker.h"
 #include "core/config_service.h"
+#include "core/libtorrent_compat.h"
 #include "core/logger.h"
 #include "core/rss/rss_fetcher.h"
 #include "core/save_path_policy.h"
@@ -50,7 +50,7 @@ AppController::AppController(QApplication* app, pfd::ui::MainWindow* window,
     : app_(app), window_(window), pipeline_(pipeline), worker_(worker) {}
 
 AppController::~AppController() {
-  shuttingDown_.store(true);
+  exitCoordinator_.beginShutdown(shuttingDown_);
   builtinHttpTracker_.reset();
   constexpr auto kWaitBudgetPerTask = std::chrono::milliseconds(120);
   std::vector<std::future<void>> tasks;
@@ -58,10 +58,7 @@ AppController::~AppController() {
     std::lock_guard<std::mutex> lk(magnetTasksMu_);
     tasks.swap(magnetTasks_);
   }
-  for (auto& f : tasks) {
-    waitFutureAtMost(f, kWaitBudgetPerTask);
-  }
-  waitFutureAtMost(statusTask_, kWaitBudgetPerTask);
+  exitCoordinator_.waitBackgroundTasks(tasks, statusTask_, kWaitBudgetPerTask);
   saveSettings();
 }
 
@@ -94,8 +91,18 @@ void AppController::initialize() {
       [this](const pfd::core::TaskEvent& ev) { pipeline_->consume(ev); },
       [this](const QString& msg) { logError(msg); });
   eventIngestOrchestrator_ = std::make_unique<pfd::app::EventIngestOrchestrator>(pipeline_);
-  rssDownloadPipeline_ =
-      std::make_unique<pfd::app::RssDownloadPipeline>(static_cast<QObject*>(app_));
+  rssDownloadOrchestrator_ =
+      std::make_unique<pfd::app::RssDownloadOrchestrator>(static_cast<QObject*>(app_));
+  rssDownloadOrchestrator_->setHandlers(
+      [this](const pfd::core::rss::RssDownloadSettlement& s, bool ok, const QString& resolved) {
+        settleRssDownloadIfNeeded(s, ok, resolved);
+      },
+      [this](pfd::app::RssDownloadPipeline::MagnetQueueItem item) {
+        startOneMagnetOnUi(std::move(item));
+      },
+      [this](pfd::app::RssDownloadPipeline::RssTorrentUrlQueueItem item) {
+        startOneRssTorrentUrlOnUi(std::move(item));
+      });
   uiRefreshScheduler_ =
       std::make_unique<pfd::app::RefreshScheduler>(static_cast<QObject*>(app_), 100, [this]() {
         const auto snaps = pipeline_->snapshots();
@@ -159,14 +166,15 @@ void AppController::initialize() {
                    static_cast<QObject*>(app_),
                    [this]() { taskBatchUseCase_->resumeAllPausedTasks(); });
 
-  QObject::connect(app_, &QApplication::aboutToQuit, static_cast<QObject*>(app_), [this]() {
+  exitCoordinator_.wireAboutToQuit(app_, static_cast<QObject*>(app_), [this]() {
     shuttingDown_.store(true);
     if (taskPersistenceCoordinator_) {
       // 快速退出：优先保存任务元数据，跳过耗时 resume 全量写盘。
       taskPersistenceCoordinator_->saveTasksNow();
     }
-    if (rssService_)
+    if (rssService_) {
       rssService_->saveState();
+    }
   });
 
   if (!bottomStatusEnabled_) {
@@ -209,16 +217,6 @@ void AppController::initialize() {
 void AppController::schedulePersistedTasksAutoSave() {
   taskPersistenceCoordinator_->setAutoSaveIntervalMs(taskAutoSaveMs_);
   taskPersistenceCoordinator_->startAutoSave();
-}
-
-void AppController::waitFutureAtMost(std::future<void>& fut,
-                                     std::chrono::milliseconds timeout) const {
-  if (!fut.valid()) {
-    return;
-  }
-  if (fut.wait_for(timeout) == std::future_status::ready) {
-    fut.wait();
-  }
 }
 
 void AppController::scheduleTimedAction() {
@@ -403,7 +401,7 @@ void AppController::submitArgvMagnet(const QString& magnet) {
     return;
   }
   libtorrent::error_code ec;
-  const auto atp = libtorrent::parse_magnet_uri(trimmed.toStdString(), ec);
+  const auto atp = pfd::core::ltcompat::parseMagnetUri(trimmed.toStdString(), ec);
   if (!ec) {
     upsertKnownTaskMagnet(pfd::lt::session_ids::taskIdFromInfoHashes(atp.info_hashes), trimmed);
   }
@@ -423,21 +421,11 @@ void AppController::enqueueMagnet(const QString& uri, const QString& savePath,
                                   const pfd::core::rss::RssDownloadSettlement& rssSettlement,
                                   bool skipInteractiveAdd, const QString& category,
                                   const QString& tagsCsv) {
-  rssDownloadPipeline_->setMagnetMaxInFlight(magnetMaxInFlight_);
-  rssDownloadPipeline_->enqueueMagnet(
+  rssDownloadOrchestrator_->setMagnetMaxInFlight(magnetMaxInFlight_);
+  rssDownloadOrchestrator_->enqueueMagnet(
       pfd::app::RssDownloadPipeline::MagnetQueueItem{uri, savePath, rssSettlement,
                                                      skipInteractiveAdd, category, tagsCsv},
-      [this](pfd::app::RssDownloadPipeline::MagnetQueueItem item) {
-        if (!shuttingDown_.load()) {
-          startOneMagnetOnUi(std::move(item));
-        } else {
-          settleRssDownloadIfNeeded(item.rssSettlement, false);
-          rssDownloadPipeline_->finishMagnet(
-              [this](pfd::app::RssDownloadPipeline::MagnetQueueItem next) {
-                startOneMagnetOnUi(std::move(next));
-              });
-        }
-      });
+      shuttingDown_);
 }
 
 void AppController::settleRssDownloadIfNeeded(const pfd::core::rss::RssDownloadSettlement& s,
@@ -455,9 +443,7 @@ void AppController::startOneMagnetOnUi(pfd::app::RssDownloadPipeline::MagnetQueu
   const pfd::core::rss::RssDownloadSettlement rssS = item.rssSettlement;
   if (shuttingDown_.load()) {
     settleRssDownloadIfNeeded(rssS, false);
-    rssDownloadPipeline_->finishMagnet([this](pfd::app::RssDownloadPipeline::MagnetQueueItem next) {
-      startOneMagnetOnUi(std::move(next));
-    });
+    rssDownloadOrchestrator_->finishMagnet();
     return;
   }
   const QString trimmed = item.uri.trimmed();
@@ -467,22 +453,32 @@ void AppController::startOneMagnetOnUi(pfd::app::RssDownloadPipeline::MagnetQueu
     if (!trimmed.isEmpty()) {
       logError(QStringLiteral("Magnet URI rejected: %1").arg(magnetErr.message()));
     }
-    rssDownloadPipeline_->finishMagnet([this](pfd::app::RssDownloadPipeline::MagnetQueueItem next) {
-      startOneMagnetOnUi(std::move(next));
-    });
+    rssDownloadOrchestrator_->finishMagnet();
     return;
   }
 
   const QString resolvedSavePath = savePathPolicy_.resolve(item.savePath);
-  const QString tempMetaPath = QDir(resolvedSavePath).filePath(QStringLiteral(".pfd_meta"));
-  QDir().mkpath(tempMetaPath);
-  logInfo(QStringLiteral("Magnet metadata fetching..."));
-
+  const bool skipInteractiveAdd = item.skipInteractiveAdd;
   QPointer<pfd::ui::MainWindow> windowGuard(window_);
   auto* workerPtr = worker_;
   const bool useDefaultTrackers = autoApplyDefaultTrackers_;
   const QStringList defaultTrackersCopy = defaultTrackers_;
-  const bool skipInteractiveAdd = item.skipInteractiveAdd;
+
+  if (skipInteractiveAdd) {
+    const QStringList trackers =
+        useDefaultTrackers ? pfd::base::sanitizeTrackers(defaultTrackersCopy) : QStringList{};
+    workerPtr->addMagnet(trimmed, resolvedSavePath, trackers);
+    logInfo(QStringLiteral("[rss-dl] 已直接添加磁力（免交互）：%1 → %2")
+                .arg(trimmed.left(120), resolvedSavePath));
+    settleRssDownloadIfNeeded(rssS, true, resolvedSavePath);
+    rssDownloadOrchestrator_->finishMagnet();
+    return;
+  }
+
+  const QString tempMetaPath = QDir(resolvedSavePath).filePath(QStringLiteral(".pfd_meta"));
+  QDir().mkpath(tempMetaPath);
+  logInfo(QStringLiteral("Magnet metadata fetching..."));
+
   const QString magnetSavePathRaw = item.savePath;
   const QString magnetCategory = item.category;
   const QString magnetTagsCsv = item.tagsCsv;
@@ -497,10 +493,7 @@ void AppController::startOneMagnetOnUi(pfd::app::RssDownloadPipeline::MagnetQueu
           static_cast<QObject*>(app_),
           [this, rssS]() {
             settleRssDownloadIfNeeded(rssS, false);
-            rssDownloadPipeline_->finishMagnet(
-                [this](pfd::app::RssDownloadPipeline::MagnetQueueItem next) {
-                  startOneMagnetOnUi(std::move(next));
-                });
+            rssDownloadOrchestrator_->finishMagnet();
           },
           Qt::QueuedConnection);
       return;
@@ -510,12 +503,7 @@ void AppController::startOneMagnetOnUi(pfd::app::RssDownloadPipeline::MagnetQueu
         target,
         [=]() {
           // 任何结果（成功/失败/取消）都要释放 in-flight 并继续 pump
-          const auto finish = [this]() {
-            rssDownloadPipeline_->finishMagnet(
-                [this](pfd::app::RssDownloadPipeline::MagnetQueueItem next) {
-                  startOneMagnetOnUi(std::move(next));
-                });
-          };
+          const auto finish = [this]() { rssDownloadOrchestrator_->finishMagnet(); };
 
           if (windowGuard.isNull()) {
             settleRssDownloadIfNeeded(rssS, false);
@@ -523,6 +511,17 @@ void AppController::startOneMagnetOnUi(pfd::app::RssDownloadPipeline::MagnetQueu
             return;
           }
           if (!metaOpt.has_value()) {
+            if (skipInteractiveAdd) {
+              const QStringList trackers =
+                  useDefaultTrackers ? pfd::base::sanitizeTrackers(defaultTrackersCopy)
+                                     : QStringList{};
+              workerPtr->addMagnet(trimmed, resolvedSavePath, trackers);
+              logInfo(QStringLiteral("[rss-dl] 元数据预取失败，已回退为直接添加磁力：%1")
+                          .arg(trimmed.left(120)));
+              settleRssDownloadIfNeeded(rssS, true, resolvedSavePath);
+              finish();
+              return;
+            }
             logError(QStringLiteral("获取磁力链接元数据超时或失败。"));
             settleRssDownloadIfNeeded(rssS, false);
             finish();
@@ -581,9 +580,6 @@ void AppController::startOneMagnetOnUi(pfd::app::RssDownloadPipeline::MagnetQueu
             logInfo(QStringLiteral("[rss-dl] 已添加磁力任务：%1 → %2")
                         .arg(meta.name, built.finalSavePath));
             settleRssDownloadIfNeeded(rssS, true, built.finalSavePath);
-            if (windowGuard) {
-              windowGuard->showTransferTab();
-            }
             finish();
             return;
           }
@@ -642,20 +638,10 @@ void AppController::startOneMagnetOnUi(pfd::app::RssDownloadPipeline::MagnetQueu
 void AppController::enqueueRssTorrentUrl(
     const QString& url, const QString& savePath, const QString& referer,
     const pfd::core::rss::RssDownloadSettlement& rssSettlement) {
-  rssDownloadPipeline_->enqueueRssTorrentUrl(
+  rssDownloadOrchestrator_->enqueueRssTorrentUrl(
       pfd::app::RssDownloadPipeline::RssTorrentUrlQueueItem{url.trimmed(), savePath, referer,
                                                             rssSettlement},
-      [this](pfd::app::RssDownloadPipeline::RssTorrentUrlQueueItem item) {
-        if (!shuttingDown_.load()) {
-          startOneRssTorrentUrlOnUi(std::move(item));
-        } else {
-          settleRssDownloadIfNeeded(item.rssSettlement, false);
-          rssDownloadPipeline_->finishRssTorrent(
-              [this](pfd::app::RssDownloadPipeline::RssTorrentUrlQueueItem next) {
-                startOneRssTorrentUrlOnUi(std::move(next));
-              });
-        }
-      });
+      shuttingDown_);
 }
 
 void AppController::startOneRssTorrentUrlOnUi(
@@ -666,19 +652,13 @@ void AppController::startOneRssTorrentUrlOnUi(
   if (url.isEmpty()) {
     settleRssDownloadIfNeeded(rssS, false);
     logError(QStringLiteral("RSS torrent URL is empty."));
-    rssDownloadPipeline_->finishRssTorrent(
-        [this](pfd::app::RssDownloadPipeline::RssTorrentUrlQueueItem next) {
-          startOneRssTorrentUrlOnUi(std::move(next));
-        });
+    rssDownloadOrchestrator_->finishRssTorrent();
     return;
   }
 
   if (shuttingDown_.load()) {
     settleRssDownloadIfNeeded(rssS, false);
-    rssDownloadPipeline_->finishRssTorrent(
-        [this](pfd::app::RssDownloadPipeline::RssTorrentUrlQueueItem next) {
-          startOneRssTorrentUrlOnUi(std::move(next));
-        });
+    rssDownloadOrchestrator_->finishRssTorrent();
     return;
   }
 
@@ -729,10 +709,7 @@ void AppController::startOneRssTorrentUrlOnUi(
           static_cast<QObject*>(app_),
           [this, rssS]() {
             settleRssDownloadIfNeeded(rssS, false);
-            rssDownloadPipeline_->finishRssTorrent(
-                [this](pfd::app::RssDownloadPipeline::RssTorrentUrlQueueItem next) {
-                  startOneRssTorrentUrlOnUi(std::move(next));
-                });
+            rssDownloadOrchestrator_->finishRssTorrent();
           },
           Qt::QueuedConnection);
       return;
@@ -746,12 +723,7 @@ void AppController::startOneRssTorrentUrlOnUi(
         target,
         [this, windowGuard, workerPtr, pathCopy, errCopy, url, resolvedSavePath, useDefaultTrackers,
          defaultTrackersCopy, rssS]() {
-          const auto finish = [this]() {
-            rssDownloadPipeline_->finishRssTorrent(
-                [this](pfd::app::RssDownloadPipeline::RssTorrentUrlQueueItem next) {
-                  startOneRssTorrentUrlOnUi(std::move(next));
-                });
-          };
+          const auto finish = [this]() { rssDownloadOrchestrator_->finishRssTorrent(); };
 
           if (windowGuard.isNull()) {
             if (!pathCopy.isEmpty()) {
@@ -781,14 +753,20 @@ void AppController::startOneRssTorrentUrlOnUi(
 
           const QStringList trackers =
               useDefaultTrackers ? pfd::base::sanitizeTrackers(defaultTrackersCopy) : QStringList{};
-          workerPtr->addTorrentFile(pathCopy, resolvedSavePath, trackers);
+          pfd::lt::SessionWorker::AddTorrentOptions opts;
+          opts.start_torrent = true;
+          opts.stop_when_ready = false;
+          opts.sequential_download = false;
+          opts.skip_hash_check = false;
+          opts.add_to_top_queue = false;
+          workerPtr->addTorrentFileWithOptions(pathCopy, resolvedSavePath, trackers, opts);
           logInfo(
               QStringLiteral("RSS torrent URL added: %1 savePath=%2").arg(url, resolvedSavePath));
-          QFile::remove(pathCopy);
+          // SessionWorker 在后台线程异步读取该临时 .torrent，不能立刻删除。
+          QTimer::singleShot(30 * 1000, static_cast<QObject*>(app_), [pathCopy]() {
+            QFile::remove(pathCopy);
+          });
           settleRssDownloadIfNeeded(rssS, true, resolvedSavePath);
-          if (windowGuard) {
-            windowGuard->showTransferTab();
-          }
           finish();
         },
         Qt::QueuedConnection);
@@ -825,7 +803,7 @@ void AppController::bindUiAddCallbacks() {
       }
     }
     libtorrent::error_code ec;
-    const auto atp = libtorrent::parse_magnet_uri(trimmed.toStdString(), ec);
+    const auto atp = pfd::core::ltcompat::parseMagnetUri(trimmed.toStdString(), ec);
     if (!ec) {
       upsertKnownTaskMagnet(pfd::lt::session_ids::taskIdFromInfoHashes(atp.info_hashes), trimmed);
     }

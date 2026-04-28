@@ -7,6 +7,7 @@ add_library(torrentlink_core STATIC
   app_settings.cc
   config_service.h
   config_service.cc
+  libtorrent_compat.h
   torrent_creator.h
   torrent_creator.cc
   rss/rss_types.h

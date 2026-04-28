@@ -66,6 +66,9 @@ TEST(RssDedup, ExtractInfoHash) {
                 "magnet:?xt=urn:btih:da39a3ee5e6b4b0d3255bfef95601890afd80709&dn=test")),
             QStringLiteral("da39a3ee5e6b4b0d3255bfef95601890afd80709"));
   EXPECT_TRUE(RssDedup::extractInfoHash(QStringLiteral("magnet:?dn=test")).isEmpty());
+  EXPECT_EQ(RssDedup::extractInfoHash(
+                QStringLiteral("magnet:?xt=urn:btih:ABCDEFGHIJKLMNOPQRSTUVWXYZ234567&dn=test")),
+            QStringLiteral("abcdefghijklmnopqrstuvwxyz234567"));
 }
 
 TEST(RssDedup, FilterDuplicates) {
@@ -83,6 +86,16 @@ TEST(RssDedup, FilterDuplicatesInternal) {
                                    makeItem(QStringLiteral("b"))};
   auto unique = RssDedup::filterDuplicates(existing, incoming);
   EXPECT_EQ(unique.size(), 2u);
+}
+
+TEST(RssDedup, DedupByTorrentUrl) {
+  RssDedup dedup;
+  RssItem existing = makeItem(QStringLiteral("a"));
+  existing.torrent_url = QStringLiteral("HTTPS://EXAMPLE.COM/A.TORRENT");
+  dedup.buildIndex({existing});
+  RssItem incoming = makeItem(QStringLiteral("b"));
+  incoming.torrent_url = QStringLiteral("https://example.com/a.torrent");
+  EXPECT_TRUE(dedup.isDuplicate(incoming));
 }
 
 TEST(RssDedup, PruneByAge) {

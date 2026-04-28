@@ -11,6 +11,36 @@
 
 namespace pfd::core::rss {
 
+namespace {
+
+constexpr int kMaxRetryCount = 3;
+constexpr qint64 kRetryBackoffMs = 5LL * 60LL * 1000LL;
+
+void markItemDecision(RssItem& item, AutoDownloadDecision decision, const QString& reasonCode,
+                      const QString& reasonText) {
+  item.last_auto_decision = decision;
+  item.last_auto_reason_code = reasonCode;
+  item.last_auto_reason_text = reasonText;
+}
+
+bool canRetryItem(const RssItem& item, const QDateTime& now) {
+  if (item.downloaded || item.ignored || item.queued) {
+    return false;
+  }
+  if (item.retry_count <= 0) {
+    return true;
+  }
+  if (item.retry_count >= kMaxRetryCount) {
+    return false;
+  }
+  if (!item.last_attempt_at.isValid()) {
+    return true;
+  }
+  return item.last_attempt_at.msecsTo(now) >= kRetryBackoffMs;
+}
+
+}  // namespace
+
 RssService::RssService(QString data_dir) : repository_(std::move(data_dir)) {}
 
 void RssService::loadState() {
@@ -19,6 +49,10 @@ void RssService::loadState() {
   rules_ = repository_.loadRules();
   series_ = repository_.loadSeries();
   settings_ = repository_.loadSettings();
+  for (auto& item : items_) {
+    // queued is process-local transient state; always reset on startup.
+    item.queued = false;
+  }
   applySettings(settings_);
   dedup_.buildIndex(items_);
   LOG_INFO(QStringLiteral("[rss] State loaded: feeds=%1 items=%2 rules=%3 series=%4")
@@ -181,6 +215,18 @@ void RssService::refreshAllFeeds() {
       refreshFeed(feed.id);
     }
   }
+  const QDateTime now = QDateTime::currentDateTime();
+  for (auto& item : items_) {
+    if (auto_download_attempts_this_refresh_ >= max_auto_per_refresh_) {
+      break;
+    }
+    if (!canRetryItem(item, now)) {
+      continue;
+    }
+    if (tryAutoDownload(item) || trySeriesAutoDownload(item)) {
+      // attempts counted in try* methods
+    }
+  }
   pruneHistory();
 }
 
@@ -201,6 +247,7 @@ void RssService::refreshFeed(const QString& feed_id) {
     return;
   }
   fit->last_error.clear();
+  fit->last_success_refreshed_at = fit->last_refreshed_at;
 
   auto parseResult = parser_.parse(feed_id, fetchResult.body);
   if (!parseResult.ok) {
@@ -264,7 +311,7 @@ void RssService::markItemsIgnored(const QStringList& item_ids) {
 
 void RssService::applyRssDownloadSettlement(const RssDownloadSettlement& s, bool success,
                                             const QString& resolved_save_override) {
-  if (!success || s.item_id.isEmpty()) {
+  if (s.item_id.isEmpty()) {
     return;
   }
   const QString pathToStore =
@@ -274,10 +321,29 @@ void RssService::applyRssDownloadSettlement(const RssDownloadSettlement& s, bool
     if (it.id != s.item_id) {
       continue;
     }
-    it.downloaded = true;
-    it.download_save_path = pathToStore;
+    it.queued = false;
+    it.last_attempt_at = QDateTime::currentDateTime();
+    if (success) {
+      it.accepted = true;
+      it.downloaded = true;
+      it.retry_count = 0;
+      it.download_save_path = pathToStore;
+      it.last_success_at = it.last_attempt_at;
+      markItemDecision(it, AutoDownloadDecision::kSucceeded, QStringLiteral("settlement_success"),
+                       QStringLiteral("Request accepted by download pipeline."));
+    } else {
+      ++it.retry_count;
+      markItemDecision(it, AutoDownloadDecision::kFailed, QStringLiteral("settlement_failed"),
+                       QStringLiteral("Request failed or cancelled."));
+    }
     touched = true;
     break;
+  }
+  if (!success) {
+    if (touched) {
+      saveState();
+    }
+    return;
   }
   if (!s.series_sub_id.isEmpty()) {
     for (auto& sub : series_) {
@@ -305,8 +371,15 @@ bool RssService::downloadItem(const QString& item_id) {
     if (it.id != item_id)
       continue;
     if (it.magnet.isEmpty() && it.torrent_url.isEmpty()) {
+      markItemDecision(it, AutoDownloadDecision::kSkipped, QStringLiteral("no_resource"),
+                       QStringLiteral("No magnet or torrent URL."));
       LOG_WARN(QStringLiteral("[rss] Cannot download item \"%1\": no magnet or torrent URL")
                    .arg(it.title));
+      return false;
+    }
+    if (it.queued) {
+      markItemDecision(it, AutoDownloadDecision::kSkipped, QStringLiteral("already_queued"),
+                       QStringLiteral("Item is already queued."));
       return false;
     }
     QString referer;
@@ -330,6 +403,8 @@ bool RssService::downloadItem(const QString& item_id) {
     }
 
     if (!on_download_request_) {
+      markItemDecision(it, AutoDownloadDecision::kFailed, QStringLiteral("no_callback"),
+                       QStringLiteral("Download callback is not set."));
       return false;
     }
     AutoDownloadRequest req;
@@ -345,6 +420,10 @@ bool RssService::downloadItem(const QString& item_id) {
     req.rss_settlement.item_id = it.id;
     req.rss_settlement.record_save_path = savePath;
     req.add_without_interactive_confirm = true;
+    it.queued = true;
+    it.last_attempt_at = QDateTime::currentDateTime();
+    markItemDecision(it, AutoDownloadDecision::kQueued, QStringLiteral("manual_queued"),
+                     QStringLiteral("Manual download queued."));
     on_download_request_(req);
     LOG_INFO(QStringLiteral("[rss] Manual download: \"%1\"").arg(it.title));
     return true;
@@ -440,18 +519,26 @@ void RssService::applySettings(const RssSettings& s) {
 
 bool RssService::tryAutoDownload(RssItem& item) {
   if (!auto_download_enabled_) {
+    markItemDecision(item, AutoDownloadDecision::kSkipped, QStringLiteral("global_disabled"),
+                     QStringLiteral("Global auto download is disabled."));
     LOG_DEBUG(QStringLiteral("[rss] Auto-download skipped(global off) item=%1").arg(item.id));
     return false;
   }
   if (item.magnet.isEmpty() && item.torrent_url.isEmpty()) {
+    markItemDecision(item, AutoDownloadDecision::kSkipped, QStringLiteral("no_resource"),
+                     QStringLiteral("No magnet or torrent URL."));
     LOG_DEBUG(
         QStringLiteral("[rss] Auto-download skipped(no magnet/torrent URL) item=%1").arg(item.id));
     return false;
   }
-  if (item.downloaded || item.ignored) {
-    LOG_DEBUG(QStringLiteral("[rss] Auto-download skipped(state downloaded=%1 ignored=%2) item=%3")
+  if (item.downloaded || item.ignored || item.queued) {
+    markItemDecision(item, AutoDownloadDecision::kSkipped, QStringLiteral("state_blocked"),
+                     QStringLiteral("Item is downloaded/ignored/queued."));
+    LOG_DEBUG(QStringLiteral(
+                  "[rss] Auto-download skipped(state downloaded=%1 ignored=%2 queued=%3) item=%4")
                   .arg(item.downloaded ? QStringLiteral("true") : QStringLiteral("false"))
                   .arg(item.ignored ? QStringLiteral("true") : QStringLiteral("false"))
+                  .arg(item.queued ? QStringLiteral("true") : QStringLiteral("false"))
                   .arg(item.id));
     return false;
   }
@@ -459,6 +546,8 @@ bool RssService::tryAutoDownload(RssItem& item) {
   auto fit = std::find_if(feeds_.begin(), feeds_.end(),
                           [&](const RssFeed& x) { return x.id == item.feed_id; });
   if (fit == feeds_.end() || !fit->auto_download_enabled) {
+    markItemDecision(item, AutoDownloadDecision::kSkipped, QStringLiteral("feed_disabled"),
+                     QStringLiteral("Feed auto download is disabled."));
     LOG_DEBUG(QStringLiteral("[rss] Auto-download skipped(feed disabled/missing) feed=%1 item=%2")
                   .arg(item.feed_id, item.id));
     return false;
@@ -466,6 +555,8 @@ bool RssService::tryAutoDownload(RssItem& item) {
 
   auto match = RssRuleEngine::findFirstEnabledMatch(rules_, item);
   if (!match.has_value()) {
+    markItemDecision(item, AutoDownloadDecision::kSkipped, QStringLiteral("no_rule_match"),
+                     QStringLiteral("No rule matched."));
     LOG_DEBUG(QStringLiteral("[rss] Auto-download skipped(no rule match) item=%1").arg(item.id));
     return false;
   }
@@ -473,12 +564,16 @@ bool RssService::tryAutoDownload(RssItem& item) {
   auto rit = std::find_if(rules_.begin(), rules_.end(),
                           [&](const RssRule& r) { return r.id == match->rule_id; });
   if (rit == rules_.end()) {
+    markItemDecision(item, AutoDownloadDecision::kFailed, QStringLiteral("rule_missing"),
+                     QStringLiteral("Matched rule not found."));
     LOG_WARN(QStringLiteral("[rss] Auto-download matched missing rule rule_id=%1 item=%2")
                  .arg(match->rule_id, item.id));
     return false;
   }
 
   if (!on_download_request_) {
+    markItemDecision(item, AutoDownloadDecision::kFailed, QStringLiteral("no_callback"),
+                     QStringLiteral("Download callback is not set."));
     LOG_WARN(QStringLiteral("[rss] Auto-download matched but no callback item=%1").arg(item.id));
     return false;
   }
@@ -497,6 +592,10 @@ bool RssService::tryAutoDownload(RssItem& item) {
   req.rss_settlement.item_id = item.id;
   req.rss_settlement.record_save_path = rit->save_path;
   req.add_without_interactive_confirm = true;
+  item.queued = true;
+  item.last_attempt_at = QDateTime::currentDateTime();
+  markItemDecision(item, AutoDownloadDecision::kQueued, QStringLiteral("rule_queued"),
+                   QStringLiteral("Queued by auto-download rule."));
   ++auto_download_attempts_this_refresh_;
   on_download_request_(req);
   LOG_INFO(QStringLiteral("[rss] Auto-download: \"%1\" rule=\"%2\" feed=%3 item=%4")
@@ -505,14 +604,22 @@ bool RssService::tryAutoDownload(RssItem& item) {
 }
 
 bool RssService::trySeriesAutoDownload(RssItem& item) {
-  if (!auto_download_enabled_)
+  if (!auto_download_enabled_) {
+    markItemDecision(item, AutoDownloadDecision::kSkipped, QStringLiteral("global_disabled"),
+                     QStringLiteral("Global auto download is disabled."));
     return false;
-  if ((item.magnet.isEmpty() && item.torrent_url.isEmpty()) || item.downloaded || item.ignored) {
+  }
+  if ((item.magnet.isEmpty() && item.torrent_url.isEmpty()) || item.downloaded || item.ignored ||
+      item.queued) {
+    markItemDecision(item, AutoDownloadDecision::kSkipped, QStringLiteral("state_blocked"),
+                     QStringLiteral("Item is downloaded/ignored/queued."));
     return false;
   }
 
   auto ep = RssSeriesTracker::parseTitle(item.title);
   if (!ep.has_value()) {
+    markItemDecision(item, AutoDownloadDecision::kSkipped, QStringLiteral("episode_parse_failed"),
+                     QStringLiteral("Failed to parse episode from title."));
     LOG_DEBUG(QStringLiteral("[rss] Series auto-download skipped(parse episode failed) item=%1")
                   .arg(item.id));
     return false;
@@ -557,6 +664,10 @@ bool RssService::trySeriesAutoDownload(RssItem& item) {
       req.rss_settlement.series_episode = ep->episode;
       req.rss_settlement.series_season = ep->season >= 0 ? ep->season : 0;
       req.add_without_interactive_confirm = true;
+      item.queued = true;
+      item.last_attempt_at = QDateTime::currentDateTime();
+      markItemDecision(item, AutoDownloadDecision::kQueued, QStringLiteral("series_queued"),
+                       QStringLiteral("Queued by series subscription."));
       ++auto_download_attempts_this_refresh_;
       on_download_request_(req);
       LOG_INFO(QStringLiteral("[rss] Series auto-download: \"%1\" series=\"%2\" ep=%3 feed=%4")
@@ -566,6 +677,8 @@ bool RssService::trySeriesAutoDownload(RssItem& item) {
     }
     return true;
   }
+  markItemDecision(item, AutoDownloadDecision::kSkipped, QStringLiteral("series_no_match"),
+                   QStringLiteral("No matching enabled series rule."));
   LOG_DEBUG(QStringLiteral("[rss] Series auto-download no match item=%1 title=%2")
                 .arg(item.id, item.title.left(80)));
   return false;

@@ -28,11 +28,13 @@ public:
   static int pruneHistory(std::vector<RssItem>& items, const HistoryPolicy& policy);
 
   static QString extractInfoHash(const QString& magnet);
+  static QString normalizeTorrentUrl(const QString& torrentUrl);
 
 private:
   std::unordered_set<QString> known_ids_;
   std::unordered_set<QString> known_guids_;
   std::unordered_set<QString> known_links_;
+  std::unordered_set<QString> known_torrent_urls_;
   std::unordered_set<QString> known_infohashes_;
 };
 
