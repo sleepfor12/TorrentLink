@@ -1,10 +1,9 @@
+#include <QtCore/QCoreApplication>
 #include <QtCore/QEventLoop>
 #include <QtCore/QObject>
 #include <QtCore/QTimer>
-#include <QtCore/QCoreApplication>
 
 #include <gtest/gtest.h>
-
 #include <vector>
 
 #include "app/rss_download_pipeline.h"

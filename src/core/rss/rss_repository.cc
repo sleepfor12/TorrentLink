@@ -26,7 +26,8 @@ QJsonObject feedToJson(const RssFeed& f) {
   o[QStringLiteral("enabled")] = f.enabled;
   o[QStringLiteral("auto_download_enabled")] = f.auto_download_enabled;
   o[QStringLiteral("last_refreshed_at")] = f.last_refreshed_at.toString(Qt::ISODate);
-  o[QStringLiteral("last_success_refreshed_at")] = f.last_success_refreshed_at.toString(Qt::ISODate);
+  o[QStringLiteral("last_success_refreshed_at")] =
+      f.last_success_refreshed_at.toString(Qt::ISODate);
   o[QStringLiteral("last_error")] = f.last_error;
   return o;
 }
@@ -40,8 +41,8 @@ RssFeed feedFromJson(const QJsonObject& o) {
   f.auto_download_enabled = o[QStringLiteral("auto_download_enabled")].toBool(false);
   f.last_refreshed_at =
       QDateTime::fromString(o[QStringLiteral("last_refreshed_at")].toString(), Qt::ISODate);
-  f.last_success_refreshed_at = QDateTime::fromString(
-      o[QStringLiteral("last_success_refreshed_at")].toString(), Qt::ISODate);
+  f.last_success_refreshed_at =
+      QDateTime::fromString(o[QStringLiteral("last_success_refreshed_at")].toString(), Qt::ISODate);
   f.last_error = o[QStringLiteral("last_error")].toString();
   return f;
 }

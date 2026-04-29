@@ -5,8 +5,8 @@
 
 #include <atomic>
 #include <chrono>
-#include <future>
 #include <functional>
+#include <future>
 #include <vector>
 
 class QApplication;

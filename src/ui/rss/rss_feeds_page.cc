@@ -52,12 +52,11 @@ void RssFeedsPage::refreshTable() {
         new QTableWidgetItem(f.last_refreshed_at.isValid()
                                  ? f.last_refreshed_at.toString(QStringLiteral("yyyy-MM-dd HH:mm"))
                                  : QStringLiteral("从未")));
-    feedTable_->setItem(
-        i, 4,
-        new QTableWidgetItem(f.last_success_refreshed_at.isValid()
-                                 ? f.last_success_refreshed_at.toString(
-                                       QStringLiteral("yyyy-MM-dd HH:mm"))
-                                 : QStringLiteral("从未")));
+    feedTable_->setItem(i, 4,
+                        new QTableWidgetItem(f.last_success_refreshed_at.isValid()
+                                                 ? f.last_success_refreshed_at.toString(
+                                                       QStringLiteral("yyyy-MM-dd HH:mm"))
+                                                 : QStringLiteral("从未")));
     feedTable_->setItem(i, 5,
                         new QTableWidgetItem(f.auto_download_enabled ? QStringLiteral("已开启")
                                                                      : QStringLiteral("关闭")));

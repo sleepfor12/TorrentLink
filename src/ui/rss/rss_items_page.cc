@@ -420,11 +420,10 @@ void RssItemsPage::buildLayout() {
   auto* splitter = new QSplitter(Qt::Horizontal, this);
   itemTable_ = new QTableWidget(splitter);
   itemTable_->setColumnCount(9);
-  itemTable_->setHorizontalHeaderLabels({QStringLiteral("标题"), QStringLiteral("来源"),
-                                         QStringLiteral("发布时间"), QStringLiteral("资源"),
-                                         QStringLiteral("规则命中"), QStringLiteral("剧集"),
-                                         QStringLiteral("自动下载诊断"),
-                                         QStringLiteral("下载状态"), QStringLiteral("任务进度")});
+  itemTable_->setHorizontalHeaderLabels(
+      {QStringLiteral("标题"), QStringLiteral("来源"), QStringLiteral("发布时间"),
+       QStringLiteral("资源"), QStringLiteral("规则命中"), QStringLiteral("剧集"),
+       QStringLiteral("自动下载诊断"), QStringLiteral("下载状态"), QStringLiteral("任务进度")});
   itemTable_->horizontalHeader()->setStretchLastSection(true);
   itemTable_->horizontalHeader()->setSectionResizeMode(QHeaderView::Interactive);
   itemTable_->setSelectionBehavior(QAbstractItemView::SelectRows);
@@ -528,7 +527,8 @@ void RssItemsPage::onSelectionChanged() {
                     .arg(it.last_auto_reason_code.toHtmlEscaped());
       }
       if (!it.last_auto_reason_text.isEmpty()) {
-        html += QStringLiteral("<p><b>说明</b>：%1</p>").arg(it.last_auto_reason_text.toHtmlEscaped());
+        html +=
+            QStringLiteral("<p><b>说明</b>：%1</p>").arg(it.last_auto_reason_text.toHtmlEscaped());
       }
       if (it.last_attempt_at.isValid()) {
         html += QStringLiteral("<p><b>最近尝试</b>：%1</p>")

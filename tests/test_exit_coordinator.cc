@@ -2,11 +2,10 @@
 #include <QtCore/QTimer>
 #include <QtWidgets/QApplication>
 
-#include <gtest/gtest.h>
-
 #include <atomic>
 #include <chrono>
 #include <future>
+#include <gtest/gtest.h>
 
 #include "app/exit_coordinator.h"
 
@@ -35,4 +34,3 @@ TEST(ExitCoordinatorTest, WaitBackgroundTasksConsumesReadyFutures) {
   EXPECT_EQ(tasks.front().wait_for(std::chrono::milliseconds(0)), std::future_status::ready);
   EXPECT_EQ(status.wait_for(std::chrono::milliseconds(0)), std::future_status::ready);
 }
-

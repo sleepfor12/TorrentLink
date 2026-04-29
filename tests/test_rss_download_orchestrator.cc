@@ -1,11 +1,10 @@
-#include <QtCore/QObject>
-#include <QtCore/QEventLoop>
-#include <QtCore/QTimer>
 #include <QtCore/QCoreApplication>
-
-#include <gtest/gtest.h>
+#include <QtCore/QEventLoop>
+#include <QtCore/QObject>
+#include <QtCore/QTimer>
 
 #include <atomic>
+#include <gtest/gtest.h>
 
 #include "app/rss_download_orchestrator.h"
 

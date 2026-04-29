@@ -512,9 +512,9 @@ void AppController::startOneMagnetOnUi(pfd::app::RssDownloadPipeline::MagnetQueu
           }
           if (!metaOpt.has_value()) {
             if (skipInteractiveAdd) {
-              const QStringList trackers =
-                  useDefaultTrackers ? pfd::base::sanitizeTrackers(defaultTrackersCopy)
-                                     : QStringList{};
+              const QStringList trackers = useDefaultTrackers
+                                               ? pfd::base::sanitizeTrackers(defaultTrackersCopy)
+                                               : QStringList{};
               workerPtr->addMagnet(trimmed, resolvedSavePath, trackers);
               logInfo(QStringLiteral("[rss-dl] 元数据预取失败，已回退为直接添加磁力：%1")
                           .arg(trimmed.left(120)));
@@ -763,9 +763,8 @@ void AppController::startOneRssTorrentUrlOnUi(
           logInfo(
               QStringLiteral("RSS torrent URL added: %1 savePath=%2").arg(url, resolvedSavePath));
           // SessionWorker 在后台线程异步读取该临时 .torrent，不能立刻删除。
-          QTimer::singleShot(30 * 1000, static_cast<QObject*>(app_), [pathCopy]() {
-            QFile::remove(pathCopy);
-          });
+          QTimer::singleShot(30 * 1000, static_cast<QObject*>(app_),
+                             [pathCopy]() { QFile::remove(pathCopy); });
           settleRssDownloadIfNeeded(rssS, true, resolvedSavePath);
           finish();
         },
