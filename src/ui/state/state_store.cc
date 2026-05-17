@@ -27,6 +27,11 @@ MainWindowUiState StateStore::loadMainWindowState() {
   out.sortKey = s.value(QStringLiteral("sort_key"), 0).toInt();
   out.sortOrder = s.value(QStringLiteral("sort_order"), 0).toInt();
   out.filter = s.value(QStringLiteral("filter"), 0).toInt();
+  const bool legacyBottom = s.value(QStringLiteral("transfer_bottom_info_visible"), true).toBool();
+  out.bottom_status_bar_visible =
+      s.value(QStringLiteral("bottom_status_bar_visible"), legacyBottom).toBool();
+  out.transfer_detail_panel_visible =
+      s.value(QStringLiteral("transfer_detail_panel_visible"), legacyBottom).toBool();
   s.endGroup();
   return out;
 }
@@ -41,6 +46,8 @@ void StateStore::saveMainWindowState(const MainWindowUiState& st) {
   s.setValue(QStringLiteral("sort_key"), st.sortKey);
   s.setValue(QStringLiteral("sort_order"), st.sortOrder);
   s.setValue(QStringLiteral("filter"), st.filter);
+  s.setValue(QStringLiteral("bottom_status_bar_visible"), st.bottom_status_bar_visible);
+  s.setValue(QStringLiteral("transfer_detail_panel_visible"), st.transfer_detail_panel_visible);
   s.endGroup();
 }
 

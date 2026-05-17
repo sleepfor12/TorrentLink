@@ -125,6 +125,12 @@ AppSettings AppSettings::load() {
       out.close_behavior != QStringLiteral("quit")) {
     out.close_behavior = QStringLiteral("minimize");
   }
+  out.ui_theme =
+      s.value(QStringLiteral("ui/theme"), QStringLiteral("system")).toString().trimmed().toLower();
+  if (out.ui_theme != QStringLiteral("light") && out.ui_theme != QStringLiteral("dark") &&
+      out.ui_theme != QStringLiteral("system")) {
+    out.ui_theme = QStringLiteral("light");
+  }
   out.start_minimized = s.value(QStringLiteral("ui/start_minimized"), false).toBool();
   out.timed_action = s.value(QStringLiteral("ui/timed_action"), QStringLiteral("none"))
                          .toString()
@@ -228,6 +234,7 @@ void AppSettings::save(const AppSettings& in) {
   s.setValue(QStringLiteral("network/proxy/username"), in.proxy_username.trimmed());
   s.setValue(QStringLiteral("network/proxy/password"), in.proxy_password);
   s.setValue(QStringLiteral("ui/close_behavior"), in.close_behavior.trimmed().toLower());
+  s.setValue(QStringLiteral("ui/theme"), in.ui_theme.trimmed().toLower());
   s.setValue(QStringLiteral("ui/start_minimized"), in.start_minimized);
   s.setValue(QStringLiteral("ui/timed_action"), in.timed_action.trimmed().toLower());
   s.setValue(QStringLiteral("ui/timed_action_delay_minutes"), in.timed_action_delay_minutes);

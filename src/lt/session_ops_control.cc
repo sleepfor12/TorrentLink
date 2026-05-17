@@ -69,14 +69,19 @@ bool handleOne(libtorrent::session&, Context& ctx, const session_cmds::PauseCmd&
 
 bool handleOne(libtorrent::session&, Context& ctx, const session_cmds::ResumeCmd& c) {
   const auto it = ctx.handlesByTaskId.find(session_ids::taskIdKey(c.taskId));
-  if (it != ctx.handlesByTaskId.end()) {
-    it->second.set_flags(libtorrent::torrent_flags::auto_managed);
-    it->second.resume();
-    LOG_INFO(QStringLiteral("[lt.worker] Resume applied taskId=%1").arg(c.taskId.toString()));
-  } else {
+  if (it == ctx.handlesByTaskId.end() || !it->second.is_valid()) {
     LOG_WARN(QStringLiteral("[lt.worker] Resume ignored, handle not found taskId=%1")
                  .arg(c.taskId.toString()));
+    return true;
   }
+  auto& h = it->second;
+  h.set_flags(libtorrent::torrent_flags::auto_managed);
+  h.resume();
+  // 显式恢复时提到队列最前，否则在 active_downloads/active_limit 较紧时可能长期抢不到槽位，
+  // 表现上像「启动无效」；强制启动会去掉 auto_managed，不受此限制。
+  h.queue_position_top();
+  LOG_INFO(
+      QStringLiteral("[lt.worker] Resume applied taskId=%1 queue=top").arg(c.taskId.toString()));
   return true;
 }
 

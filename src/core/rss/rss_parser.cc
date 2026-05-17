@@ -12,8 +12,12 @@ namespace {
 
 QString stableItemId(const QString& feed_id, const QString& guid, const QString& link,
                      const QString& title) {
+  // 必须包含 feed_id：不同订阅源常出现相同 guid/链接/磁力；仅用 guid 作 id 会全局冲突。
   if (!guid.isEmpty()) {
-    return guid;
+    return QString::fromLatin1(
+        QCryptographicHash::hash((feed_id + QChar('|') + guid).toUtf8(), QCryptographicHash::Sha256)
+            .toHex()
+            .left(32));
   }
   const QString seed = feed_id + QStringLiteral("|") + link + QStringLiteral("|") + title;
   return QString::fromLatin1(

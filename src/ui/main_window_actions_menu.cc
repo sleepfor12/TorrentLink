@@ -40,6 +40,7 @@ void MainWindow::openPreferences() {
   }
   if (rssService_ != nullptr) {
     rssService_->applySettings(dlg.currentRssSettings());
+    rssService_->refreshAutoDownloadDiagnostics();
     rssService_->saveState();
     emit rssSettingsChanged();
   }
@@ -58,6 +59,8 @@ void MainWindow::openPreferences() {
                                                           st.log_rotate_max_backup_files);
   appendLog(QStringLiteral("设置已保存。"));
   emit settingsChanged();
+  applyTheme();
+  syncThemeMenuChecks();
 }
 
 void MainWindow::openLogCenter() {

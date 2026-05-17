@@ -18,8 +18,11 @@ public:
 
   void addSample(qint64 downloadRate, qint64 uploadRate);
   void clear();
+  /// 从当前 AppSettings 重新应用速度图配色（主题切换时调用）
+  void syncChartTheme();
 
 private:
+  void pushThemeTokensToQml();
   SpeedChartModel* model_{nullptr};
   QQuickWidget* qmlView_{nullptr};
 };

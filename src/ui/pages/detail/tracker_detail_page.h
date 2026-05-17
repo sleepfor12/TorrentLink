@@ -8,6 +8,8 @@
 #include "core/task_query_dto.h"
 #include "core/task_snapshot.h"
 
+class QLabel;
+class QPushButton;
 class QTreeWidget;
 class QTreeWidgetItem;
 class QTimer;
@@ -35,6 +37,7 @@ public:
                    ReannounceAllFn reannounceAllFn);
   void setSnapshot(const pfd::core::TaskSnapshot& snap);
   void clear();
+  void syncTheme();
 
 protected:
   void showEvent(QShowEvent* event) override;
@@ -42,6 +45,8 @@ protected:
 
 private:
   void buildLayout();
+  void applyTreeStyle();
+  void updateToolbarState();
   void reload();
   void showContextMenu(const QPoint& pos);
   void actionAddTracker();
@@ -66,6 +71,9 @@ private:
   ReannounceAllFn reannounceAllFn_;
 
   pfd::base::TaskId taskId_;
+  QPushButton* addTrackerBtn_{nullptr};
+  QPushButton* reannounceAllBtn_{nullptr};
+  QLabel* hintLabel_{nullptr};
   QTreeWidget* tree_{nullptr};
   QTimer* refreshTimer_{nullptr};
   int refreshTick_{0};

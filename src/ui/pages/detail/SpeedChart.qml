@@ -5,9 +5,42 @@ Item {
     property var periodOptions: ["1min", "5min", "30min", "1h", "3h", "6h", "12h", "24h"]
     property int periodIndex: 1
 
+    property string colorSurface: "#ffffff"
+    property string colorTopBarBg: "#f8fafc"
+    property string colorTopBarBorder: "#e2e8f0"
+    property string colorTitleText: "#0f172a"
+    property string colorMutedText: "#64748b"
+    property string colorMetricDlBg: "#eff6ff"
+    property string colorMetricDlBorder: "#bfdbfe"
+    property string colorMetricDlLabel: "#0369a1"
+    property string colorMetricDlValue: "#0f172a"
+    property string colorMetricUlBg: "#fff7ed"
+    property string colorMetricUlBorder: "#fed7aa"
+    property string colorMetricUlLabel: "#b45309"
+    property string colorMetricUlValue: "#0f172a"
+    property string colorMetricPeakBg: "#f5f3ff"
+    property string colorMetricPeakBorder: "#ddd6fe"
+    property string colorMetricPeakLabel: "#6d28d9"
+    property string colorMetricPeakValue: "#0f172a"
+    property string colorControlBg: "#ffffff"
+    property string colorControlBorder: "#cbd5e1"
+    property string colorControlText: "#334155"
+    property string colorSeriesPanelBg: "#ffffffee"
+    property string colorSeriesPanelBorder: "#e2e8f0"
+    property string colorSeriesLabel: "#334155"
+    property string colorCheckboxBorder: "#94a3b8"
+    property string colorCheckboxUnchecked: "#ffffff"
+    property string colorGridMajor: "#e2e8f0"
+    property string colorAxisLine: "#94a3b8"
+    property string colorAxisBase: "#64748b"
+    property string colorTickLabel: "#64748b"
+    property string colorLegendText: "#334155"
+    property string colorAreaDl: "rgba(56, 189, 248, 0.14)"
+    property string colorAreaUl: "rgba(251, 146, 60, 0.10)"
+
     Rectangle {
         anchors.fill: parent
-        color: "#ffffff"
+        color: root.colorSurface
 
         Rectangle {
             id: topBar
@@ -15,8 +48,8 @@ Item {
             anchors.right: parent.right
             anchors.top: parent.top
             height: 54
-            color: "#f8fafc"
-            border.color: "#e2e8f0"
+            color: root.colorTopBarBg
+            border.color: root.colorTopBarBorder
             border.width: 1
 
             Text {
@@ -26,7 +59,7 @@ Item {
                 text: "速度趋势（总上传/总下载）"
                 font.pixelSize: 13
                 font.bold: true
-                color: "#0f172a"
+                color: root.colorTitleText
             }
 
             Text {
@@ -35,7 +68,7 @@ Item {
                 anchors.verticalCenter: parent.verticalCenter
                 text: chartModelRef ? ("采样: " + chartModelRef.sampleCount + " / 4096") : "采样: 0 / 4096"
                 font.pixelSize: 11
-                color: "#64748b"
+                color: root.colorMutedText
             }
         }
 
@@ -51,28 +84,28 @@ Item {
                 width: (metricRow.width - 16) / 3
                 height: 42
                 radius: 6
-                color: "#eff6ff"
-                border.color: "#bfdbfe"
-                Text { anchors.left: parent.left; anchors.leftMargin: 10; anchors.top: parent.top; anchors.topMargin: 6; text: "下载"; font.pixelSize: 10; color: "#0369a1" }
-                Text { anchors.left: parent.left; anchors.leftMargin: 10; anchors.bottom: parent.bottom; anchors.bottomMargin: 7; text: chartModelRef ? chartModelRef.dlCurrent : "0 B/s"; font.pixelSize: 12; color: "#0f172a"; font.bold: true }
+                color: root.colorMetricDlBg
+                border.color: root.colorMetricDlBorder
+                Text { anchors.left: parent.left; anchors.leftMargin: 10; anchors.top: parent.top; anchors.topMargin: 6; text: "下载"; font.pixelSize: 10; color: root.colorMetricDlLabel }
+                Text { anchors.left: parent.left; anchors.leftMargin: 10; anchors.bottom: parent.bottom; anchors.bottomMargin: 7; text: chartModelRef ? chartModelRef.dlCurrent : "0 B/s"; font.pixelSize: 12; color: root.colorMetricDlValue; font.bold: true }
             }
             Rectangle {
                 width: (metricRow.width - 16) / 3
                 height: 42
                 radius: 6
-                color: "#fff7ed"
-                border.color: "#fed7aa"
-                Text { anchors.left: parent.left; anchors.leftMargin: 10; anchors.top: parent.top; anchors.topMargin: 6; text: "上传"; font.pixelSize: 10; color: "#b45309" }
-                Text { anchors.left: parent.left; anchors.leftMargin: 10; anchors.bottom: parent.bottom; anchors.bottomMargin: 7; text: chartModelRef ? chartModelRef.ulCurrent : "0 B/s"; font.pixelSize: 12; color: "#0f172a"; font.bold: true }
+                color: root.colorMetricUlBg
+                border.color: root.colorMetricUlBorder
+                Text { anchors.left: parent.left; anchors.leftMargin: 10; anchors.top: parent.top; anchors.topMargin: 6; text: "上传"; font.pixelSize: 10; color: root.colorMetricUlLabel }
+                Text { anchors.left: parent.left; anchors.leftMargin: 10; anchors.bottom: parent.bottom; anchors.bottomMargin: 7; text: chartModelRef ? chartModelRef.ulCurrent : "0 B/s"; font.pixelSize: 12; color: root.colorMetricUlValue; font.bold: true }
             }
             Rectangle {
                 width: (metricRow.width - 16) / 3
                 height: 42
                 radius: 6
-                color: "#f5f3ff"
-                border.color: "#ddd6fe"
-                Text { anchors.left: parent.left; anchors.leftMargin: 10; anchors.top: parent.top; anchors.topMargin: 6; text: "峰值刻度"; font.pixelSize: 10; color: "#6d28d9" }
-                Text { anchors.left: parent.left; anchors.leftMargin: 10; anchors.bottom: parent.bottom; anchors.bottomMargin: 7; text: chartModelRef ? chartModelRef.formatRate(chartModelRef.maxRate) : "0 B/s"; font.pixelSize: 12; color: "#0f172a"; font.bold: true }
+                color: root.colorMetricPeakBg
+                border.color: root.colorMetricPeakBorder
+                Text { anchors.left: parent.left; anchors.leftMargin: 10; anchors.top: parent.top; anchors.topMargin: 6; text: "峰值刻度"; font.pixelSize: 10; color: root.colorMetricPeakLabel }
+                Text { anchors.left: parent.left; anchors.leftMargin: 10; anchors.bottom: parent.bottom; anchors.bottomMargin: 7; text: chartModelRef ? chartModelRef.formatRate(chartModelRef.maxRate) : "0 B/s"; font.pixelSize: 12; color: root.colorMetricPeakValue; font.bold: true }
             }
         }
 
@@ -88,12 +121,12 @@ Item {
                 width: 96
                 height: 24
                 radius: 4
-                color: "#ffffff"
-                border.color: "#cbd5e1"
+                color: root.colorControlBg
+                border.color: root.colorControlBorder
                 Text {
                     anchors.centerIn: parent
                     text: "周期: " + root.periodOptions[root.periodIndex]
-                    color: "#334155"
+                    color: root.colorControlText
                     font.pixelSize: 11
                 }
                 MouseArea {
@@ -118,8 +151,8 @@ Item {
 
             Rectangle {
                 anchors.fill: parent
-                color: "#ffffffee"
-                border.color: "#e2e8f0"
+                color: root.colorSeriesPanelBg
+                border.color: root.colorSeriesPanelBorder
                 radius: 6
             }
             Column {
@@ -135,8 +168,8 @@ Item {
                 property bool checked: true
                 width: 128; height: 20
                 Row { anchors.fill: parent; spacing: 6
-                    Rectangle { width: 14; height: 14; radius: 2; color: cTotalDl.checked ? "#38bdf8" : "#ffffff"; border.color: "#94a3b8"; anchors.verticalCenter: parent.verticalCenter }
-                    Text { text: "总下载"; color: "#334155"; font.pixelSize: 11; anchors.verticalCenter: parent.verticalCenter }
+                    Rectangle { width: 14; height: 14; radius: 2; color: cTotalDl.checked ? "#38bdf8" : root.colorCheckboxUnchecked; border.color: root.colorCheckboxBorder; anchors.verticalCenter: parent.verticalCenter }
+                    Text { text: "总下载"; color: root.colorSeriesLabel; font.pixelSize: 11; anchors.verticalCenter: parent.verticalCenter }
                 }
                 MouseArea { anchors.fill: parent; onClicked: { cTotalDl.checked = !cTotalDl.checked; canvas.requestPaint(); } }
             }
@@ -145,8 +178,8 @@ Item {
                 property bool checked: true
                 width: 128; height: 20
                 Row { anchors.fill: parent; spacing: 6
-                    Rectangle { width: 14; height: 14; radius: 2; color: cTotalUl.checked ? "#fb923c" : "#ffffff"; border.color: "#94a3b8"; anchors.verticalCenter: parent.verticalCenter }
-                    Text { text: "总上传"; color: "#334155"; font.pixelSize: 11; anchors.verticalCenter: parent.verticalCenter }
+                    Rectangle { width: 14; height: 14; radius: 2; color: cTotalUl.checked ? "#fb923c" : root.colorCheckboxUnchecked; border.color: root.colorCheckboxBorder; anchors.verticalCenter: parent.verticalCenter }
+                    Text { text: "总上传"; color: root.colorSeriesLabel; font.pixelSize: 11; anchors.verticalCenter: parent.verticalCenter }
                 }
                 MouseArea { anchors.fill: parent; onClicked: { cTotalUl.checked = !cTotalUl.checked; canvas.requestPaint(); } }
             }
@@ -155,8 +188,8 @@ Item {
                 property bool checked: true
                 width: 128; height: 20
                 Row { anchors.fill: parent; spacing: 6
-                    Rectangle { width: 14; height: 14; radius: 2; color: cPayloadDl.checked ? "#38bdf8" : "#ffffff"; border.color: "#94a3b8"; anchors.verticalCenter: parent.verticalCenter }
-                    Text { text: "有效负荷下载"; color: "#334155"; font.pixelSize: 11; anchors.verticalCenter: parent.verticalCenter }
+                    Rectangle { width: 14; height: 14; radius: 2; color: cPayloadDl.checked ? "#38bdf8" : root.colorCheckboxUnchecked; border.color: root.colorCheckboxBorder; anchors.verticalCenter: parent.verticalCenter }
+                    Text { text: "有效负荷下载"; color: root.colorSeriesLabel; font.pixelSize: 11; anchors.verticalCenter: parent.verticalCenter }
                 }
                 MouseArea { anchors.fill: parent; onClicked: { cPayloadDl.checked = !cPayloadDl.checked; canvas.requestPaint(); } }
             }
@@ -165,46 +198,47 @@ Item {
                 property bool checked: true
                 width: 128; height: 20
                 Row { anchors.fill: parent; spacing: 6
-                    Rectangle { width: 14; height: 14; radius: 2; color: cPayloadUl.checked ? "#fb923c" : "#ffffff"; border.color: "#94a3b8"; anchors.verticalCenter: parent.verticalCenter }
-                    Text { text: "有效负荷上传"; color: "#334155"; font.pixelSize: 11; anchors.verticalCenter: parent.verticalCenter }
+                    Rectangle { width: 14; height: 14; radius: 2; color: cPayloadUl.checked ? "#fb923c" : root.colorCheckboxUnchecked; border.color: root.colorCheckboxBorder; anchors.verticalCenter: parent.verticalCenter }
+                    Text { text: "有效负荷上传"; color: root.colorSeriesLabel; font.pixelSize: 11; anchors.verticalCenter: parent.verticalCenter }
                 }
                 MouseArea { anchors.fill: parent; onClicked: { cPayloadUl.checked = !cPayloadUl.checked; canvas.requestPaint(); } }
             }
             Item { id: cOverDl; property bool checked: false; width: 128; height: 20
                 Row { anchors.fill: parent; spacing: 6
-                    Rectangle { width: 14; height: 14; radius: 2; color: cOverDl.checked ? "#38bdf8" : "#ffffff"; border.color: "#94a3b8"; anchors.verticalCenter: parent.verticalCenter }
-                    Text { text: "下载开销"; color: "#334155"; font.pixelSize: 11; anchors.verticalCenter: parent.verticalCenter } }
+                    Rectangle { width: 14; height: 14; radius: 2; color: cOverDl.checked ? "#38bdf8" : root.colorCheckboxUnchecked; border.color: root.colorCheckboxBorder; anchors.verticalCenter: parent.verticalCenter }
+                    Text { text: "下载开销"; color: root.colorSeriesLabel; font.pixelSize: 11; anchors.verticalCenter: parent.verticalCenter } }
                 MouseArea { anchors.fill: parent; onClicked: { cOverDl.checked = !cOverDl.checked; canvas.requestPaint(); } } }
             Item { id: cOverUl; property bool checked: false; width: 128; height: 20
                 Row { anchors.fill: parent; spacing: 6
-                    Rectangle { width: 14; height: 14; radius: 2; color: cOverUl.checked ? "#fb923c" : "#ffffff"; border.color: "#94a3b8"; anchors.verticalCenter: parent.verticalCenter }
-                    Text { text: "上传开销"; color: "#334155"; font.pixelSize: 11; anchors.verticalCenter: parent.verticalCenter } }
+                    Rectangle { width: 14; height: 14; radius: 2; color: cOverUl.checked ? "#fb923c" : root.colorCheckboxUnchecked; border.color: root.colorCheckboxBorder; anchors.verticalCenter: parent.verticalCenter }
+                    Text { text: "上传开销"; color: root.colorSeriesLabel; font.pixelSize: 11; anchors.verticalCenter: parent.verticalCenter } }
                 MouseArea { anchors.fill: parent; onClicked: { cOverUl.checked = !cOverUl.checked; canvas.requestPaint(); } } }
             Item { id: cDhtDl; property bool checked: false; width: 128; height: 20
                 Row { anchors.fill: parent; spacing: 6
-                    Rectangle { width: 14; height: 14; radius: 2; color: cDhtDl.checked ? "#38bdf8" : "#ffffff"; border.color: "#94a3b8"; anchors.verticalCenter: parent.verticalCenter }
-                    Text { text: "DHT下载"; color: "#334155"; font.pixelSize: 11; anchors.verticalCenter: parent.verticalCenter } }
+                    Rectangle { width: 14; height: 14; radius: 2; color: cDhtDl.checked ? "#38bdf8" : root.colorCheckboxUnchecked; border.color: root.colorCheckboxBorder; anchors.verticalCenter: parent.verticalCenter }
+                    Text { text: "DHT下载"; color: root.colorSeriesLabel; font.pixelSize: 11; anchors.verticalCenter: parent.verticalCenter } }
                 MouseArea { anchors.fill: parent; onClicked: { cDhtDl.checked = !cDhtDl.checked; canvas.requestPaint(); } } }
             Item { id: cDhtUl; property bool checked: false; width: 128; height: 20
                 Row { anchors.fill: parent; spacing: 6
-                    Rectangle { width: 14; height: 14; radius: 2; color: cDhtUl.checked ? "#fb923c" : "#ffffff"; border.color: "#94a3b8"; anchors.verticalCenter: parent.verticalCenter }
-                    Text { text: "DHT上传"; color: "#334155"; font.pixelSize: 11; anchors.verticalCenter: parent.verticalCenter } }
+                    Rectangle { width: 14; height: 14; radius: 2; color: cDhtUl.checked ? "#fb923c" : root.colorCheckboxUnchecked; border.color: root.colorCheckboxBorder; anchors.verticalCenter: parent.verticalCenter }
+                    Text { text: "DHT上传"; color: root.colorSeriesLabel; font.pixelSize: 11; anchors.verticalCenter: parent.verticalCenter } }
                 MouseArea { anchors.fill: parent; onClicked: { cDhtUl.checked = !cDhtUl.checked; canvas.requestPaint(); } } }
             Item { id: cTrDl; property bool checked: false; width: 128; height: 20
                 Row { anchors.fill: parent; spacing: 6
-                    Rectangle { width: 14; height: 14; radius: 2; color: cTrDl.checked ? "#38bdf8" : "#ffffff"; border.color: "#94a3b8"; anchors.verticalCenter: parent.verticalCenter }
-                    Text { text: "Tracker下载"; color: "#334155"; font.pixelSize: 11; anchors.verticalCenter: parent.verticalCenter } }
+                    Rectangle { width: 14; height: 14; radius: 2; color: cTrDl.checked ? "#38bdf8" : root.colorCheckboxUnchecked; border.color: root.colorCheckboxBorder; anchors.verticalCenter: parent.verticalCenter }
+                    Text { text: "Tracker下载"; color: root.colorSeriesLabel; font.pixelSize: 11; anchors.verticalCenter: parent.verticalCenter } }
                 MouseArea { anchors.fill: parent; onClicked: { cTrDl.checked = !cTrDl.checked; canvas.requestPaint(); } } }
             Item { id: cTrUl; property bool checked: false; width: 128; height: 20
                 Row { anchors.fill: parent; spacing: 6
-                    Rectangle { width: 14; height: 14; radius: 2; color: cTrUl.checked ? "#fb923c" : "#ffffff"; border.color: "#94a3b8"; anchors.verticalCenter: parent.verticalCenter }
-                    Text { text: "Tracker上传"; color: "#334155"; font.pixelSize: 11; anchors.verticalCenter: parent.verticalCenter } }
+                    Rectangle { width: 14; height: 14; radius: 2; color: cTrUl.checked ? "#fb923c" : root.colorCheckboxUnchecked; border.color: root.colorCheckboxBorder; anchors.verticalCenter: parent.verticalCenter }
+                    Text { text: "Tracker上传"; color: root.colorSeriesLabel; font.pixelSize: 11; anchors.verticalCenter: parent.verticalCenter } }
                 MouseArea { anchors.fill: parent; onClicked: { cTrUl.checked = !cTrUl.checked; canvas.requestPaint(); } } }
             }
         }
 
         Canvas {
             id: canvas
+            objectName: "speedChartCanvas"
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.top: controlsRow.bottom
@@ -286,6 +320,7 @@ Item {
             onPaint: {
                 var ctx = getContext("2d");
                 ctx.clearRect(0, 0, width, height);
+                var skin = canvas.parent.parent;
 
                 var cw = width - leftMargin - rightMargin;
                 var ch = height - topMargin - bottomMargin;
@@ -307,7 +342,7 @@ Item {
                 var tickStep = axisMax / tickCount;
 
                 // grid lines (aligned with ticks)
-                ctx.strokeStyle = "#e2e8f0";
+                ctx.strokeStyle = skin.colorGridMajor;
                 ctx.lineWidth = 1;
                 ctx.setLineDash([4, 3]);
                 for (var g = 0; g <= tickCount; g++) {
@@ -321,7 +356,7 @@ Item {
                 ctx.setLineDash([]);
 
                 // left axis and ticks
-                ctx.strokeStyle = "#94a3b8";
+                ctx.strokeStyle = skin.colorAxisLine;
                 ctx.lineWidth = 1;
                 ctx.beginPath();
                 ctx.moveTo(leftMargin, topMargin);
@@ -329,19 +364,20 @@ Item {
                 ctx.stroke();
                 // x-axis baseline (0 B/s) - draw thicker for visibility
                 var baseY = yOf(0, axisMax, topMargin, ch);
-                ctx.strokeStyle = "#64748b";
+                ctx.strokeStyle = skin.colorAxisBase;
                 ctx.lineWidth = 1.5;
                 ctx.beginPath();
                 ctx.moveTo(leftMargin, baseY);
                 ctx.lineTo(leftMargin + cw, baseY);
                 ctx.stroke();
 
-                ctx.fillStyle = "#64748b";
+                ctx.fillStyle = skin.colorTickLabel;
                 ctx.font = "10px sans-serif";
                 ctx.textAlign = "right";
                 for (var yi = 0; yi <= tickCount; yi++) {
                     var val = yi * tickStep;
                     var yy = yOf(val, axisMax, topMargin, ch);
+                    ctx.strokeStyle = skin.colorAxisLine;
                     ctx.beginPath();
                     ctx.moveTo(leftMargin - 4, yy);
                     ctx.lineTo(leftMargin, yy);
@@ -366,7 +402,7 @@ Item {
                     ctx.lineTo(legendX + 16, legendY + li * 14);
                     ctx.stroke();
                     ctx.setLineDash([]);
-                    ctx.fillStyle = "#334155";
+                    ctx.fillStyle = skin.colorLegendText;
                     ctx.font = "10px sans-serif";
                     ctx.textAlign = "left";
                     ctx.fillText(s.name + "（" + shapeLabel(shape) + "）", legendX + 20, legendY + 4 + li * 14);
@@ -392,7 +428,7 @@ Item {
                         }
                         ctx.lineTo(leftMargin + dx * (count - 1), topMargin + ch);
                         ctx.closePath();
-                        ctx.fillStyle = ss.up ? "rgba(251, 146, 60, 0.10)" : "rgba(56, 189, 248, 0.14)";
+                        ctx.fillStyle = ss.up ? skin.colorAreaUl : skin.colorAreaDl;
                         ctx.fill();
                     }
 

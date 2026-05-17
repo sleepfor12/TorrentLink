@@ -36,6 +36,10 @@ public:
   /// 仅更新「任务进度」列（与传输列表快照对齐）；由 MainWindow::refreshTasks 周期性调用。
   void refreshTaskProgressCells();
 
+Q_SIGNALS:
+  /// 已从网络执行 `refreshAllFeeds` 并 `saveState`；由 RssModulePage 连接以刷新订阅源等表格。
+  void rssFeedsReloaded();
+
 protected:
   void keyPressEvent(QKeyEvent* event) override;
   bool eventFilter(QObject* watched, QEvent* event) override;
@@ -47,6 +51,7 @@ private:
   void onSelectionChanged();
   void onDownloadClicked();
   void onFilterChanged();
+  void onRefreshAllFeedsClicked();
   void onCopyMagnet();
   void onOpenFolder();
   void onPlayClicked();
@@ -74,6 +79,7 @@ private:
   QPushButton* ignoreBtn_{nullptr};
   QTableWidget* itemTable_{nullptr};
   QTextBrowser* detailView_{nullptr};
+  QString lastFocusedItemId_;
 };
 
 }  // namespace pfd::ui::rss

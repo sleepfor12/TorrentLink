@@ -1,20 +1,17 @@
 #include "core/rss/rss_service.h"
 
 #include <QtCore/QDateTime>
+#include <QtCore/QScopeGuard>
 #include <QtCore/QSet>
 #include <QtCore/QUuid>
 
 #include <algorithm>
 
 #include "core/logger.h"
-#include "core/rss/rss_series_tracker.h"
 
 namespace pfd::core::rss {
 
 namespace {
-
-constexpr int kMaxRetryCount = 3;
-constexpr qint64 kRetryBackoffMs = 5LL * 60LL * 1000LL;
 
 void markItemDecision(RssItem& item, AutoDownloadDecision decision, const QString& reasonCode,
                       const QString& reasonText) {
@@ -23,20 +20,8 @@ void markItemDecision(RssItem& item, AutoDownloadDecision decision, const QStrin
   item.last_auto_reason_text = reasonText;
 }
 
-bool canRetryItem(const RssItem& item, const QDateTime& now) {
-  if (item.downloaded || item.ignored || item.queued) {
-    return false;
-  }
-  if (item.retry_count <= 0) {
-    return true;
-  }
-  if (item.retry_count >= kMaxRetryCount) {
-    return false;
-  }
-  if (!item.last_attempt_at.isValid()) {
-    return true;
-  }
-  return item.last_attempt_at.msecsTo(now) >= kRetryBackoffMs;
+[[nodiscard]] bool isDiagnosticAutoEligible(const QString& code) {
+  return code == QStringLiteral("diagnostic_rule_eligible");
 }
 
 }  // namespace
@@ -47,26 +32,52 @@ void RssService::loadState() {
   feeds_ = repository_.loadFeeds();
   items_ = repository_.loadItems();
   rules_ = repository_.loadRules();
-  series_ = repository_.loadSeries();
   settings_ = repository_.loadSettings();
   for (auto& item : items_) {
     // queued is process-local transient state; always reset on startup.
     item.queued = false;
+    item.rss_auto_waitlisted = false;
   }
   applySettings(settings_);
+  pruneItemsWithoutMatchingFeed();
   dedup_.buildIndex(items_);
-  LOG_INFO(QStringLiteral("[rss] State loaded: feeds=%1 items=%2 rules=%3 series=%4")
+  auto_backlog_scratch_.clear();
+  auto_backlog_scratch_.shrink_to_fit();
+  LOG_INFO(QStringLiteral("[rss] State loaded: feeds=%1 items=%2 rules=%3")
                .arg(feeds_.size())
                .arg(items_.size())
-               .arg(rules_.size())
-               .arg(series_.size()));
+               .arg(rules_.size()));
+}
+
+void RssService::pruneItemsWithoutMatchingFeed() {
+  QSet<QString> feed_ids;
+  feed_ids.reserve(static_cast<int>(feeds_.size()) + 1);
+  for (const auto& f : feeds_) {
+    feed_ids.insert(f.id);
+  }
+  const bool have_feeds = !feeds_.empty();
+  const std::size_t before = items_.size();
+  items_.erase(std::remove_if(items_.begin(), items_.end(),
+                              [&](const RssItem& x) {
+                                if (x.feed_id.isEmpty()) {
+                                  // 有订阅时仍无 feed_id 的条目无法归属来源，视为损坏数据
+                                  return have_feeds;
+                                }
+                                return !feed_ids.contains(x.feed_id);
+                              }),
+               items_.end());
+  if (items_.size() != before) {
+    LOG_WARN(
+        QStringLiteral("[rss] Pruned orphan items (feed_id has no feed) removed=%1 remaining=%2")
+            .arg(static_cast<int>(before - items_.size()))
+            .arg(items_.size()));
+  }
 }
 
 void RssService::saveState() const {
   repository_.saveFeeds(feeds_);
   repository_.saveItems(items_);
   repository_.saveRules(rules_);
-  repository_.saveSeries(series_);
   repository_.saveSettings(settings_);
 }
 
@@ -78,9 +89,6 @@ const std::vector<RssItem>& RssService::items() const {
 }
 const std::vector<RssRule>& RssService::rules() const {
   return rules_;
-}
-const std::vector<SeriesSubscription>& RssService::series() const {
-  return series_;
 }
 
 bool RssService::autoDownloadEnabled() const {
@@ -102,9 +110,16 @@ void RssService::setRequestHeaders(const RssFetcher::RequestHeaders& headers) {
   fetcher_.setRequestHeaders(headers);
 }
 
+void RssService::setHttpProxy(const RssFetcher::HttpProxyConfig& proxy) {
+  fetcher_.setHttpProxy(proxy);
+}
+
 void RssService::upsertFeed(const RssFeed& feed) {
-  auto it =
-      std::find_if(feeds_.begin(), feeds_.end(), [&](const RssFeed& x) { return x.id == feed.id; });
+  std::vector<RssFeed>::iterator it = feeds_.end();
+  if (!feed.id.isEmpty()) {
+    it = std::find_if(feeds_.begin(), feeds_.end(),
+                      [&](const RssFeed& x) { return x.id == feed.id; });
+  }
   if (it == feeds_.end() && !feed.url.isEmpty()) {
     it = std::find_if(feeds_.begin(), feeds_.end(),
                       [&](const RssFeed& x) { return x.url == feed.url; });
@@ -118,7 +133,23 @@ void RssService::upsertFeed(const RssFeed& feed) {
                  .arg(feeds_.back().id, feeds_.back().title)
                  .arg(feeds_.back().enabled ? QStringLiteral("true") : QStringLiteral("false")));
   } else {
+    // 按 URL 合并时，新传入的 feed 往往 id 为空；必须保留原 id，否则条目 feed_id 与刷新目标会错乱。
+    const RssFeed previous = *it;
+    const QString previousId = previous.id;
     *it = feed;
+    if (it->id.isEmpty()) {
+      it->id =
+          !previousId.isEmpty() ? previousId : QUuid::createUuid().toString(QUuid::WithoutBraces);
+    }
+    // 仅 id 为空（按 URL 命中已有订阅）时，传入对象常为只有 url/title 的默认构造，会误把
+    // auto_download 等刷回默认关。
+    if (feed.id.isEmpty()) {
+      it->enabled = previous.enabled;
+      it->auto_download_enabled = previous.auto_download_enabled;
+      it->last_refreshed_at = previous.last_refreshed_at;
+      it->last_success_refreshed_at = previous.last_success_refreshed_at;
+      it->last_error = previous.last_error;
+    }
     LOG_INFO(QStringLiteral("[rss] Feed updated id=%1 title=%2 enabled=%3")
                  .arg(it->id, it->title)
                  .arg(it->enabled ? QStringLiteral("true") : QStringLiteral("false")));
@@ -134,6 +165,7 @@ void RssService::removeFeed(const QString& feed_id) {
   items_.erase(std::remove_if(items_.begin(), items_.end(),
                               [&](const RssItem& x) { return x.feed_id == feed_id; }),
                items_.end());
+  pruneItemsWithoutMatchingFeed();
   dedup_.buildIndex(items_);
   LOG_INFO(QStringLiteral("[rss] Feed removed id=%1 feeds:%2->%3 items:%4->%5")
                .arg(feed_id)
@@ -189,45 +221,40 @@ void RssService::removeRule(const QString& rule_id) {
                rules_.end());
 }
 
-void RssService::upsertSeries(const SeriesSubscription& entry) {
-  auto it = std::find_if(series_.begin(), series_.end(),
-                         [&](const SeriesSubscription& x) { return x.id == entry.id; });
-  if (it == series_.end()) {
-    SeriesSubscription copy = entry;
-    if (copy.id.isEmpty())
-      copy.id = QUuid::createUuid().toString(QUuid::WithoutBraces);
-    series_.push_back(std::move(copy));
-  } else {
-    *it = entry;
-  }
-}
-
-void RssService::removeSeries(const QString& series_id) {
-  series_.erase(std::remove_if(series_.begin(), series_.end(),
-                               [&](const SeriesSubscription& x) { return x.id == series_id; }),
-                series_.end());
-}
-
 void RssService::refreshAllFeeds() {
-  auto_download_attempts_this_refresh_ = 0;
+  last_refresh_new_item_ids_.clear();
   for (auto& feed : feeds_) {
     if (feed.enabled) {
-      refreshFeed(feed.id);
-    }
-  }
-  const QDateTime now = QDateTime::currentDateTime();
-  for (auto& item : items_) {
-    if (auto_download_attempts_this_refresh_ >= max_auto_per_refresh_) {
-      break;
-    }
-    if (!canRetryItem(item, now)) {
-      continue;
-    }
-    if (tryAutoDownload(item) || trySeriesAutoDownload(item)) {
-      // attempts counted in try* methods
+      refreshFeedImpl(feed.id);
     }
   }
   pruneHistory();
+  pruneItemsWithoutMatchingFeed();
+  dedup_.buildIndex(items_);
+}
+
+void RssService::reloadItemStreamFromEnabledFeeds() {
+  QSet<QString> enabled_ids;
+  enabled_ids.reserve(static_cast<int>(feeds_.size()) + 1);
+  for (const auto& f : feeds_) {
+    if (f.enabled) {
+      enabled_ids.insert(f.id);
+    }
+  }
+  if (!enabled_ids.isEmpty()) {
+    const int before = static_cast<int>(items_.size());
+    items_.erase(std::remove_if(items_.begin(), items_.end(),
+                                [&](const RssItem& x) { return enabled_ids.contains(x.feed_id); }),
+                 items_.end());
+    dedup_.buildIndex(items_);
+    LOG_INFO(
+        QStringLiteral(
+            "[rss] Item stream reload: cleared items for %1 enabled feeds removed=%2 remaining=%3")
+            .arg(enabled_ids.size())
+            .arg(before - static_cast<int>(items_.size()))
+            .arg(items_.size()));
+  }
+  refreshAllFeeds();
 }
 
 void RssService::refreshFeed(const QString& feed_id) {
@@ -235,6 +262,19 @@ void RssService::refreshFeed(const QString& feed_id) {
       std::find_if(feeds_.begin(), feeds_.end(), [&](const RssFeed& x) { return x.id == feed_id; });
   if (fit == feeds_.end())
     return;
+  refreshFeedImpl(feed_id);
+}
+
+void RssService::refreshFeedImpl(const QString& feed_id) {
+  auto fit =
+      std::find_if(feeds_.begin(), feeds_.end(), [&](const RssFeed& x) { return x.id == feed_id; });
+  if (fit == feeds_.end())
+    return;
+
+  const QScopeGuard on_exit([this]() {
+    pruneItemsWithoutMatchingFeed();
+    dedup_.buildIndex(items_);
+  });
 
   LOG_INFO(QStringLiteral("[rss] Refreshing feed: %1 (%2)").arg(fit->title, fit->url));
 
@@ -264,21 +304,13 @@ void RssService::refreshFeed(const QString& feed_id) {
 
   int added = 0;
   for (auto& item : parseResult.items) {
-    dedup_.recordItem(item);
+    // dedupIncoming 已对保留项调用 recordItem，含同批次内去重。
+    last_refresh_new_item_ids_.insert(item.id);
     items_.push_back(std::move(item));
     ++added;
-    if (auto_download_attempts_this_refresh_ < max_auto_per_refresh_) {
-      if (tryAutoDownload(items_.back()) || trySeriesAutoDownload(items_.back())) {
-        // attempts counted inside the try* methods
-      }
-    }
   }
 
-  LOG_INFO(QStringLiteral("[rss] Feed %1: +%2 new items, auto-dl attempts this cycle: %3/%4")
-               .arg(fit->title)
-               .arg(added)
-               .arg(auto_download_attempts_this_refresh_)
-               .arg(max_auto_per_refresh_));
+  LOG_INFO(QStringLiteral("[rss] Feed %1: +%2 new items").arg(fit->title).arg(added));
 }
 
 void RssService::markItemRead(const QString& item_id) {
@@ -310,7 +342,7 @@ void RssService::markItemsIgnored(const QStringList& item_ids) {
 }
 
 void RssService::applyRssDownloadSettlement(const RssDownloadSettlement& s, bool success,
-                                            const QString& resolved_save_override) {
+                                            const QString& resolved_save_override, bool persist) {
   if (s.item_id.isEmpty()) {
     return;
   }
@@ -339,29 +371,7 @@ void RssService::applyRssDownloadSettlement(const RssDownloadSettlement& s, bool
     touched = true;
     break;
   }
-  if (!success) {
-    if (touched) {
-      saveState();
-    }
-    return;
-  }
-  if (!s.series_sub_id.isEmpty()) {
-    for (auto& sub : series_) {
-      if (sub.id != s.series_sub_id) {
-        continue;
-      }
-      if (s.series_episode >= 0) {
-        sub.last_episode_num = s.series_episode;
-      }
-      sub.last_episode =
-          QStringLiteral("S%1E%2")
-              .arg(s.series_season >= 0 ? s.series_season : 0, 2, 10, QLatin1Char('0'))
-              .arg(s.series_episode >= 0 ? s.series_episode : 0, 2, 10, QLatin1Char('0'));
-      touched = true;
-      break;
-    }
-  }
-  if (touched) {
+  if (touched && persist) {
     saveState();
   }
 }
@@ -450,27 +460,6 @@ std::vector<RuleMatchResult> RssService::evaluateItem(const RssItem& item) const
   return RssRuleEngine::evaluateAll(rules_, item);
 }
 
-std::optional<EpisodeInfo> RssService::parseEpisode(const QString& title) const {
-  return RssSeriesTracker::parseTitle(title);
-}
-
-std::optional<SeriesSubscription> RssService::matchSeries(const RssItem& item) const {
-  auto ep = RssSeriesTracker::parseTitle(item.title);
-  if (!ep.has_value())
-    return std::nullopt;
-
-  for (const auto& sub : series_) {
-    if (!sub.enabled)
-      continue;
-    if (!RssSeriesTracker::matchesSeries(*ep, sub))
-      continue;
-    if (!RssSeriesTracker::isNewerEpisode(*ep, sub))
-      continue;
-    return sub;
-  }
-  return std::nullopt;
-}
-
 void RssService::setHistoryPolicy(const HistoryPolicy& policy) {
   history_policy_ = policy;
 }
@@ -487,9 +476,16 @@ int RssService::pruneHistory() {
 
 void RssService::dedupIncoming(std::vector<RssItem>& incoming) {
   const int before = static_cast<int>(incoming.size());
-  incoming.erase(std::remove_if(incoming.begin(), incoming.end(),
-                                [&](const RssItem& it) { return dedup_.isDuplicate(it); }),
-                 incoming.end());
+  std::vector<RssItem> unique;
+  unique.reserve(incoming.size());
+  for (auto& it : incoming) {
+    if (dedup_.isDuplicate(it)) {
+      continue;
+    }
+    dedup_.recordItem(it);
+    unique.push_back(std::move(it));
+  }
+  incoming = std::move(unique);
   const int after = static_cast<int>(incoming.size());
   if (before != after) {
     LOG_INFO(
@@ -508,6 +504,9 @@ void RssService::applySettings(const RssSettings& s) {
   settings_.refresh_interval_minutes = std::clamp(settings_.refresh_interval_minutes, 5, 1440);
   settings_.max_auto_downloads_per_refresh =
       std::clamp(settings_.max_auto_downloads_per_refresh, 1, 100);
+  settings_.max_concurrent_auto_downloads =
+      std::clamp(settings_.max_concurrent_auto_downloads, 1, 50);
+  settings_.max_auto_download_backlog = std::clamp(settings_.max_auto_download_backlog, 1, 500);
   settings_.history_max_items = std::clamp(settings_.history_max_items, 100, 100000);
   settings_.history_max_age_days = std::clamp(settings_.history_max_age_days, 0, 3650);
   settings_.external_player_command = settings_.external_player_command.trimmed();
@@ -517,48 +516,216 @@ void RssService::applySettings(const RssSettings& s) {
   history_policy_.max_age_days = settings_.history_max_age_days;
 }
 
-bool RssService::tryAutoDownload(RssItem& item) {
+const QSet<QString>& RssService::lastRefreshNewItemIds() const {
+  return last_refresh_new_item_ids_;
+}
+
+int RssService::effectiveAutoDownloadBacklogCap() const {
+  return std::clamp(settings_.max_auto_download_backlog, 1, 500);
+}
+
+void RssService::applyAutoDownloadBacklogOverflowMarkers() {
+  if (!auto_download_enabled_) {
+    return;
+  }
+  rebuildAutoBacklogScratch(RssAutoDownloadScope::kAllEligible);
+  QSet<QString> tracked;
+  tracked.reserve(static_cast<int>(auto_backlog_scratch_.size()) + 1);
+  for (const std::size_t idx : auto_backlog_scratch_) {
+    tracked.insert(items_[idx].id);
+  }
+  for (auto& it : items_) {
+    if (it.queued || it.downloaded || it.ignored) {
+      continue;
+    }
+    if (!isDiagnosticAutoEligible(it.last_auto_reason_code)) {
+      continue;
+    }
+    if (tracked.contains(it.id)) {
+      continue;
+    }
+    markItemDecision(it, AutoDownloadDecision::kSkipped, QStringLiteral("auto_backlog_overflow"),
+                     QStringLiteral("符合条件但超出自动下载排队上限，将随进度陆续入队。"));
+  }
+}
+
+void RssService::refreshAutoDownloadDiagnostics() {
+  for (auto& it : items_) {
+    diagnoseItemAutoDownloadState(it);
+  }
+  applyAutoDownloadBacklogOverflowMarkers();
+  syncRssAutoWaitlistMarkers(RssAutoDownloadScope::kAllEligible);
+}
+
+void RssService::refreshAutoDownloadDiagnosticsForFeed(const QString& feed_id) {
+  if (feed_id.isEmpty()) {
+    return;
+  }
+  for (auto& it : items_) {
+    if (it.feed_id == feed_id) {
+      diagnoseItemAutoDownloadState(it);
+    }
+  }
+  applyAutoDownloadBacklogOverflowMarkers();
+  syncRssAutoWaitlistMarkers(RssAutoDownloadScope::kAllEligible);
+}
+
+bool RssService::itemMatchesAutoDownloadScope(const RssItem& item,
+                                              RssAutoDownloadScope scope) const {
+  if (scope == RssAutoDownloadScope::kNewItemsOnly) {
+    return last_refresh_new_item_ids_.contains(item.id);
+  }
+  return true;
+}
+
+void RssService::rebuildAutoBacklogScratch(RssAutoDownloadScope scope) {
+  auto_backlog_scratch_.clear();
+  const std::size_t n = items_.size();
+  if (n == 0) {
+    return;
+  }
+  auto_backlog_scratch_.reserve(n / 8 + 1);
+  for (std::size_t i = 0; i < n; ++i) {
+    const RssItem& it = items_[i];
+    if (!itemMatchesAutoDownloadScope(it, scope)) {
+      continue;
+    }
+    if (it.queued || it.downloaded || it.ignored) {
+      continue;
+    }
+    if (it.magnet.isEmpty() && it.torrent_url.isEmpty()) {
+      continue;
+    }
+    if (!isDiagnosticAutoEligible(it.last_auto_reason_code)) {
+      continue;
+    }
+    auto_backlog_scratch_.push_back(i);
+  }
+  const auto publishedDesc = [this](std::size_t ia, std::size_t ib) {
+    const RssItem& a = items_[ia];
+    const RssItem& b = items_[ib];
+    const QDateTime ta =
+        a.published_at.isValid() ? a.published_at : QDateTime::fromSecsSinceEpoch(0);
+    const QDateTime tb =
+        b.published_at.isValid() ? b.published_at : QDateTime::fromSecsSinceEpoch(0);
+    return ta > tb;
+  };
+  const int backlogCap = effectiveAutoDownloadBacklogCap();
+  if (static_cast<int>(auto_backlog_scratch_.size()) <= backlogCap) {
+    std::sort(auto_backlog_scratch_.begin(), auto_backlog_scratch_.end(), publishedDesc);
+  } else {
+    std::partial_sort(auto_backlog_scratch_.begin(), auto_backlog_scratch_.begin() + backlogCap,
+                      auto_backlog_scratch_.end(), publishedDesc);
+    auto_backlog_scratch_.resize(static_cast<std::size_t>(backlogCap));
+  }
+}
+
+void RssService::syncRssAutoWaitlistMarkers(RssAutoDownloadScope scope) {
+  int inflight = 0;
+  for (auto& it : items_) {
+    if (scope == RssAutoDownloadScope::kAllEligible || itemMatchesAutoDownloadScope(it, scope)) {
+      it.rss_auto_waitlisted = false;
+    }
+    if (it.queued) {
+      ++inflight;
+    }
+  }
+  if (!auto_download_enabled_) {
+    auto_backlog_scratch_.clear();
+    return;
+  }
+  rebuildAutoBacklogScratch(scope);
+  const int maxConc = std::clamp(settings_.max_concurrent_auto_downloads, 1, 50);
+  const int freeSlots = std::max(0, maxConc - inflight);
+  for (int i = freeSlots; i < static_cast<int>(auto_backlog_scratch_.size()); ++i) {
+    items_[auto_backlog_scratch_[static_cast<std::size_t>(i)]].rss_auto_waitlisted = true;
+  }
+}
+
+int RssService::dispatchDeferredAutoDownloads(int max_batch, bool refresh_diagnosis,
+                                              RssAutoDownloadScope scope) {
+  if (!auto_download_enabled_) {
+    return 0;
+  }
+  const int cap = std::clamp(max_batch, 1, 100);
+  const int maxConc = std::clamp(settings_.max_concurrent_auto_downloads, 1, 50);
+
+  if (refresh_diagnosis) {
+    for (auto& it : items_) {
+      diagnoseItemAutoDownloadState(it);
+    }
+  }
+
+  int inflight = 0;
+  for (const auto& it : items_) {
+    if (it.queued) {
+      ++inflight;
+    }
+  }
+
+  rebuildAutoBacklogScratch(scope);
+  std::size_t scratchPos = 0;
+  int started = 0;
+  while (started < cap && inflight < maxConc && scratchPos < auto_backlog_scratch_.size()) {
+    RssItem& it = items_[auto_backlog_scratch_[scratchPos++]];
+    if (it.queued || it.downloaded || it.ignored) {
+      continue;
+    }
+    if (!isDiagnosticAutoEligible(it.last_auto_reason_code)) {
+      continue;
+    }
+    if (!downloadItem(it.id)) {
+      // 单条失败（如回调暂不可用）不阻塞其余候选；连续失败由 cap / 空槽终止。
+      continue;
+    }
+    ++started;
+    ++inflight;
+  }
+
+  applyAutoDownloadBacklogOverflowMarkers();
+  syncRssAutoWaitlistMarkers(scope);
+  return started;
+}
+
+void RssService::diagnoseItemAutoDownloadState(RssItem& item) {
   if (!auto_download_enabled_) {
     markItemDecision(item, AutoDownloadDecision::kSkipped, QStringLiteral("global_disabled"),
                      QStringLiteral("Global auto download is disabled."));
-    LOG_DEBUG(QStringLiteral("[rss] Auto-download skipped(global off) item=%1").arg(item.id));
-    return false;
+    return;
   }
   if (item.magnet.isEmpty() && item.torrent_url.isEmpty()) {
     markItemDecision(item, AutoDownloadDecision::kSkipped, QStringLiteral("no_resource"),
                      QStringLiteral("No magnet or torrent URL."));
-    LOG_DEBUG(
-        QStringLiteral("[rss] Auto-download skipped(no magnet/torrent URL) item=%1").arg(item.id));
-    return false;
+    return;
   }
   if (item.downloaded || item.ignored || item.queued) {
     markItemDecision(item, AutoDownloadDecision::kSkipped, QStringLiteral("state_blocked"),
                      QStringLiteral("Item is downloaded/ignored/queued."));
-    LOG_DEBUG(QStringLiteral(
-                  "[rss] Auto-download skipped(state downloaded=%1 ignored=%2 queued=%3) item=%4")
-                  .arg(item.downloaded ? QStringLiteral("true") : QStringLiteral("false"))
-                  .arg(item.ignored ? QStringLiteral("true") : QStringLiteral("false"))
-                  .arg(item.queued ? QStringLiteral("true") : QStringLiteral("false"))
-                  .arg(item.id));
-    return false;
+    return;
   }
+  diagnoseRuleAutoDownloadState(item);
+}
 
+void RssService::diagnoseRuleAutoDownloadState(RssItem& item) {
   auto fit = std::find_if(feeds_.begin(), feeds_.end(),
                           [&](const RssFeed& x) { return x.id == item.feed_id; });
-  if (fit == feeds_.end() || !fit->auto_download_enabled) {
-    markItemDecision(item, AutoDownloadDecision::kSkipped, QStringLiteral("feed_disabled"),
-                     QStringLiteral("Feed auto download is disabled."));
-    LOG_DEBUG(QStringLiteral("[rss] Auto-download skipped(feed disabled/missing) feed=%1 item=%2")
-                  .arg(item.feed_id, item.id));
-    return false;
+  if (fit == feeds_.end()) {
+    markItemDecision(
+        item, AutoDownloadDecision::kSkipped, QStringLiteral("unknown_feed"),
+        QStringLiteral("条目的 feed_id 与当前订阅列表不一致（可能为历史数据或合并订阅导致）。"));
+    return;
+  }
+  if (!fit->auto_download_enabled) {
+    markItemDecision(item, AutoDownloadDecision::kSkipped, QStringLiteral("feed_auto_off"),
+                     QStringLiteral("该订阅源已关闭「自动下载」。"));
+    return;
   }
 
   auto match = RssRuleEngine::findFirstEnabledMatch(rules_, item);
   if (!match.has_value()) {
     markItemDecision(item, AutoDownloadDecision::kSkipped, QStringLiteral("no_rule_match"),
                      QStringLiteral("No rule matched."));
-    LOG_DEBUG(QStringLiteral("[rss] Auto-download skipped(no rule match) item=%1").arg(item.id));
-    return false;
+    return;
   }
 
   auto rit = std::find_if(rules_.begin(), rules_.end(),
@@ -566,122 +733,15 @@ bool RssService::tryAutoDownload(RssItem& item) {
   if (rit == rules_.end()) {
     markItemDecision(item, AutoDownloadDecision::kFailed, QStringLiteral("rule_missing"),
                      QStringLiteral("Matched rule not found."));
-    LOG_WARN(QStringLiteral("[rss] Auto-download matched missing rule rule_id=%1 item=%2")
-                 .arg(match->rule_id, item.id));
-    return false;
+    return;
   }
-
   if (!on_download_request_) {
     markItemDecision(item, AutoDownloadDecision::kFailed, QStringLiteral("no_callback"),
                      QStringLiteral("Download callback is not set."));
-    LOG_WARN(QStringLiteral("[rss] Auto-download matched but no callback item=%1").arg(item.id));
-    return false;
+    return;
   }
-
-  AutoDownloadRequest req;
-  req.magnet = item.magnet;
-  req.torrent_url = item.torrent_url;
-  req.save_path = rit->save_path;
-  req.category = rit->category;
-  req.tags_csv = rit->tags_csv;
-  req.rule_id = rit->id;
-  req.item_id = item.id;
-  req.feed_id = item.feed_id;
-  req.item_title = item.title;
-  req.referer_url = fit->url;
-  req.rss_settlement.item_id = item.id;
-  req.rss_settlement.record_save_path = rit->save_path;
-  req.add_without_interactive_confirm = true;
-  item.queued = true;
-  item.last_attempt_at = QDateTime::currentDateTime();
-  markItemDecision(item, AutoDownloadDecision::kQueued, QStringLiteral("rule_queued"),
-                   QStringLiteral("Queued by auto-download rule."));
-  ++auto_download_attempts_this_refresh_;
-  on_download_request_(req);
-  LOG_INFO(QStringLiteral("[rss] Auto-download: \"%1\" rule=\"%2\" feed=%3 item=%4")
-               .arg(item.title, match->rule_name, item.feed_id, item.id));
-  return true;
-}
-
-bool RssService::trySeriesAutoDownload(RssItem& item) {
-  if (!auto_download_enabled_) {
-    markItemDecision(item, AutoDownloadDecision::kSkipped, QStringLiteral("global_disabled"),
-                     QStringLiteral("Global auto download is disabled."));
-    return false;
-  }
-  if ((item.magnet.isEmpty() && item.torrent_url.isEmpty()) || item.downloaded || item.ignored ||
-      item.queued) {
-    markItemDecision(item, AutoDownloadDecision::kSkipped, QStringLiteral("state_blocked"),
-                     QStringLiteral("Item is downloaded/ignored/queued."));
-    return false;
-  }
-
-  auto ep = RssSeriesTracker::parseTitle(item.title);
-  if (!ep.has_value()) {
-    markItemDecision(item, AutoDownloadDecision::kSkipped, QStringLiteral("episode_parse_failed"),
-                     QStringLiteral("Failed to parse episode from title."));
-    LOG_DEBUG(QStringLiteral("[rss] Series auto-download skipped(parse episode failed) item=%1")
-                  .arg(item.id));
-    return false;
-  }
-
-  auto fit = std::find_if(feeds_.begin(), feeds_.end(),
-                          [&](const RssFeed& x) { return x.id == item.feed_id; });
-  const QString referer = fit != feeds_.end() ? fit->url : QString();
-
-  for (auto& sub : series_) {
-    if (!sub.enabled || !sub.auto_download_enabled)
-      continue;
-    if (!RssSeriesTracker::matchesSeries(*ep, sub))
-      continue;
-    if (!RssSeriesTracker::isNewerEpisode(*ep, sub))
-      continue;
-
-    if (!sub.quality_keywords.isEmpty()) {
-      bool qualityOk = false;
-      for (const auto& q : sub.quality_keywords) {
-        if (item.title.contains(q, Qt::CaseInsensitive)) {
-          qualityOk = true;
-          break;
-        }
-      }
-      if (!qualityOk)
-        continue;
-    }
-
-    if (on_download_request_) {
-      AutoDownloadRequest req;
-      req.magnet = item.magnet;
-      req.torrent_url = item.torrent_url;
-      req.save_path = sub.save_path;
-      req.item_id = item.id;
-      req.feed_id = item.feed_id;
-      req.item_title = item.title;
-      req.referer_url = referer;
-      req.rss_settlement.item_id = item.id;
-      req.rss_settlement.record_save_path = sub.save_path;
-      req.rss_settlement.series_sub_id = sub.id;
-      req.rss_settlement.series_episode = ep->episode;
-      req.rss_settlement.series_season = ep->season >= 0 ? ep->season : 0;
-      req.add_without_interactive_confirm = true;
-      item.queued = true;
-      item.last_attempt_at = QDateTime::currentDateTime();
-      markItemDecision(item, AutoDownloadDecision::kQueued, QStringLiteral("series_queued"),
-                       QStringLiteral("Queued by series subscription."));
-      ++auto_download_attempts_this_refresh_;
-      on_download_request_(req);
-      LOG_INFO(QStringLiteral("[rss] Series auto-download: \"%1\" series=\"%2\" ep=%3 feed=%4")
-                   .arg(item.title, sub.name)
-                   .arg(ep->episode)
-                   .arg(item.feed_id));
-    }
-    return true;
-  }
-  markItemDecision(item, AutoDownloadDecision::kSkipped, QStringLiteral("series_no_match"),
-                   QStringLiteral("No matching enabled series rule."));
-  LOG_DEBUG(QStringLiteral("[rss] Series auto-download no match item=%1 title=%2")
-                .arg(item.id, item.title.left(80)));
-  return false;
+  markItemDecision(item, AutoDownloadDecision::kSkipped, QStringLiteral("diagnostic_rule_eligible"),
+                   QStringLiteral("Rule would auto-download (diagnostic only)."));
 }
 
 }  // namespace pfd::core::rss

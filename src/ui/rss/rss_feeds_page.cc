@@ -103,10 +103,11 @@ void RssFeedsPage::buildLayout() {
   feedTable_->setRowCount(0);
   root->addWidget(feedTable_, 1);
 
-  auto* hint =
-      new QLabel(QStringLiteral("提示：自动下载默认关闭，需在设置页、订阅源和规则页三处均手动开启后"
-                                "才会生效。表格支持多选，右键可刷新、编辑、复制链接等。"),
-                 this);
+  auto* hint = new QLabel(
+      QStringLiteral("提示：RSS 自动下载需在设置页开启全局开关，并在本页为订阅源开启「自动下载」，"
+                     "在「自动规则」页配置并启用匹配规则。"
+                     "表格支持多选，右键可刷新、编辑、复制链接等。"),
+      this);
   hint->setStyleSheet(QStringLiteral("color:#6b7280;font-size:12px;"));
   root->addWidget(hint);
 }
@@ -148,6 +149,7 @@ void RssFeedsPage::removeFeedsByIds(const QStringList& ids) {
   }
   service_->saveState();
   refreshTable();
+  emit rssFeedsDataChanged();
 }
 
 void RssFeedsPage::editFeedById(const QString& feedId) {
@@ -191,115 +193,129 @@ void RssFeedsPage::editFeedById(const QString& feedId) {
 }
 
 void RssFeedsPage::showFeedContextMenu(const QPoint& pos) {
-  if (!service_ || feedTable_ == nullptr)
+  if (!service_ || feedTable_ == nullptr || feedTable_->selectionModel() == nullptr)
     return;
 
-  QModelIndexList rows = feedTable_->selectionModel()->selectedRows();
-  if (rows.isEmpty()) {
-    const int r = feedTable_->rowAt(pos.y());
-    if (r >= 0) {
-      feedTable_->selectRow(r);
-      rows = feedTable_->selectionModel()->selectedRows();
+  // customContextMenuRequested 的坐标相对于 viewport；以鼠标下单元格为准，避免
+  // 「多选 / 仅当前格无选中行」时 selectedRows() 为空或条数≠1 导致无法出现「编辑」等项。
+  const QModelIndex underMouse = feedTable_->indexAt(pos);
+  if (feedTable_->selectionModel()->selectedRows().isEmpty() && underMouse.isValid()) {
+    feedTable_->selectRow(underMouse.row());
+  }
+
+  int pivotRow = -1;
+  if (underMouse.isValid()) {
+    pivotRow = underMouse.row();
+  } else {
+    const QModelIndexList rows = feedTable_->selectionModel()->selectedRows();
+    if (!rows.isEmpty()) {
+      pivotRow = rows.front().row();
     }
   }
-  if (rows.isEmpty())
+  if (pivotRow < 0 || pivotRow >= feedTable_->rowCount())
+    return;
+
+  QTableWidgetItem* nameItem = feedTable_->item(pivotRow, 0);
+  if (nameItem == nullptr)
+    return;
+  const QString feedId = nameItem->data(Qt::UserRole).toString();
+  if (feedId.isEmpty())
+    return;
+  const auto f = service_->findFeed(feedId);
+  if (!f.has_value())
     return;
 
   const QPoint globalPos = feedTable_->viewport()->mapToGlobal(pos);
   QMenu menu(this);
 
-  if (rows.size() == 1) {
-    const int row = rows.front().row();
-    QTableWidgetItem* nameItem = feedTable_->item(row, 0);
-    if (nameItem == nullptr)
-      return;
-    const QString feedId = nameItem->data(Qt::UserRole).toString();
-    if (feedId.isEmpty())
-      return;
-    const auto f = service_->findFeed(feedId);
-    if (!f.has_value())
-      return;
-
-    menu.addAction(QStringLiteral("刷新此订阅"), this, [this, feedId]() {
-      service_->refreshFeed(feedId);
-      service_->saveState();
-      refreshTable();
-    });
-    menu.addSeparator();
-    menu.addAction(QStringLiteral("复制订阅链接"), this, [u = f->url]() {
-      if (!u.isEmpty()) {
-        QApplication::clipboard()->setText(u);
-      }
-    });
-    menu.addAction(QStringLiteral("复制订阅 ID"), this, [id = f->id]() {
-      if (!id.isEmpty()) {
-        QApplication::clipboard()->setText(id);
-      }
-    });
-    menu.addAction(QStringLiteral("在浏览器中打开"), this, [u = f->url]() {
-      if (!u.isEmpty()) {
-        QDesktopServices::openUrl(QUrl::fromUserInput(u));
-      }
-    });
-    menu.addSeparator();
-    menu.addAction(QStringLiteral("编辑名称与地址…"), this,
-                   [this, feedId]() { editFeedById(feedId); });
-    menu.addAction(f->enabled ? QStringLiteral("暂停此订阅") : QStringLiteral("启用此订阅"), this,
-                   [this, feed = *f]() mutable {
-                     feed.enabled = !feed.enabled;
-                     service_->upsertFeed(feed);
-                     service_->saveState();
-                     refreshTable();
-                   });
-    menu.addAction(f->auto_download_enabled ? QStringLiteral("关闭此订阅自动下载")
-                                            : QStringLiteral("开启此订阅自动下载"),
-                   this, [this, feed = *f]() mutable {
-                     feed.auto_download_enabled = !feed.auto_download_enabled;
-                     service_->upsertFeed(feed);
-                     service_->saveState();
-                     refreshTable();
-                   });
-    if (!f->last_error.isEmpty()) {
-      menu.addAction(QStringLiteral("清除错误信息"), this, [this, feed = *f]() mutable {
-        feed.last_error.clear();
-        service_->upsertFeed(feed);
-        service_->saveState();
-        refreshTable();
-      });
+  menu.addAction(QStringLiteral("刷新此订阅"), this, [this, feedId]() {
+    service_->refreshFeed(feedId);
+    service_->saveState();
+    refreshTable();
+    emit rssFeedsDataChanged();
+  });
+  menu.addSeparator();
+  menu.addAction(QStringLiteral("复制订阅链接"), this, [u = f->url]() {
+    if (!u.isEmpty()) {
+      QApplication::clipboard()->setText(u);
     }
-    menu.addSeparator();
-    menu.addAction(QStringLiteral("清空本地条目（不删订阅）…"), this, [this, feedId]() {
-      const auto r = QMessageBox::question(
-          this, QStringLiteral("清空本地条目"),
-          QStringLiteral("将删除该订阅源下已缓存的所有条目，订阅地址本身保留。\n"
-                         "之后再次刷新订阅时，若 RSS 仍包含相同条目，会重新出现在列表中。\n\n"
-                         "确定继续？"),
-          QMessageBox::Yes | QMessageBox::No, QMessageBox::No);
-      if (r != QMessageBox::Yes)
-        return;
-      service_->clearItemsForFeed(feedId);
+  });
+  menu.addAction(QStringLiteral("复制订阅 ID"), this, [id = f->id]() {
+    if (!id.isEmpty()) {
+      QApplication::clipboard()->setText(id);
+    }
+  });
+  menu.addAction(QStringLiteral("在浏览器中打开"), this, [u = f->url]() {
+    if (!u.isEmpty()) {
+      QDesktopServices::openUrl(QUrl::fromUserInput(u));
+    }
+  });
+  menu.addSeparator();
+  menu.addAction(QStringLiteral("编辑名称与地址…"), this,
+                 [this, feedId]() { editFeedById(feedId); });
+  menu.addAction(f->enabled ? QStringLiteral("暂停此订阅") : QStringLiteral("启用此订阅"), this,
+                 [this, feed = *f]() mutable {
+                   feed.enabled = !feed.enabled;
+                   service_->upsertFeed(feed);
+                   service_->refreshAutoDownloadDiagnosticsForFeed(feed.id);
+                   service_->saveState();
+                   refreshTable();
+                   emit rssFeedsDataChanged();
+                 });
+  menu.addAction(f->auto_download_enabled ? QStringLiteral("关闭此订阅自动下载")
+                                          : QStringLiteral("开启此订阅自动下载"),
+                 this, [this, feed = *f]() mutable {
+                   feed.auto_download_enabled = !feed.auto_download_enabled;
+                   service_->upsertFeed(feed);
+                   service_->refreshAutoDownloadDiagnosticsForFeed(feed.id);
+                   service_->saveState();
+                   refreshTable();
+                   emit rssFeedsDataChanged();
+                 });
+  if (!f->last_error.isEmpty()) {
+    menu.addAction(QStringLiteral("清除错误信息"), this, [this, feed = *f]() mutable {
+      feed.last_error.clear();
+      service_->upsertFeed(feed);
       service_->saveState();
       refreshTable();
     });
-    menu.addAction(QStringLiteral("删除此订阅…"), this, [this, feedId]() {
-      const auto r =
-          QMessageBox::question(this, QStringLiteral("删除订阅"),
-                                QStringLiteral("确定删除该订阅及其条目吗？此操作不可撤销。"),
-                                QMessageBox::Yes | QMessageBox::No, QMessageBox::No);
-      if (r != QMessageBox::Yes)
-        return;
-      removeFeedsByIds({feedId});
-    });
-  } else {
-    const QStringList ids = selectedFeedIds();
+  }
+  menu.addSeparator();
+  menu.addAction(QStringLiteral("清空本地条目（不删订阅）…"), this, [this, feedId]() {
+    const auto r = QMessageBox::question(
+        this, QStringLiteral("清空本地条目"),
+        QStringLiteral("将删除该订阅源下已缓存的所有条目，订阅地址本身保留。\n"
+                       "之后再次刷新订阅时，若 RSS 仍包含相同条目，会重新出现在列表中。\n\n"
+                       "确定继续？"),
+        QMessageBox::Yes | QMessageBox::No, QMessageBox::No);
+    if (r != QMessageBox::Yes)
+      return;
+    service_->clearItemsForFeed(feedId);
+    service_->saveState();
+    refreshTable();
+    emit rssFeedsDataChanged();
+  });
+  menu.addAction(QStringLiteral("删除此订阅…"), this, [this, feedId]() {
+    const auto r =
+        QMessageBox::question(this, QStringLiteral("删除订阅"),
+                              QStringLiteral("确定删除该订阅及其条目吗？此操作不可撤销。"),
+                              QMessageBox::Yes | QMessageBox::No, QMessageBox::No);
+    if (r != QMessageBox::Yes)
+      return;
+    removeFeedsByIds({feedId});
+  });
+
+  const QStringList ids = selectedFeedIds();
+  if (ids.size() > 1) {
+    menu.addSeparator();
     menu.addAction(QStringLiteral("刷新选中订阅（%1）").arg(ids.size()), this, [this, ids]() {
       for (const QString& id : ids) {
         service_->refreshFeed(id);
       }
       service_->saveState();
       refreshTable();
+      emit rssFeedsDataChanged();
     });
-    menu.addSeparator();
     menu.addAction(QStringLiteral("清空选中订阅的本地条目…"), this, [this, ids]() {
       const auto r = QMessageBox::question(
           this, QStringLiteral("清空本地条目"),
@@ -313,6 +329,7 @@ void RssFeedsPage::showFeedContextMenu(const QPoint& pos) {
       service_->clearItemsForFeeds(ids);
       service_->saveState();
       refreshTable();
+      emit rssFeedsDataChanged();
     });
     menu.addAction(QStringLiteral("删除选中订阅…"), this, [this, ids]() {
       const auto r = QMessageBox::question(
@@ -341,10 +358,22 @@ void RssFeedsPage::onAddFeed() {
   feed.url = url;
   feed.title = url;
   service_->upsertFeed(feed);
-  service_->refreshFeed(service_->feeds().back().id);
+
+  QString feedIdForRefresh;
+  for (const auto& f : service_->feeds()) {
+    if (f.url == url) {
+      feedIdForRefresh = f.id;
+      break;
+    }
+  }
+  if (!feedIdForRefresh.isEmpty()) {
+    service_->refreshFeed(feedIdForRefresh);
+  }
+
   service_->saveState();
   feedUrlEdit_->clear();
   refreshTable();
+  emit rssFeedsDataChanged();
 }
 
 void RssFeedsPage::onRefreshAll() {
@@ -353,6 +382,8 @@ void RssFeedsPage::onRefreshAll() {
   service_->refreshAllFeeds();
   service_->saveState();
   refreshTable();
+  emit rssFeedsDataChanged();
+  emit rssNetworkRefreshFinished();
 }
 
 void RssFeedsPage::onRemoveSelected() {

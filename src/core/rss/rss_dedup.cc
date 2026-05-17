@@ -4,6 +4,7 @@
 
 #include <algorithm>
 
+#include "base/input_sanitizer.h"
 #include "core/logger.h"
 
 namespace pfd::core::rss {
@@ -27,6 +28,21 @@ QString RssDedup::normalizeTorrentUrl(const QString& torrentUrl) {
   return torrentUrl.trimmed().toLower();
 }
 
+namespace {
+
+/// 将 guid / 链接 / 种子 URL 等与 feed_id 绑定，避免多个订阅源镜像相同内容时误判为全局重复。
+QString feedScopeKey(const QString& feed_id, const QString& key) {
+  if (key.isEmpty()) {
+    return {};
+  }
+  if (feed_id.isEmpty()) {
+    return key;
+  }
+  return feed_id + QChar(0x1e) + key;
+}
+
+}  // namespace
+
 void RssDedup::buildIndex(const std::vector<RssItem>& existing) {
   known_ids_.clear();
   known_guids_.clear();
@@ -49,19 +65,19 @@ void RssDedup::recordItem(const RssItem& item) {
   if (!item.id.isEmpty())
     known_ids_.insert(item.id);
   if (!item.guid.isEmpty())
-    known_guids_.insert(item.guid);
+    known_guids_.insert(feedScopeKey(item.feed_id, item.guid));
   if (!item.link.isEmpty())
-    known_links_.insert(item.link);
+    known_links_.insert(feedScopeKey(item.feed_id, item.link));
   if (!item.torrent_url.isEmpty()) {
     const QString normalized = normalizeTorrentUrl(item.torrent_url);
     if (!normalized.isEmpty()) {
-      known_torrent_urls_.insert(normalized);
+      known_torrent_urls_.insert(feedScopeKey(item.feed_id, normalized));
     }
   }
   if (!item.magnet.isEmpty()) {
     const auto ih = extractInfoHash(item.magnet);
     if (!ih.isEmpty())
-      known_infohashes_.insert(ih);
+      known_infohashes_.insert(feedScopeKey(item.feed_id, ih));
   }
 }
 
@@ -69,20 +85,21 @@ bool RssDedup::isDuplicate(const RssItem& item) const {
   if (!item.id.isEmpty() && known_ids_.count(item.id) > 0)
     return true;
 
-  if (!item.guid.isEmpty() && known_guids_.count(item.guid) > 0)
+  if (!item.guid.isEmpty() && known_guids_.count(feedScopeKey(item.feed_id, item.guid)) > 0)
     return true;
 
-  if (!item.link.isEmpty() && known_links_.count(item.link) > 0)
+  if (!item.link.isEmpty() && known_links_.count(feedScopeKey(item.feed_id, item.link)) > 0)
     return true;
   if (!item.torrent_url.isEmpty()) {
     const QString normalized = normalizeTorrentUrl(item.torrent_url);
-    if (!normalized.isEmpty() && known_torrent_urls_.count(normalized) > 0)
+    if (!normalized.isEmpty() &&
+        known_torrent_urls_.count(feedScopeKey(item.feed_id, normalized)) > 0)
       return true;
   }
 
   if (!item.magnet.isEmpty()) {
     const auto ih = extractInfoHash(item.magnet);
-    if (!ih.isEmpty() && known_infohashes_.count(ih) > 0)
+    if (!ih.isEmpty() && known_infohashes_.count(feedScopeKey(item.feed_id, ih)) > 0)
       return true;
   }
   return false;

@@ -39,6 +39,19 @@ TEST(RssDedup, DedupByGuid) {
   EXPECT_TRUE(dedup.isDuplicate(newItem));
 }
 
+TEST(RssDedup, SameGuidDifferentFeedsNotDuplicate) {
+  RssDedup dedup;
+  RssItem a = makeItem(QStringLiteral("id-a"), QStringLiteral("shared-guid"));
+  a.feed_id = QStringLiteral("feed-1");
+  RssItem b = makeItem(QStringLiteral("id-b"), QStringLiteral("shared-guid"));
+  b.feed_id = QStringLiteral("feed-2");
+  dedup.buildIndex({a});
+
+  EXPECT_FALSE(dedup.isDuplicate(b));
+  dedup.recordItem(b);
+  EXPECT_TRUE(dedup.isDuplicate(b));
+}
+
 TEST(RssDedup, DedupByLink) {
   RssDedup dedup;
   auto existing = makeItem(QStringLiteral("a"), {}, QStringLiteral("https://example.com/item1"));

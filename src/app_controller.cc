@@ -17,6 +17,8 @@
 #include <QTimer>
 #include <QUrl>
 #include <QUuid>
+#include <QtCore/QFileInfo>
+#include <QtCore/QFileSystemWatcher>
 #include <QtWidgets/QApplication>
 #include <QtWidgets/QSystemTrayIcon>
 
@@ -26,6 +28,7 @@
 
 #include <algorithm>
 #include <future>
+#include <vector>
 
 #include "app/task_query_mapper.h"
 #include "base/input_sanitizer.h"
@@ -51,6 +54,8 @@ AppController::AppController(QApplication* app, pfd::ui::MainWindow* window,
 
 AppController::~AppController() {
   exitCoordinator_.beginShutdown(shuttingDown_);
+  delete ipFilterFileWatcher_;
+  ipFilterFileWatcher_ = nullptr;
   builtinHttpTracker_.reset();
   constexpr auto kWaitBudgetPerTask = std::chrono::milliseconds(120);
   std::vector<std::future<void>> tasks;
@@ -109,6 +114,16 @@ void AppController::initialize() {
         window_->refreshTasks(snaps);
         applySeedingPolicy(snaps);
       });
+  rssPostSettleScheduler_ =
+      std::make_unique<pfd::app::RefreshScheduler>(static_cast<QObject*>(app_), 250, [this]() {
+        if (rssService_ != nullptr) {
+          rssService_->saveState();
+          pumpRssDeferredAutoDownloads(pfd::core::rss::RssAutoDownloadScope::kAllEligible, true);
+        }
+        if (window_ != nullptr) {
+          window_->refreshRssDataViews();
+        }
+      });
   taskPersistenceCoordinator_ = std::make_unique<pfd::app::TaskPersistenceCoordinator>(
       static_cast<QObject*>(app_), [this]() { savePersistedTasks(); },
       [this]() { saveResumeData(); });
@@ -117,6 +132,7 @@ void AppController::initialize() {
   bindUiCallbacks();
   bindWorkerCallbacks();
   applyRuntimeSettingsFromConfig(&cachedAppSettings_);
+  syncIpFilterFileWatcher();
   schedulePersistedTasksAutoSave();
   initializeRss();
   if (window_) {
@@ -136,6 +152,8 @@ void AppController::initialize() {
                      loadSettings();
                      applyRuntimeSettingsFromConfig(&cachedAppSettings_);
                      scheduleTimedAction();
+                     schedulePersistedTasksAutoSave();
+                     syncIpFilterFileWatcher();
                      updateRssTimerInterval();
                      logInfo(QStringLiteral("Runtime settings updated from preferences."));
                    });
@@ -369,10 +387,62 @@ void AppController::applyRuntimeSettingsFromConfig(const pfd::core::AppSettings*
   if (rssService_ != nullptr) {
     rssService_->setRequestHeaders(pfd::core::rss::RssFetcher::RequestHeaders{
         s.http_user_agent, s.http_accept_language, s.http_cookie_header, s.http_cookie_rules});
+    rssService_->setHttpProxy(httpProxyConfigForRss());
   }
   if (window_ != nullptr) {
     window_->setSearchRequestHeaders(pfd::ui::SearchTab::RequestHeaders{
         s.http_user_agent, s.http_accept_language, s.http_cookie_header});
+  }
+}
+
+pfd::core::rss::RssFetcher::HttpProxyConfig AppController::httpProxyConfigForRss() const {
+  const auto& s = cachedAppSettings_;
+  pfd::core::rss::RssFetcher::HttpProxyConfig c;
+  c.enabled = s.proxy_enabled;
+  c.type = s.proxy_type;
+  c.host = s.proxy_host;
+  c.port = s.proxy_port;
+  c.user = s.proxy_username;
+  c.password = s.proxy_password;
+  return c;
+}
+
+void AppController::syncIpFilterFileWatcher() {
+  if (app_ == nullptr) {
+    return;
+  }
+  if (ipFilterFileWatcher_ == nullptr) {
+    ipFilterFileWatcher_ = new QFileSystemWatcher();
+    QObject::connect(ipFilterFileWatcher_, &QFileSystemWatcher::fileChanged, app_,
+                     [this](const QString& path) {
+                       Q_UNUSED(path);
+                       if (shuttingDown_.load()) {
+                         return;
+                       }
+                       applyRuntimeSettingsFromConfig(nullptr);
+                       syncIpFilterFileWatcher();
+                     });
+  }
+
+  const QStringList watched = ipFilterFileWatcher_->files();
+  if (!watched.isEmpty()) {
+    ipFilterFileWatcher_->removePaths(watched);
+  }
+
+  if (!cachedAppSettings_.ip_filter_enabled) {
+    return;
+  }
+  const QString rawPath = cachedAppSettings_.ip_filter_path.trimmed();
+  if (rawPath.isEmpty()) {
+    return;
+  }
+  const QFileInfo fi(rawPath);
+  if (!fi.exists() || !fi.isFile()) {
+    return;
+  }
+  const QString abs = fi.absoluteFilePath();
+  if (!ipFilterFileWatcher_->addPath(abs)) {
+    LOG_WARN(QStringLiteral("[main] ip filter: failed to watch file: %1").arg(abs));
   }
 }
 
@@ -421,7 +491,12 @@ void AppController::enqueueMagnet(const QString& uri, const QString& savePath,
                                   const pfd::core::rss::RssDownloadSettlement& rssSettlement,
                                   bool skipInteractiveAdd, const QString& category,
                                   const QString& tagsCsv) {
-  rssDownloadOrchestrator_->setMagnetMaxInFlight(magnetMaxInFlight_);
+  int maxInFlight = magnetMaxInFlight_;
+  if (!rssSettlement.item_id.isEmpty() && rssService_ != nullptr) {
+    const int rssConc = std::clamp(rssService_->settings().max_concurrent_auto_downloads, 1, 50);
+    maxInFlight = std::min(maxInFlight, rssConc);
+  }
+  rssDownloadOrchestrator_->setMagnetMaxInFlight(maxInFlight);
   rssDownloadOrchestrator_->enqueueMagnet(
       pfd::app::RssDownloadPipeline::MagnetQueueItem{uri, savePath, rssSettlement,
                                                      skipInteractiveAdd, category, tagsCsv},
@@ -433,9 +508,32 @@ void AppController::settleRssDownloadIfNeeded(const pfd::core::rss::RssDownloadS
   if (s.item_id.isEmpty() || !rssService_) {
     return;
   }
-  rssService_->applyRssDownloadSettlement(s, ok, resolved_save_override);
-  if (ok && window_) {
-    window_->refreshRssDataViews();
+  rssService_->applyRssDownloadSettlement(s, ok, resolved_save_override, false);
+  scheduleRssPostSettleFollowUp();
+}
+
+void AppController::scheduleRssPostSettleFollowUp() {
+  if (rssPostSettleScheduler_ != nullptr) {
+    rssPostSettleScheduler_->requestRefresh();
+  }
+}
+
+void AppController::pumpRssDeferredAutoDownloads(pfd::core::rss::RssAutoDownloadScope scope,
+                                                 bool skip_diagnosis) {
+  if (shuttingDown_.load(std::memory_order_acquire) || rssService_ == nullptr) {
+    return;
+  }
+  if (!rssService_->autoDownloadEnabled()) {
+    return;
+  }
+
+  const int maxBatch = std::clamp(rssService_->settings().max_auto_downloads_per_refresh, 1, 100);
+  const int started = rssService_->dispatchDeferredAutoDownloads(maxBatch, !skip_diagnosis, scope);
+  if (started > 0) {
+    rssService_->saveState();
+    if (window_ != nullptr) {
+      window_->refreshRssDataViews();
+    }
   }
 }
 
@@ -672,11 +770,14 @@ void AppController::startOneRssTorrentUrlOnUi(
   const auto requestHeaders = pfd::core::rss::RssFetcher::RequestHeaders{
       cachedAppSettings_.http_user_agent, cachedAppSettings_.http_accept_language,
       cachedAppSettings_.http_cookie_header, cachedAppSettings_.http_cookie_rules};
+  const auto proxyConfig = httpProxyConfigForRss();
   auto fut = std::async(std::launch::async, [this, windowGuard, workerPtr, url, referer,
                                              resolvedSavePath, useDefaultTrackers,
-                                             defaultTrackersCopy, rssS, requestHeaders]() {
+                                             defaultTrackersCopy, rssS, requestHeaders,
+                                             proxyConfig]() {
     pfd::core::rss::RssFetcher fetcher;
     fetcher.setRequestHeaders(requestHeaders);
+    fetcher.setHttpProxy(proxyConfig);
     const auto res = fetcher.fetch(url, referer);
 
     QString torrentPath;
@@ -1291,12 +1392,17 @@ void AppController::savePersistedTasks() const {
   envelope.insert(QStringLiteral("tasks"), arr);
 
   const QJsonDocument doc(envelope);
-  const auto err =
-      pfd::base::writeWholeFileWithBackup(filePath, doc.toJson(QJsonDocument::Indented));
+  const QByteArray outBytes = doc.toJson(QJsonDocument::Indented);
+  if (outBytes == lastPersistedTasksJson_) {
+    return;
+  }
+  const auto err = pfd::base::writeWholeFileWithBackup(filePath, outBytes);
   if (err.hasError()) {
     LOG_ERROR(QStringLiteral("[main] save persisted tasks failed: %1 err=%2")
                   .arg(filePath, err.message()));
+    return;
   }
+  lastPersistedTasksJson_ = outBytes;
 }
 
 void AppController::saveResumeData() const {
@@ -1307,12 +1413,15 @@ void AppController::saveResumeData() const {
   if (!pfd::base::ensureExists(rd)) {
     LOG_WARN(QStringLiteral("[main] Failed to ensure resume data dir exists: %1").arg(rd));
   }
-  const int saved = worker_->saveAllResumeData(rd);
-  LOG_INFO(QStringLiteral("[main] Resume data saved: %1 files").arg(saved));
+
+  const auto snapshots = pipeline_->snapshots();
+  if (!snapshots.empty()) {
+    const int saved = worker_->saveAllResumeData(rd);
+    LOG_DEBUG(QStringLiteral("[main] Resume data saved: %1 files").arg(saved));
+  }
 
   // Remove stale resume-data files for tasks that no longer exist.
   std::unordered_set<QString> activeTaskKeys;
-  const auto snapshots = pipeline_->snapshots();
   activeTaskKeys.reserve(snapshots.size());
   for (const auto& s : snapshots) {
     activeTaskKeys.insert(s.taskId.toString(QUuid::WithoutBraces));
@@ -1526,6 +1635,7 @@ void AppController::initializeRss() {
   rssService_->setRequestHeaders(pfd::core::rss::RssFetcher::RequestHeaders{
       cachedAppSettings_.http_user_agent, cachedAppSettings_.http_accept_language,
       cachedAppSettings_.http_cookie_header, cachedAppSettings_.http_cookie_rules});
+  rssService_->setHttpProxy(httpProxyConfigForRss());
 
   rssService_->setDownloadRequestCallback([this](const pfd::core::rss::AutoDownloadRequest& req) {
     if (shuttingDown_.load())
@@ -1539,6 +1649,9 @@ void AppController::initializeRss() {
       logError(QStringLiteral("[rss-dl] No magnet or torrent URL for \"%1\"")
                    .arg(req.item_title.left(120)));
       return;
+    }
+    if (window_ != nullptr) {
+      uiRefreshScheduler_->requestRefresh();
     }
     logInfo(QStringLiteral("[rss-dl] \"%1\" rule=%2 feed=%3 item=%4")
                 .arg(req.item_title.left(60), req.rule_id.left(8), req.feed_id.left(8),
@@ -1565,8 +1678,23 @@ void AppController::initializeRss() {
       cachedAppSettings_.http_user_agent, cachedAppSettings_.http_accept_language,
       cachedAppSettings_.http_cookie_header});
 
-  QObject::connect(window_, &pfd::ui::MainWindow::rssSettingsChanged, static_cast<QObject*>(app_),
-                   [this]() { updateRssTimerInterval(); });
+  QObject::connect(
+      window_, &pfd::ui::MainWindow::rssSettingsChanged, static_cast<QObject*>(app_), [this]() {
+        updateRssTimerInterval();
+        pumpRssDeferredAutoDownloads(pfd::core::rss::RssAutoDownloadScope::kAllEligible);
+      });
+
+  QObject::connect(
+      window_, &pfd::ui::MainWindow::rssViewsRefreshed, static_cast<QObject*>(app_), [this]() {
+        // 不在此处预判 hasPumpable：诊断与等待标记刚更新后必须尝试派发，避免误判导致永远不下载。
+        pumpRssDeferredAutoDownloads(pfd::core::rss::RssAutoDownloadScope::kAllEligible, true);
+      });
+
+  QObject::connect(window_, &pfd::ui::MainWindow::rssNetworkRefreshFinished,
+                   static_cast<QObject*>(app_), [this]() {
+                     pumpRssDeferredAutoDownloads(
+                         pfd::core::rss::RssAutoDownloadScope::kAllEligible);
+                   });
 
   const int intervalMs = rssService_->settings().refresh_interval_minutes * 60 * 1000;
   rssTimer_ = new QTimer(static_cast<QObject*>(app_));
@@ -1575,9 +1703,19 @@ void AppController::initializeRss() {
     if (shuttingDown_.load())
       return;
     rssService_->refreshAllFeeds();
+    // 须用 kAllEligible：本轮若 RSS 无新条目，last_refresh_new_item_ids_ 为空，kNewItemsOnly
+    // 会跳过派发，导致「等待自动入队」永远不交给传输；全量范围在 max_batch / 并发上限下仍是有界的。
+    pumpRssDeferredAutoDownloads(pfd::core::rss::RssAutoDownloadScope::kAllEligible);
     rssService_->saveState();
+    if (window_ != nullptr) {
+      window_->refreshRssDataViews();
+    }
   });
   rssTimer_->start();
+
+  QTimer::singleShot(0, static_cast<QObject*>(app_), [this]() {
+    pumpRssDeferredAutoDownloads(pfd::core::rss::RssAutoDownloadScope::kAllEligible);
+  });
 }
 
 }  // namespace pfd::app

@@ -40,29 +40,20 @@ TEST(RssRepository, SaveAndLoadRoundTrip) {
   rule.feed_ids = {feed.id};
   rule.include_keywords = {QStringLiteral("Item")};
 
-  pfd::core::rss::SeriesSubscription series;
-  series.id = QStringLiteral("s1");
-  series.name = QStringLiteral("Series 1");
-  series.auto_download_enabled = true;
-
   ASSERT_TRUE(repo.saveFeeds({feed}));
   ASSERT_TRUE(repo.saveItems({item}));
   ASSERT_TRUE(repo.saveRules({rule}));
-  ASSERT_TRUE(repo.saveSeries({series}));
 
   const auto feeds = repo.loadFeeds();
   const auto items = repo.loadItems();
   const auto rules = repo.loadRules();
-  const auto allSeries = repo.loadSeries();
 
   ASSERT_EQ(feeds.size(), 1u);
   ASSERT_EQ(items.size(), 1u);
   ASSERT_EQ(rules.size(), 1u);
-  ASSERT_EQ(allSeries.size(), 1u);
   EXPECT_EQ(feeds[0].url, feed.url);
   EXPECT_EQ(items[0].magnet, item.magnet);
   EXPECT_TRUE(rules[0].enabled);
-  EXPECT_TRUE(allSeries[0].auto_download_enabled);
 }
 
 TEST(RssRepository, ChecksumMismatchStillLoadsData) {
@@ -99,6 +90,7 @@ TEST(RssRepository, LoadSettingsAppliesClampAndTrim) {
   o[QStringLiteral("global_auto_download")] = true;
   o[QStringLiteral("refresh_interval_minutes")] = 1;
   o[QStringLiteral("max_auto_downloads_per_refresh")] = 999;
+  o[QStringLiteral("max_concurrent_auto_downloads")] = 999;
   o[QStringLiteral("history_max_items")] = 42;
   o[QStringLiteral("history_max_age_days")] = 99999;
   o[QStringLiteral("external_player_command")] = QStringLiteral("  mpv --force-window=yes  ");
@@ -108,6 +100,7 @@ TEST(RssRepository, LoadSettingsAppliesClampAndTrim) {
   EXPECT_TRUE(settings.global_auto_download);
   EXPECT_EQ(settings.refresh_interval_minutes, 5);
   EXPECT_EQ(settings.max_auto_downloads_per_refresh, 100);
+  EXPECT_EQ(settings.max_concurrent_auto_downloads, 50);
   EXPECT_EQ(settings.history_max_items, 100);
   EXPECT_EQ(settings.history_max_age_days, 3650);
   EXPECT_EQ(settings.external_player_command, QStringLiteral("mpv --force-window=yes"));

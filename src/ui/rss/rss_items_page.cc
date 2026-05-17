@@ -131,6 +131,17 @@ QString taskProgressCellText(const pfd::core::TaskSnapshot& s) {
 
 QString decisionToText(const pfd::core::rss::RssItem& it) {
   using pfd::core::rss::AutoDownloadDecision;
+  // 诊断路径仍写入 kSkipped，但原因码表示「满足自动下载条件」；避免与真实跳过混淆。
+  if (it.rss_auto_waitlisted &&
+      it.last_auto_reason_code == QStringLiteral("diagnostic_rule_eligible")) {
+    return QStringLiteral("等待自动入队");
+  }
+  if (it.last_auto_reason_code == QStringLiteral("auto_backlog_overflow")) {
+    return QStringLiteral("排队较后");
+  }
+  if (it.last_auto_reason_code == QStringLiteral("diagnostic_rule_eligible")) {
+    return QStringLiteral("将自动下载");
+  }
   switch (it.last_auto_decision) {
     case AutoDownloadDecision::kQueued:
       return QStringLiteral("已排队");
@@ -266,6 +277,7 @@ void RssItemsPage::updateActionStates() {
 
 void RssItemsPage::refreshTable() {
   QSet<QString> keepSelectedIds;
+  QString anchorItemId;
   const int prevRow = itemTable_->currentRow();
   if (itemTable_->selectionModel()) {
     for (const QModelIndex& ix : itemTable_->selectionModel()->selectedRows()) {
@@ -274,9 +286,35 @@ void RssItemsPage::refreshTable() {
       }
     }
   }
-  if (keepSelectedIds.isEmpty() && prevRow >= 0) {
+  if (prevRow >= 0) {
     if (QTableWidgetItem* titleCell = itemTable_->item(prevRow, 0)) {
-      keepSelectedIds.insert(titleCell->data(Qt::UserRole).toString());
+      const QString id = titleCell->data(Qt::UserRole).toString();
+      if (!id.isEmpty()) {
+        if (keepSelectedIds.isEmpty() || keepSelectedIds.contains(id)) {
+          anchorItemId = id;
+        }
+        if (keepSelectedIds.isEmpty()) {
+          keepSelectedIds.insert(id);
+        }
+      }
+    }
+  }
+  if (anchorItemId.isEmpty() && !lastFocusedItemId_.isEmpty() &&
+      keepSelectedIds.contains(lastFocusedItemId_)) {
+    anchorItemId = lastFocusedItemId_;
+  }
+  if (anchorItemId.isEmpty() && !keepSelectedIds.isEmpty()) {
+    anchorItemId = *keepSelectedIds.constBegin();
+  }
+
+  if (service_) {
+    QSet<QString> existingIds;
+    for (const auto& it : service_->items()) {
+      existingIds.insert(it.id);
+    }
+    keepSelectedIds.intersect(existingIds);
+    if (!anchorItemId.isEmpty() && !existingIds.contains(anchorItemId)) {
+      anchorItemId.clear();
     }
   }
 
@@ -288,14 +326,29 @@ void RssItemsPage::refreshTable() {
     return;
   }
 
+  // 与 `RssService::refreshAutoDownloadDiagnostics` / `downloadItem`
+  // 路径对齐，避免「规则命中」列与诊断列长期陈旧或不一致。
+  service_->refreshAutoDownloadDiagnostics();
+
   const QString filter = searchEdit_->text().trimmed().toLower();
   const auto& allItems = service_->items();
+
+  QSet<QString> validFeedIds;
+  for (const auto& f : service_->feeds()) {
+    validFeedIds.insert(f.id);
+  }
 
   std::vector<const pfd::core::rss::RssItem*> filtered;
   filtered.reserve(allItems.size());
   for (const auto& it : allItems) {
     if (it.ignored)
       continue;
+    if (!validFeedIds.isEmpty() && it.feed_id.isEmpty()) {
+      continue;
+    }
+    if (!it.feed_id.isEmpty() && !validFeedIds.contains(it.feed_id)) {
+      continue;
+    }
     if (!filter.isEmpty() && !it.title.toLower().contains(filter))
       continue;
     filtered.push_back(&it);
@@ -329,30 +382,24 @@ void RssItemsPage::refreshTable() {
     QString ruleHit;
     {
       const auto matches = service_->evaluateItem(*it);
+      const auto& rules = service_->rules();
       int hitCount = 0;
       for (const auto& m : matches) {
-        if (m.matched)
-          ++hitCount;
+        if (!m.matched)
+          continue;
+        for (const auto& r : rules) {
+          if (r.id == m.rule_id && r.enabled) {
+            ++hitCount;
+            break;
+          }
+        }
       }
       ruleHit = hitCount > 0 ? QStringLiteral("命中 %1 条").arg(hitCount) : QStringLiteral("-");
     }
     itemTable_->setItem(i, 4, new QTableWidgetItem(ruleHit));
-
-    QString seriesHit;
-    auto ep = service_->parseEpisode(it->title);
-    if (ep.has_value()) {
-      auto matchedSub = service_->matchSeries(*it);
-      if (matchedSub.has_value()) {
-        seriesHit = QStringLiteral("%1 E%2").arg(matchedSub->name).arg(ep->episode);
-      } else {
-        seriesHit = QStringLiteral("E%1").arg(ep->episode);
-      }
-    }
+    itemTable_->setItem(i, 5, new QTableWidgetItem(decisionToText(*it)));
     itemTable_->setItem(
-        i, 5, new QTableWidgetItem(seriesHit.isEmpty() ? QStringLiteral("-") : seriesHit));
-    itemTable_->setItem(i, 6, new QTableWidgetItem(decisionToText(*it)));
-    itemTable_->setItem(
-        i, 7,
+        i, 6,
         new QTableWidgetItem(it->downloaded ? QStringLiteral("已下载") : QStringLiteral("-")));
   }
 
@@ -365,22 +412,44 @@ void RssItemsPage::refreshTable() {
   }
 
   int anchorRow = -1;
-  {
-    QSignalBlocker blocker(itemTable_);
-    itemTable_->clearSelection();
-    for (int i = 0; i < itemTable_->rowCount(); ++i) {
-      if (QTableWidgetItem* cell = itemTable_->item(i, 0)) {
-        const QString id = cell->data(Qt::UserRole).toString();
-        if (keepSelectedIds.contains(id)) {
-          itemTable_->selectRow(i);
-          if (anchorRow < 0) {
-            anchorRow = i;
-          }
+  QList<int> restoreRows;
+  for (int i = 0; i < itemTable_->rowCount(); ++i) {
+    if (QTableWidgetItem* cell = itemTable_->item(i, 0)) {
+      const QString id = cell->data(Qt::UserRole).toString();
+      if (keepSelectedIds.contains(id)) {
+        restoreRows.push_back(i);
+        if (!anchorItemId.isEmpty() && id == anchorItemId) {
+          anchorRow = i;
         }
       }
     }
-    if (anchorRow >= 0) {
-      itemTable_->setCurrentCell(anchorRow, 0);
+  }
+  if (anchorRow < 0 && !restoreRows.isEmpty()) {
+    anchorRow = restoreRows.front();
+  }
+
+  if (itemTable_->selectionModel() != nullptr) {
+    QSignalBlocker blocker(itemTable_);
+    QItemSelectionModel* sel = itemTable_->selectionModel();
+    if (!restoreRows.isEmpty()) {
+      sel->clearSelection();
+      for (int r : restoreRows) {
+        const QModelIndex idx = itemTable_->model()->index(r, 0);
+        sel->select(idx, QItemSelectionModel::Select | QItemSelectionModel::Rows);
+      }
+      if (anchorRow >= 0) {
+        const QModelIndex curIdx = itemTable_->model()->index(anchorRow, 0);
+        sel->setCurrentIndex(curIdx, QItemSelectionModel::Current);
+        if (QTableWidgetItem* cell = itemTable_->item(anchorRow, 0)) {
+          lastFocusedItemId_ = cell->data(Qt::UserRole).toString();
+        }
+      }
+    } else if (itemTable_->rowCount() == 0) {
+      sel->clearSelection();
+      itemTable_->setCurrentCell(-1, -1);
+    } else {
+      sel->clearSelection();
+      itemTable_->setCurrentCell(-1, -1);
     }
   }
 
@@ -389,6 +458,7 @@ void RssItemsPage::refreshTable() {
   } else {
     detailView_->clear();
   }
+
   updateActionStates();
 }
 
@@ -401,7 +471,10 @@ void RssItemsPage::buildLayout() {
   top->setSpacing(8);
   searchEdit_ = new QLineEdit(this);
   searchEdit_->setPlaceholderText(QStringLiteral("按标题搜索"));
-  refreshBtn_ = new QPushButton(QStringLiteral("刷新列表"), this);
+  refreshBtn_ = new QPushButton(QStringLiteral("全部刷新"), this);
+  refreshBtn_->setToolTip(QStringLiteral(
+      "先清空所有「已启用」订阅下的本地条目，再从网络完整拉取条目流，并刷新本页与订阅源等表格。"
+      "（暂停中的订阅其本地条目不会被清空）"));
   downloadBtn_ = new QPushButton(QStringLiteral("下载选中"), this);
   downloadBtn_->setObjectName(QStringLiteral("PrimaryButton"));
   copyMagnetBtn_ = new QPushButton(QStringLiteral("复制链接"), this);
@@ -419,11 +492,11 @@ void RssItemsPage::buildLayout() {
 
   auto* splitter = new QSplitter(Qt::Horizontal, this);
   itemTable_ = new QTableWidget(splitter);
-  itemTable_->setColumnCount(9);
-  itemTable_->setHorizontalHeaderLabels(
-      {QStringLiteral("标题"), QStringLiteral("来源"), QStringLiteral("发布时间"),
-       QStringLiteral("资源"), QStringLiteral("规则命中"), QStringLiteral("剧集"),
-       QStringLiteral("自动下载诊断"), QStringLiteral("下载状态"), QStringLiteral("任务进度")});
+  itemTable_->setColumnCount(8);
+  itemTable_->setHorizontalHeaderLabels({QStringLiteral("标题"), QStringLiteral("来源"),
+                                         QStringLiteral("发布时间"), QStringLiteral("资源"),
+                                         QStringLiteral("规则命中"), QStringLiteral("自动下载诊断"),
+                                         QStringLiteral("下载状态"), QStringLiteral("任务进度")});
   itemTable_->horizontalHeader()->setStretchLastSection(true);
   itemTable_->horizontalHeader()->setSectionResizeMode(QHeaderView::Interactive);
   itemTable_->setSelectionBehavior(QAbstractItemView::SelectRows);
@@ -445,16 +518,30 @@ void RssItemsPage::buildLayout() {
 
 void RssItemsPage::bindSignals() {
   connect(downloadBtn_, &QPushButton::clicked, this, &RssItemsPage::onDownloadClicked);
-  connect(refreshBtn_, &QPushButton::clicked, this, &RssItemsPage::refreshTable);
+  connect(refreshBtn_, &QPushButton::clicked, this, &RssItemsPage::onRefreshAllFeedsClicked);
   connectImeAwareLineEditApply(this, searchEdit_, 120, [this]() { onFilterChanged(); });
   connect(copyMagnetBtn_, &QPushButton::clicked, this, &RssItemsPage::onCopyMagnet);
   connect(openFolderBtn_, &QPushButton::clicked, this, &RssItemsPage::onOpenFolder);
   connect(playBtn_, &QPushButton::clicked, this, &RssItemsPage::onPlayClicked);
   connect(ignoreBtn_, &QPushButton::clicked, this, &RssItemsPage::onIgnoreItem);
-  connect(itemTable_, &QTableWidget::currentCellChanged, this,
-          [this](int, int, int, int) { onSelectionChanged(); });
+  connect(itemTable_, &QTableWidget::currentCellChanged, this, [this](int row, int, int, int) {
+    if (row >= 0) {
+      if (QTableWidgetItem* cell = itemTable_->item(row, 0)) {
+        lastFocusedItemId_ = cell->data(Qt::UserRole).toString();
+      }
+    }
+    onSelectionChanged();
+  });
   if (itemTable_->selectionModel()) {
     connect(itemTable_->selectionModel(), &QItemSelectionModel::selectionChanged, this, [this]() {
+      if (itemTable_ != nullptr && itemTable_->selectionModel() != nullptr) {
+        const int row = itemTable_->currentRow();
+        if (row >= 0 && itemTable_->selectionModel()->isRowSelected(row, QModelIndex())) {
+          if (QTableWidgetItem* cell = itemTable_->item(row, 0)) {
+            lastFocusedItemId_ = cell->data(Qt::UserRole).toString();
+          }
+        }
+      }
       updateActionStates();
       onSelectionChanged();
     });
@@ -464,10 +551,14 @@ void RssItemsPage::bindSignals() {
 }
 
 void RssItemsPage::onSelectionChanged() {
-  if (!service_)
+  if (!service_ || itemTable_ == nullptr || itemTable_->selectionModel() == nullptr)
     return;
   const auto selectedRows = itemTable_->selectionModel()->selectedRows();
   if (selectedRows.size() > 1) {
+    if (itemTable_->currentRow() < 0 && !selectedRows.isEmpty()) {
+      QSignalBlocker blocker(itemTable_);
+      itemTable_->setCurrentCell(selectedRows.front().row(), 0);
+    }
     detailView_->setHtml(QStringLiteral("<p>已选择 <b>%1</b> "
                                         "条。可使用顶部按钮或右键菜单批量下载、忽略；复制链接按列表"
                                         "顺序取第一条可复制的条目。</p>")
@@ -476,12 +567,18 @@ void RssItemsPage::onSelectionChanged() {
   }
 
   const int row = itemTable_->currentRow();
-  if (row < 0) {
+  if (row < 0 || row >= itemTable_->rowCount()) {
     detailView_->clear();
     return;
   }
 
-  const QString itemId = itemTable_->item(row, 0)->data(Qt::UserRole).toString();
+  QTableWidgetItem* titleCell = itemTable_->item(row, 0);
+  if (titleCell == nullptr) {
+    detailView_->clear();
+    return;
+  }
+
+  const QString itemId = titleCell->data(Qt::UserRole).toString();
   for (const auto& it : service_->items()) {
     if (it.id != itemId)
       continue;
@@ -505,15 +602,6 @@ void RssItemsPage::onSelectionChanged() {
     if (!it.torrent_url.isEmpty()) {
       html += QStringLiteral("<p><b>Torrent：</b><a href=\"%1\">%1</a></p>")
                   .arg(it.torrent_url.toHtmlEscaped());
-    }
-
-    auto ep = service_->parseEpisode(it.title);
-    if (ep.has_value()) {
-      html += QStringLiteral("<p><b>剧集识别：</b>%1 S%2E%3 %4</p>")
-                  .arg(ep->series_name.toHtmlEscaped())
-                  .arg(ep->season >= 0 ? ep->season : 0, 2, 10, QLatin1Char('0'))
-                  .arg(ep->episode, 2, 10, QLatin1Char('0'))
-                  .arg(ep->quality.toHtmlEscaped());
     }
 
     if (!it.summary.isEmpty()) {
@@ -574,6 +662,8 @@ void RssItemsPage::onSelectionChanged() {
     detailView_->setHtml(html);
     return;
   }
+
+  detailView_->clear();
 }
 
 void RssItemsPage::onDownloadClicked() {
@@ -721,6 +811,15 @@ void RssItemsPage::onIgnoreItem() {
 }
 
 void RssItemsPage::showRowContextMenu(const QPoint& pos) {
+  if (itemTable_ == nullptr || itemTable_->selectionModel() == nullptr) {
+    return;
+  }
+  const QModelIndex underMouse = itemTable_->indexAt(pos);
+  if (underMouse.isValid() &&
+      !itemTable_->selectionModel()->isRowSelected(underMouse.row(), QModelIndex())) {
+    itemTable_->selectRow(underMouse.row());
+  }
+
   QMenu menu(this);
   auto* aDl = menu.addAction(QStringLiteral("下载选中"));
   aDl->setEnabled(downloadBtn_->isEnabled());
@@ -748,6 +847,15 @@ void RssItemsPage::showRowContextMenu(const QPoint& pos) {
 
 void RssItemsPage::onFilterChanged() {
   refreshTable();
+}
+
+void RssItemsPage::onRefreshAllFeedsClicked() {
+  if (!service_)
+    return;
+  userLog(QStringLiteral("[RSS] 已清空已启用订阅的本地条目，正在从网络重新拉取条目流…"));
+  service_->reloadItemStreamFromEnabledFeeds();
+  service_->saveState();
+  emit rssFeedsReloaded();
 }
 
 void RssItemsPage::keyPressEvent(QKeyEvent* event) {
@@ -779,7 +887,7 @@ void RssItemsPage::refreshTaskProgressCells() {
       QTableWidgetItem* progCell = itemTable_->item(i, 8);
       if (!progCell) {
         progCell = new QTableWidgetItem(QStringLiteral("—"));
-        itemTable_->setItem(i, 8, progCell);
+        itemTable_->setItem(i, 7, progCell);
       } else {
         progCell->setText(QStringLiteral("—"));
       }
@@ -804,7 +912,7 @@ void RssItemsPage::refreshTaskProgressCells() {
     QTableWidgetItem* progCell = itemTable_->item(i, 8);
     if (!progCell) {
       progCell = new QTableWidgetItem(text);
-      itemTable_->setItem(i, 8, progCell);
+      itemTable_->setItem(i, 7, progCell);
     } else {
       progCell->setText(text);
     }

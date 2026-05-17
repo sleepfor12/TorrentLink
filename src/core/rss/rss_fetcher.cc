@@ -4,9 +4,11 @@
 #include <QtCore/QTimer>
 #include <QtCore/QUrl>
 #include <QtNetwork/QNetworkAccessManager>
+#include <QtNetwork/QNetworkProxy>
 #include <QtNetwork/QNetworkReply>
 #include <QtNetwork/QNetworkRequest>
 
+#include <algorithm>
 #include <utility>
 
 namespace pfd::core::rss {
@@ -47,10 +49,26 @@ QString cookieFromRules(const QString& rulesText, const QString& host) {
   return pairs.join(QStringLiteral("; "));
 }
 
+void applyProxy(QNetworkAccessManager& nam, const RssFetcher::HttpProxyConfig& cfg) {
+  if (cfg.enabled && !cfg.host.trimmed().isEmpty()) {
+    const QString t = cfg.type.trimmed().toLower();
+    const QNetworkProxy::ProxyType pt =
+        t == QStringLiteral("http") ? QNetworkProxy::HttpProxy : QNetworkProxy::Socks5Proxy;
+    const quint16 port = static_cast<quint16>(std::clamp(cfg.port, 1, 65535));
+    nam.setProxy(QNetworkProxy(pt, cfg.host.trimmed(), port, cfg.user.trimmed(), cfg.password));
+  } else {
+    nam.setProxy(QNetworkProxy(QNetworkProxy::DefaultProxy));
+  }
+}
+
 }  // namespace
 
 void RssFetcher::setRequestHeaders(RequestHeaders headers) {
   headers_ = std::move(headers);
+}
+
+void RssFetcher::setHttpProxy(HttpProxyConfig proxy) {
+  proxy_ = std::move(proxy);
 }
 
 FetchResult RssFetcher::fetch(const QString& url, const QString& referer) const {
@@ -70,12 +88,17 @@ FetchResult RssFetcher::fetch(const QString& url, const QString& referer) const 
   FetchResult result;
   for (int attempt = 0; attempt <= kFetchMaxRetries; ++attempt) {
     QNetworkAccessManager nam;
+    applyProxy(nam, proxy_);
     QNetworkRequest req(parsed);
     req.setTransferTimeout(kFetchTimeoutMs);
     const QString userAgent = headers_.user_agent.trimmed().isEmpty()
                                   ? QStringLiteral("pfd-rss-reader/1.0")
                                   : headers_.user_agent.trimmed();
     req.setHeader(QNetworkRequest::UserAgentHeader, userAgent);
+    req.setRawHeader(
+        QByteArrayLiteral("Accept"),
+        QByteArrayLiteral("application/rss+xml, application/atom+xml, application/xml, text/xml, "
+                          "*/*;q=0.1"));
     if (!headers_.accept_language.trimmed().isEmpty()) {
       req.setRawHeader(QByteArrayLiteral("Accept-Language"),
                        headers_.accept_language.trimmed().toUtf8());

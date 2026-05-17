@@ -36,6 +36,7 @@ class BuiltinHttpTracker;
 #include "ui/system_tray.h"
 
 class QTimer;
+class QFileSystemWatcher;
 
 class QApplication;
 
@@ -73,14 +74,22 @@ private:
                            const QString& savePath, const QString& category,
                            const QString& tagsCsv);
   void applyRuntimeSettingsFromConfig(const pfd::core::AppSettings* app_settings = nullptr);
+  [[nodiscard]] pfd::core::rss::RssFetcher::HttpProxyConfig httpProxyConfigForRss() const;
+  void syncIpFilterFileWatcher();
   void applyBuiltinHttpTrackerFromSettings(const pfd::core::AppSettings& s);
   void loadPersistedTasks();
   void savePersistedTasks() const;
   void saveResumeData() const;
   void schedulePersistedTasksAutoSave();
   void initializeRss();
+  /// 对诊断为可自动下载的条目调用
+  /// `RssService::downloadItem`（与条目流「下载选中」相同路径），受并发与单次批量上限约束。
+  void pumpRssDeferredAutoDownloads(pfd::core::rss::RssAutoDownloadScope scope =
+                                        pfd::core::rss::RssAutoDownloadScope::kAllEligible,
+                                    bool skip_diagnosis = false);
   void settleRssDownloadIfNeeded(const pfd::core::rss::RssDownloadSettlement& s, bool ok,
                                  const QString& resolved_save_override = {});
+  void scheduleRssPostSettleFollowUp();
   void upsertKnownTaskMagnet(const pfd::base::TaskId& taskId, const QString& magnet);
   void injectTransitionalStatus(const pfd::base::TaskId& taskId, pfd::base::TaskStatus status);
   [[nodiscard]] bool restoreStartPaused() const;
@@ -128,6 +137,8 @@ private:
   bool restoreStartPaused_{true};
   pfd::core::AppSettings cachedAppSettings_{};
   std::unordered_map<QString, QString> knownTaskMagnets_;
+  /// 与上次成功落盘的 tasks.json 内容一致则跳过写入，减少磁盘抖动。
+  mutable QByteArray lastPersistedTasksJson_{};
 
   std::unique_ptr<pfd::core::BuiltinHttpTracker> builtinHttpTracker_;
   std::unique_ptr<pfd::core::rss::RssService> rssService_;
@@ -139,6 +150,8 @@ private:
   bool postDownloadActionTriggered_{false};
 
   std::unique_ptr<pfd::app::RefreshScheduler> uiRefreshScheduler_;
+  /// 合并 RSS 结算后的 saveState / 视图刷新 / 续派，避免批量自动下载时 UI 线程被连续重入拖死。
+  std::unique_ptr<pfd::app::RefreshScheduler> rssPostSettleScheduler_;
   std::unique_ptr<pfd::app::TaskBatchUseCase> taskBatchUseCase_;
   std::unique_ptr<pfd::app::TaskControlCommandUseCase> taskControlCommandUseCase_;
   std::unique_ptr<pfd::app::TaskDetailQueryUseCase> taskDetailQueryUseCase_;
@@ -146,6 +159,7 @@ private:
   std::unique_ptr<pfd::app::RssDownloadOrchestrator> rssDownloadOrchestrator_;
   std::unique_ptr<pfd::app::TaskPersistenceCoordinator> taskPersistenceCoordinator_;
   pfd::app::ExitCoordinator exitCoordinator_;
+  QFileSystemWatcher* ipFilterFileWatcher_{nullptr};
 
   std::unique_ptr<pfd::app::EventIngestOrchestrator> eventIngestOrchestrator_;
 };

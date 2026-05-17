@@ -1,5 +1,6 @@
 #include <QtCore/QByteArray>
 #include <QtCore/QObject>
+#include <QtCore/QString>
 #include <QtCore/QVariant>
 #include <QtWidgets/QPushButton>
 #include <QtWidgets/QTabWidget>
@@ -37,6 +38,12 @@ TEST(UiMainWindowTest, DefaultsToTransferTabOnStartup) {
   ASSERT_GT(tabs->count(), 0);
   EXPECT_EQ(tabs->currentIndex(), 0);
   EXPECT_EQ(tabs->tabText(0), QStringLiteral("传输"));
+}
+
+TEST(UiMainWindowTest, AppliesNonEmptyThemeStyleSheet) {
+  pfd::ui::MainWindow w;
+  EXPECT_FALSE(w.styleSheet().isEmpty());
+  EXPECT_TRUE(w.styleSheet().contains(QStringLiteral("QMainWindow")));
 }
 
 TEST(UiMainWindowTest, HidesHttpSourceDetailTabButton) {

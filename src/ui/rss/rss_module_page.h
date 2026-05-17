@@ -19,7 +19,6 @@ namespace pfd::ui::rss {
 class RssFeedsPage;
 class RssItemsPage;
 class RssRulesPage;
-class RssSeriesPage;
 
 class RssModulePage : public QWidget {
   Q_OBJECT
@@ -33,9 +32,12 @@ public:
                              std::function<QString()> defaultSaveRoot,
                              std::function<std::vector<pfd::core::TaskSnapshot>()> taskSnapshots);
 
-  /// 条目下载状态、剧集订阅进度等变更后刷新相关子页表格。
   void refreshDataViews();
   void refreshItemsTaskProgress();
+
+Q_SIGNALS:
+  void dataViewsRefreshed();
+  void rssNetworkRefreshFinished();
 
 private:
   void buildLayout();
@@ -44,7 +46,6 @@ private:
   RssFeedsPage* feedsPage_{nullptr};
   RssItemsPage* itemsPage_{nullptr};
   RssRulesPage* rulesPage_{nullptr};
-  RssSeriesPage* seriesPage_{nullptr};
 };
 
 }  // namespace pfd::ui::rss

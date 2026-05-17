@@ -28,7 +28,6 @@ set(PFD_TESTS_CORE
   test_rss_repository.cc
   test_rss_service.cc
   test_rss_rule_engine.cc
-  test_rss_series_tracker.cc
   test_rss_auto_download.cc
   test_rss_dedup.cc
   test_rss_opml.cc

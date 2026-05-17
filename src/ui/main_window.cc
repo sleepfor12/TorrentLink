@@ -115,6 +115,9 @@ void MainWindow::loadUiState() {
         static_cast<pfd::ui::TransferPage::SortOrder>(std::max(0, st.sortOrder)));
     // UX: 每次启动默认“全部”状态列表
     transferPage_->setFilter(pfd::ui::TransferPage::TaskFilter::kAll);
+    bottomStatusBarVisible_ = st.bottom_status_bar_visible;
+    transferDetailPanelVisible_ = st.transfer_detail_panel_visible;
+    applyTransferBottomPanelsVisible();
   }
 }
 
@@ -127,6 +130,8 @@ void MainWindow::saveUiState() const {
     st.sortKey = static_cast<int>(transferPage_->currentSortKey());
     st.sortOrder = static_cast<int>(transferPage_->currentSortOrder());
   }
+  st.bottom_status_bar_visible = bottomStatusBarVisible_;
+  st.transfer_detail_panel_visible = transferDetailPanelVisible_;
   StateStore::saveMainWindowState(st);
 }
 

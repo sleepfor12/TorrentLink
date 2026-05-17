@@ -22,6 +22,8 @@
 #include <libtorrent/info_hash.hpp>
 #include <libtorrent/torrent_info.hpp>
 
+#include "core/config_service.h"
+#include "ui/app_theme.h"
 #include "ui/input_ime_utils.h"
 
 namespace pfd::ui {
@@ -93,10 +95,14 @@ AddTorrentDialog::runForMagnetMetadata(QWidget* parent, const MagnetInput& in,
 }
 
 AddTorrentDialog::AddTorrentDialog(QWidget* parent) : QDialog(parent) {
+  setObjectName(QStringLiteral("addTorrentDialog"));
   setModal(true);
   resize(1080, 680);
   buildLayout();
   bindSignals();
+  const auto st = pfd::core::ConfigService::loadAppSettings();
+  const EffectiveUiTheme eff = UiTheme::resolveEffectiveTheme(st.ui_theme);
+  setStyleSheet(UiTheme::auxiliaryDialogStyleSheet(objectName(), eff));
 }
 
 bool AddTorrentDialog::loadTorrentFile(const QString& torrentFilePath) {
@@ -218,7 +224,7 @@ void AddTorrentDialog::buildLayout() {
   root->setSpacing(10);
 
   title_ = new QLabel(QStringLiteral(""), this);
-  title_->setStyleSheet(QStringLiteral("font-size:18px;font-weight:800;color:#1f2d3d;"));
+  title_->setObjectName(QStringLiteral("DialogTitleLabel"));
   root->addWidget(title_);
 
   auto* splitter = new QSplitter(Qt::Horizontal, this);

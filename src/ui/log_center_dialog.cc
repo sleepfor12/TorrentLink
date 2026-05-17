@@ -23,6 +23,7 @@
 #include "base/types.h"
 #include "core/config_service.h"
 #include "core/logger.h"
+#include "ui/app_theme.h"
 #include "ui/input_ime_utils.h"
 #include "ui/state/state_store.h"
 
@@ -44,9 +45,15 @@ bool passLevel(const pfd::core::LogEntry& e, const QString& level) {
 }  // namespace
 
 LogCenterDialog::LogCenterDialog(QWidget* parent) : QDialog(parent) {
+  setObjectName(QStringLiteral("logCenterDialog"));
   setWindowTitle(QStringLiteral("日志中心"));
   resize(920, 580);
   buildLayout();
+  {
+    const auto st = pfd::core::ConfigService::loadAppSettings();
+    const EffectiveUiTheme eff = UiTheme::resolveEffectiveTheme(st.ui_theme);
+    setStyleSheet(UiTheme::auxiliaryDialogStyleSheet(objectName(), eff));
+  }
   bindSignals();
   const auto st = StateStore::loadLogCenterState();
   if (!st.geometry.isEmpty()) {

@@ -2,6 +2,7 @@
 
 #include <QtCore/QDir>
 #include <QtCore/QFileInfo>
+#include <QtCore/QItemSelectionModel>
 #include <QtCore/QSet>
 #include <QtCore/QSignalBlocker>
 #include <QtCore/QUuid>
@@ -20,6 +21,7 @@
 #include <QtWidgets/QTableWidget>
 #include <QtWidgets/QTableWidgetItem>
 #include <QtWidgets/QVBoxLayout>
+#include <QtWidgets/QWidget>
 
 #include <utility>
 
@@ -72,6 +74,30 @@ QString ratioText(const pfd::core::TaskSnapshot& s) {
                                 static_cast<double>(s.downloadedBytes));
 }
 
+bool filterUsesMoreSection(TransferPage::TaskFilter f) {
+  using TF = TransferPage::TaskFilter;
+  switch (f) {
+    case TF::kChecking:
+    case TF::kRunning:
+    case TF::kStopped:
+    case TF::kActive:
+    case TF::kIdle:
+    case TF::kPaused:
+    case TF::kUploadPaused:
+    case TF::kDownloadPaused:
+    case TF::kMoving:
+    case TF::kErrorDetail:
+      return true;
+    case TF::kAll:
+    case TF::kDownloading:
+    case TF::kSeeding:
+    case TF::kFinished:
+    case TF::kError:
+    default:
+      return false;
+  }
+}
+
 }  // namespace
 
 TransferPage::TransferPage(QWidget* parent) : QWidget(parent) {
@@ -91,42 +117,83 @@ void TransferPage::buildLayout() {
   sideLayout->setContentsMargins(12, 12, 12, 12);
   sideLayout->setSpacing(8);
   auto* sideTitle = new QLabel(QStringLiteral("状态列表"), sideBar);
-  sideTitle->setStyleSheet(QStringLiteral("font-size:14px;font-weight:700;color:#1f2d3d;"));
+  sideTitle->setObjectName(QStringLiteral("FilterSideTitle"));
   sideLayout->addWidget(sideTitle);
+
+  allFilterButtons_.clear();
+  const auto addFilterToLayout = [this](QPushButton* btn, QVBoxLayout* lay) {
+    btn->setObjectName(QStringLiteral("FilterButton"));
+    btn->setCheckable(true);
+    lay->addWidget(btn);
+    allFilterButtons_.push_back(btn);
+  };
 
   filterAllBtn_ = new QPushButton(QStringLiteral("全部"), sideBar);
   filterDownloadingBtn_ = new QPushButton(QStringLiteral("下载"), sideBar);
   filterSeedingBtn_ = new QPushButton(QStringLiteral("做种"), sideBar);
   filterFinishedBtn_ = new QPushButton(QStringLiteral("完成"), sideBar);
+  filterPausedBtn_ = new QPushButton(QStringLiteral("暂停"), sideBar);
   filterErrorBtn_ = new QPushButton(QStringLiteral("错误"), sideBar);
+
+  filterCheckingBtn_ = new QPushButton(QStringLiteral("正在检查"), sideBar);
   filterRunningBtn_ = new QPushButton(QStringLiteral("正运行"), sideBar);
   filterStoppedBtn_ = new QPushButton(QStringLiteral("已停止"), sideBar);
   filterActiveBtn_ = new QPushButton(QStringLiteral("活动"), sideBar);
   filterIdleBtn_ = new QPushButton(QStringLiteral("空闲"), sideBar);
-  filterPausedBtn_ = new QPushButton(QStringLiteral("暂停"), sideBar);
   filterUploadPausedBtn_ = new QPushButton(QStringLiteral("上传已暂停"), sideBar);
   filterDownloadPausedBtn_ = new QPushButton(QStringLiteral("下载已暂停"), sideBar);
-  filterCheckingBtn_ = new QPushButton(QStringLiteral("正在检查"), sideBar);
   filterMovingBtn_ = new QPushButton(QStringLiteral("正在移动"), sideBar);
-  filterErrorDetailBtn_ = new QPushButton(QStringLiteral("错误"), sideBar);
-  for (auto* btn :
-       {filterAllBtn_, filterDownloadingBtn_, filterSeedingBtn_, filterFinishedBtn_,
-        filterErrorBtn_, filterRunningBtn_, filterStoppedBtn_, filterActiveBtn_, filterIdleBtn_,
-        filterPausedBtn_, filterUploadPausedBtn_, filterDownloadPausedBtn_, filterCheckingBtn_,
-        filterMovingBtn_, filterErrorDetailBtn_}) {
-    btn->setObjectName(QStringLiteral("FilterButton"));
-    btn->setCheckable(true);
-    sideLayout->addWidget(btn);
-  }
-  filterAllBtn_->setChecked(true);
+  filterErrorDetailBtn_ = new QPushButton(QStringLiteral("错误详情"), sideBar);
 
-  auto* tagTitle = new QLabel(QStringLiteral("标签"), sideBar);
-  tagTitle->setStyleSheet(
-      QStringLiteral("font-size:14px;font-weight:700;color:#1f2d3d;margin-top:8px;"));
-  sideLayout->addWidget(tagTitle);
-  tagFilterLayout_ = new QVBoxLayout();
-  tagFilterLayout_->setSpacing(4);
-  sideLayout->addLayout(tagFilterLayout_);
+  addFilterToLayout(filterAllBtn_, sideLayout);
+  addFilterToLayout(filterDownloadingBtn_, sideLayout);
+  addFilterToLayout(filterSeedingBtn_, sideLayout);
+  addFilterToLayout(filterFinishedBtn_, sideLayout);
+  addFilterToLayout(filterPausedBtn_, sideLayout);
+  addFilterToLayout(filterErrorBtn_, sideLayout);
+
+  filterMoreExpandBtn_ = new QPushButton(QStringLiteral("更多…"), sideBar);
+  filterMoreExpandBtn_->setObjectName(QStringLiteral("FilterMoreButton"));
+  filterMoreExpandBtn_->setCheckable(true);
+  sideLayout->addWidget(filterMoreExpandBtn_);
+
+  filterMorePanel_ = new QWidget(sideBar);
+  auto* moreLay = new QVBoxLayout(filterMorePanel_);
+  moreLay->setContentsMargins(0, 0, 0, 0);
+  moreLay->setSpacing(8);
+  addFilterToLayout(filterCheckingBtn_, moreLay);
+  addFilterToLayout(filterRunningBtn_, moreLay);
+  addFilterToLayout(filterStoppedBtn_, moreLay);
+  addFilterToLayout(filterActiveBtn_, moreLay);
+  addFilterToLayout(filterIdleBtn_, moreLay);
+  addFilterToLayout(filterUploadPausedBtn_, moreLay);
+  addFilterToLayout(filterDownloadPausedBtn_, moreLay);
+  addFilterToLayout(filterMovingBtn_, moreLay);
+  addFilterToLayout(filterErrorDetailBtn_, moreLay);
+
+  filterMorePanel_->setVisible(false);
+  sideLayout->addWidget(filterMorePanel_);
+
+  connect(filterMoreExpandBtn_, &QPushButton::toggled, this, [this](bool on) {
+    const TaskFilter f = currentFilter();
+    if (filterUsesMoreSection(f)) {
+      QSignalBlocker b(filterMoreExpandBtn_);
+      filterMoreExpandBtn_->setChecked(true);
+      if (filterMorePanel_ != nullptr) {
+        filterMorePanel_->setVisible(true);
+      }
+      return;
+    }
+    if (filterMorePanel_ != nullptr) {
+      filterMorePanel_->setVisible(on);
+    }
+    if (filterMoreExpandBtn_ != nullptr) {
+      filterMoreExpandBtn_->setText(on ? QStringLiteral("收起") : QStringLiteral("更多…"));
+    }
+  });
+
+  filterAllBtn_->setChecked(true);
+  updateFilterMoreUiForCurrentFilter();
 
   sideLayout->addStretch(1);
   root->addWidget(sideBar);
@@ -193,16 +260,13 @@ void TransferPage::buildLayout() {
 
 void TransferPage::bindSignals() {
   const auto activateOnly = [this](QPushButton* current) {
-    for (auto* btn :
-         {filterAllBtn_, filterDownloadingBtn_, filterSeedingBtn_, filterFinishedBtn_,
-          filterErrorBtn_, filterRunningBtn_, filterStoppedBtn_, filterActiveBtn_, filterIdleBtn_,
-          filterPausedBtn_, filterUploadPausedBtn_, filterDownloadPausedBtn_, filterCheckingBtn_,
-          filterMovingBtn_, filterErrorDetailBtn_}) {
+    for (QPushButton* btn : allFilterButtons_) {
       if (btn != nullptr) {
         btn->setChecked(btn == current);
       }
     }
     emit filterChanged();
+    updateFilterMoreUiForCurrentFilter();
   };
   connect(filterAllBtn_, &QPushButton::clicked, this,
           [activateOnly, this]() { activateOnly(filterAllBtn_); });
@@ -252,6 +316,120 @@ void TransferPage::bindSignals() {
       }
       updateDetailForSelection();
     });
+    if (taskTable_->selectionModel() != nullptr) {
+      connect(taskTable_->selectionModel(), &QItemSelectionModel::selectionChanged, this, [this]() {
+        if (taskTable_ == nullptr || isMemoryMode_) {
+          return;
+        }
+        const int row = taskTable_->currentRow();
+        if (row >= 0 && row < static_cast<int>(displayedSnapshots_.size()) &&
+            taskTable_->selectionModel()->isRowSelected(row, QModelIndex())) {
+          lastFocusedTaskId_ = displayedSnapshots_[static_cast<std::size_t>(row)].taskId;
+        }
+        updateDetailForSelection();
+      });
+    }
+  }
+}
+
+TransferPage::TableSelectionState TransferPage::captureTableSelection() const {
+  TableSelectionState out;
+  if (taskTable_ == nullptr) {
+    return out;
+  }
+
+  QItemSelectionModel* sel = taskTable_->selectionModel();
+  if (sel != nullptr) {
+    for (const QModelIndex& idx : sel->selectedRows()) {
+      const int r = idx.row();
+      if (r >= 0 && r < static_cast<int>(displayedSnapshots_.size())) {
+        out.selectedIds.insert(displayedSnapshots_[static_cast<std::size_t>(r)].taskId);
+      }
+    }
+  }
+
+  const int currentRow = taskTable_->currentRow();
+  if (currentRow >= 0 && currentRow < static_cast<int>(displayedSnapshots_.size())) {
+    const pfd::base::TaskId currentId =
+        displayedSnapshots_[static_cast<std::size_t>(currentRow)].taskId;
+    if (out.selectedIds.isEmpty() || out.selectedIds.contains(currentId)) {
+      out.anchorId = currentId;
+    }
+  }
+
+  if (out.anchorId.isNull() && !lastFocusedTaskId_.isNull() &&
+      out.selectedIds.contains(lastFocusedTaskId_)) {
+    out.anchorId = lastFocusedTaskId_;
+  }
+  if (out.anchorId.isNull() && !out.selectedIds.isEmpty()) {
+    out.anchorId = *out.selectedIds.constBegin();
+  }
+  if (out.selectedIds.isEmpty() && !out.anchorId.isNull()) {
+    out.selectedIds.insert(out.anchorId);
+  }
+  return out;
+}
+
+void TransferPage::restoreTableSelection(const TableSelectionState& prev) {
+  if (taskTable_ == nullptr || taskTable_->selectionModel() == nullptr) {
+    return;
+  }
+
+  QSet<pfd::base::TaskId> visibleIds;
+  for (const auto& s : displayedSnapshots_) {
+    if (!s.taskId.isNull()) {
+      visibleIds.insert(s.taskId);
+    }
+  }
+
+  QSet<pfd::base::TaskId> restoreIds = prev.selectedIds;
+  restoreIds.intersect(visibleIds);
+  if (restoreIds.isEmpty() && !prev.anchorId.isNull() && visibleIds.contains(prev.anchorId)) {
+    restoreIds.insert(prev.anchorId);
+  }
+
+  pfd::base::TaskId anchorId = prev.anchorId;
+  if (!anchorId.isNull() && !visibleIds.contains(anchorId)) {
+    anchorId = {};
+  }
+  if (anchorId.isNull() && !lastFocusedTaskId_.isNull() &&
+      visibleIds.contains(lastFocusedTaskId_)) {
+    anchorId = lastFocusedTaskId_;
+  }
+
+  QList<int> restoreRows;
+  restoreRows.reserve(restoreIds.size());
+  for (int row = 0; row < static_cast<int>(displayedSnapshots_.size()); ++row) {
+    if (restoreIds.contains(displayedSnapshots_[static_cast<std::size_t>(row)].taskId)) {
+      restoreRows.push_back(row);
+    }
+  }
+
+  int targetRow = indexOfTask(anchorId);
+  if (targetRow < 0 && !restoreRows.isEmpty()) {
+    targetRow = restoreRows.front();
+  }
+
+  QItemSelectionModel* sel = taskTable_->selectionModel();
+  if (!restoreRows.isEmpty()) {
+    sel->clearSelection();
+    for (int r : restoreRows) {
+      const QModelIndex idx = taskTable_->model()->index(r, 0);
+      sel->select(idx, QItemSelectionModel::Select | QItemSelectionModel::Rows);
+    }
+    if (targetRow >= 0) {
+      const QModelIndex curIdx = taskTable_->model()->index(targetRow, 0);
+      sel->setCurrentIndex(curIdx, QItemSelectionModel::Current);
+      lastFocusedTaskId_ = displayedSnapshots_[static_cast<std::size_t>(targetRow)].taskId;
+    }
+  } else if (targetRow >= 0) {
+    const QModelIndex curIdx = taskTable_->model()->index(targetRow, 0);
+    sel->setCurrentIndex(curIdx, QItemSelectionModel::ClearAndSelect | QItemSelectionModel::Rows |
+                                     QItemSelectionModel::Current);
+    lastFocusedTaskId_ = displayedSnapshots_[static_cast<std::size_t>(targetRow)].taskId;
+  } else {
+    sel->clearSelection();
+    taskTable_->setCurrentCell(-1, -1);
   }
 }
 
@@ -262,18 +440,7 @@ void TransferPage::setSnapshots(const std::vector<pfd::core::TaskSnapshot>& snap
     return;
   }
 
-  const pfd::base::TaskId previousSelected = selectedTaskId();
-  QSet<QString> previousSelectedIds;
-  if (taskTable_ != nullptr && taskTable_->selectionModel() != nullptr) {
-    const auto rows = taskTable_->selectionModel()->selectedRows();
-    for (const auto& idx : rows) {
-      const int r = idx.row();
-      if (r >= 0 && r < static_cast<int>(displayedSnapshots_.size())) {
-        previousSelectedIds.insert(
-            displayedSnapshots_[static_cast<std::size_t>(r)].taskId.toString(QUuid::WithoutBraces));
-      }
-    }
-  }
+  const TableSelectionState previousSelection = captureTableSelection();
 
   updateStats(snapshots);
   const auto filter = currentFilter();
@@ -286,8 +453,6 @@ void TransferPage::setSnapshots(const std::vector<pfd::core::TaskSnapshot>& snap
     if (!matchFilter(s, filter))
       continue;
     if (!nameFilter.isEmpty() && !s.name.contains(nameFilter, Qt::CaseInsensitive))
-      continue;
-    if (!activeTagFilter_.isEmpty() && !s.tags.contains(activeTagFilter_, Qt::CaseInsensitive))
       continue;
     visible.push_back(s);
   }
@@ -338,9 +503,6 @@ void TransferPage::setSnapshots(const std::vector<pfd::core::TaskSnapshot>& snap
     }
   }
 
-  int restoreRow = -1;
-  QList<int> restoreRows;
-
   const auto rowColorForStatus = [](pfd::base::TaskStatus status) -> QColor {
     if (status == pfd::base::TaskStatus::kDownloading)
       return {40, 167, 69};
@@ -378,13 +540,6 @@ void TransferPage::setSnapshots(const std::vector<pfd::core::TaskSnapshot>& snap
 
   for (int row = 0; row < newRowCount; ++row) {
     const auto& s = visible[static_cast<std::size_t>(row)];
-
-    if (!previousSelected.isNull() && s.taskId == previousSelected) {
-      restoreRow = row;
-    }
-    if (previousSelectedIds.contains(s.taskId.toString(QUuid::WithoutBraces))) {
-      restoreRows.push_back(row);
-    }
 
     QColor rowColor = rowColorForStatus(s.status);
     const bool isMemoryRow = isMemoryMode_ && !memoryTaskId_.isNull() && s.taskId == memoryTaskId_;
@@ -440,32 +595,7 @@ void TransferPage::setSnapshots(const std::vector<pfd::core::TaskSnapshot>& snap
     taskTable_->clearSelection();
     taskTable_->setCurrentCell(-1, -1);
   } else {
-    int targetRow = -1;
-    if (!lastFocusedTaskId_.isNull()) {
-      targetRow = indexOfTask(lastFocusedTaskId_);
-    }
-    if (targetRow < 0 && restoreRow >= 0 && restoreRow < taskTable_->rowCount()) {
-      targetRow = restoreRow;
-    }
-    if (!restoreRows.isEmpty() && taskTable_->selectionModel() != nullptr) {
-      taskTable_->clearSelection();
-      for (int r : restoreRows) {
-        if (r < 0 || r >= taskTable_->rowCount())
-          continue;
-        const QModelIndex idx = taskTable_->model()->index(r, 0);
-        taskTable_->selectionModel()->select(idx, QItemSelectionModel::Select |
-                                                      QItemSelectionModel::Rows);
-      }
-      if (targetRow >= 0 && targetRow < taskTable_->rowCount()) {
-        const QModelIndex curIdx = taskTable_->model()->index(targetRow, 0);
-        taskTable_->selectionModel()->setCurrentIndex(curIdx, QItemSelectionModel::NoUpdate);
-      }
-    } else if (targetRow >= 0 && targetRow < taskTable_->rowCount()) {
-      taskTable_->setCurrentCell(targetRow, 0);
-    } else {
-      taskTable_->clearSelection();
-      taskTable_->setCurrentCell(-1, -1);
-    }
+    restoreTableSelection(previousSelection);
   }
   taskTable_->setUpdatesEnabled(true);
 
@@ -530,11 +660,29 @@ pfd::base::TaskId TransferPage::selectedTaskId() const {
   if (taskTable_ == nullptr) {
     return {};
   }
-  const int row = taskTable_->currentRow();
-  if (row < 0 || row >= static_cast<int>(displayedSnapshots_.size())) {
-    return {};
+
+  QItemSelectionModel* sel = taskTable_->selectionModel();
+  const int currentRow = taskTable_->currentRow();
+  if (currentRow >= 0 && currentRow < static_cast<int>(displayedSnapshots_.size()) &&
+      (sel == nullptr || sel->selectedRows().isEmpty() ||
+       sel->isRowSelected(currentRow, QModelIndex()))) {
+    return displayedSnapshots_[static_cast<std::size_t>(currentRow)].taskId;
   }
-  return displayedSnapshots_[static_cast<std::size_t>(row)].taskId;
+
+  if (sel != nullptr) {
+    const QModelIndexList rows = sel->selectedRows();
+    if (!rows.isEmpty()) {
+      const int row = rows.front().row();
+      if (row >= 0 && row < static_cast<int>(displayedSnapshots_.size())) {
+        return displayedSnapshots_[static_cast<std::size_t>(row)].taskId;
+      }
+    }
+  }
+
+  if (!lastFocusedTaskId_.isNull() && indexOfTask(lastFocusedTaskId_) >= 0) {
+    return lastFocusedTaskId_;
+  }
+  return {};
 }
 
 TransferPage::TaskFilter TransferPage::currentFilter() const {
@@ -615,6 +763,44 @@ void TransferPage::setFilter(TaskFilter f) {
     filterMovingBtn_->setChecked(v == 13);
   if (filterErrorDetailBtn_ != nullptr)
     filterErrorDetailBtn_->setChecked(v == 14);
+  updateFilterMoreUiForCurrentFilter();
+}
+
+void TransferPage::updateFilterMoreUiForCurrentFilter() {
+  if (filterMoreExpandBtn_ == nullptr || filterMorePanel_ == nullptr) {
+    return;
+  }
+  const TaskFilter f = currentFilter();
+  const bool need = filterUsesMoreSection(f);
+  QSignalBlocker b(filterMoreExpandBtn_);
+  filterMoreExpandBtn_->setChecked(need);
+  filterMorePanel_->setVisible(need);
+  filterMoreExpandBtn_->setText(need ? QStringLiteral("收起") : QStringLiteral("更多…"));
+}
+
+void TransferPage::syncDetailTheme() {
+  if (detailPanel_ != nullptr) {
+    detailPanel_->syncTheme();
+  }
+}
+
+void TransferPage::setDetailPanelVisible(bool visible) {
+  if (splitter_ == nullptr || detailPanel_ == nullptr) {
+    return;
+  }
+  detailPanel_->setVisible(visible);
+  if (!visible) {
+    const QList<int> sizes = splitter_->sizes();
+    if (sizes.size() >= 2 && sizes[1] > 0) {
+      savedDetailSplitterSizes_ = sizes;
+    }
+    const int total = sizes.isEmpty() ? splitter_->height() : sizes[0] + sizes[1];
+    splitter_->setSizes({std::max(1, total), 0});
+    return;
+  }
+  if (!savedDetailSplitterSizes_.isEmpty() && savedDetailSplitterSizes_.size() >= 2) {
+    splitter_->setSizes(savedDetailSplitterSizes_);
+  }
 }
 
 TransferPage::SortKey TransferPage::currentSortKey() const {
@@ -705,57 +891,6 @@ void TransferPage::updateStats(const std::vector<pfd::core::TaskSnapshot>& snaps
     finishedStatLabel_->setText(QString::number(finished));
   if (errorStatLabel_ != nullptr)
     errorStatLabel_->setText(QString::number(error));
-
-  QSet<QString> allTags;
-  for (const auto& s : snapshots) {
-    if (s.tags.isEmpty())
-      continue;
-    const auto parts = s.tags.split(QLatin1Char(','), Qt::SkipEmptyParts);
-    for (const auto& t : parts) {
-      allTags.insert(t.trimmed());
-    }
-  }
-
-  if (tagFilterLayout_ != nullptr && allTags != lastTagSet_) {
-    lastTagSet_ = allTags;
-
-    for (auto* btn : tagFilterButtons_) {
-      tagFilterLayout_->removeWidget(btn);
-      delete btn;
-    }
-    tagFilterButtons_.clear();
-
-    auto* allBtn = new QPushButton(QStringLiteral("全部标签"));
-    allBtn->setObjectName(QStringLiteral("FilterButton"));
-    allBtn->setCheckable(true);
-    allBtn->setChecked(activeTagFilter_.isEmpty());
-    tagFilterLayout_->addWidget(allBtn);
-    tagFilterButtons_.push_back(allBtn);
-    connect(allBtn, &QPushButton::clicked, this, [this]() {
-      activeTagFilter_.clear();
-      for (auto* b : tagFilterButtons_)
-        b->setChecked(b == tagFilterButtons_.first());
-      emit filterChanged();
-    });
-
-    QList<QString> sorted(allTags.begin(), allTags.end());
-    std::sort(sorted.begin(), sorted.end());
-    for (const auto& tag : sorted) {
-      auto* btn = new QPushButton(tag);
-      btn->setObjectName(QStringLiteral("FilterButton"));
-      btn->setCheckable(true);
-      btn->setChecked(activeTagFilter_ == tag);
-      tagFilterLayout_->addWidget(btn);
-      tagFilterButtons_.push_back(btn);
-      connect(btn, &QPushButton::clicked, this, [this, tag]() {
-        activeTagFilter_ = tag;
-        for (auto* b : tagFilterButtons_) {
-          b->setChecked(b->text() == tag);
-        }
-        emit filterChanged();
-      });
-    }
-  }
 }
 
 bool TransferPage::matchFilter(const pfd::core::TaskSnapshot& snapshot, TaskFilter filter) {

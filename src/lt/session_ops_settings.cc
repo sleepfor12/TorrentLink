@@ -68,21 +68,14 @@ bool handleOne(libtorrent::session& ses, Context& ctx,
                                            std::clamp(c.monitor_port, 0, 65535))
                    .toStdString());
 
-  if (c.active_downloads > 0) {
-    pack.set_int(libtorrent::settings_pack::active_downloads, c.active_downloads);
-  } else if (c.active_downloads == 0) {
-    pack.set_int(libtorrent::settings_pack::active_downloads, 0);
-  }
-  if (c.active_seeds > 0) {
-    pack.set_int(libtorrent::settings_pack::active_seeds, c.active_seeds);
-  } else if (c.active_seeds == 0) {
-    pack.set_int(libtorrent::settings_pack::active_seeds, 0);
-  }
-  if (c.active_limit > 0) {
-    pack.set_int(libtorrent::settings_pack::active_limit, c.active_limit);
-  } else if (c.active_limit == 0) {
-    pack.set_int(libtorrent::settings_pack::active_limit, 0);
-  }
+  // AppSettings / UI 约定：0 表示「默认 / 不限制」。libtorrent 需用 -1 表示不限制；传 0 会把
+  // 活跃槽位压成 0，自动管理会把任务暂停，表现为下载突然停住。
+  const int activeDownloadsLt = c.active_downloads > 0 ? c.active_downloads : -1;
+  const int activeSeedsLt = c.active_seeds > 0 ? c.active_seeds : -1;
+  const int activeLimitLt = c.active_limit > 0 ? c.active_limit : -1;
+  pack.set_int(libtorrent::settings_pack::active_downloads, activeDownloadsLt);
+  pack.set_int(libtorrent::settings_pack::active_seeds, activeSeedsLt);
+  pack.set_int(libtorrent::settings_pack::active_limit, activeLimitLt);
   if (c.max_active_checking > 0) {
     pack.set_int(libtorrent::settings_pack::active_checking, c.max_active_checking);
   }
@@ -189,9 +182,9 @@ bool handleOne(libtorrent::session& ses, Context& ctx,
                .arg(c.download_rate_limit_kib)
                .arg(c.upload_rate_limit_kib)
                .arg(c.connections_limit)
-               .arg(c.active_downloads)
-               .arg(c.active_seeds)
-               .arg(c.active_limit)
+               .arg(activeDownloadsLt)
+               .arg(activeSeedsLt)
+               .arg(activeLimitLt)
                .arg(c.upload_slots_limit)
                .arg(c.per_torrent_upload_slots_limit)
                .arg(c.listen_port)

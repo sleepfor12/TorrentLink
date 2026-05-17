@@ -8,6 +8,8 @@
 
 #include <utility>
 
+#include "core/config_service.h"
+#include "ui/app_theme.h"
 #include "ui/pages/detail/content_tree_page.h"
 #include "ui/pages/detail/general_detail_page.h"
 #include "ui/pages/detail/http_source_page.h"
@@ -19,6 +21,7 @@ namespace pfd::ui {
 
 TaskDetailPanel::TaskDetailPanel(QWidget* parent) : QWidget(parent) {
   buildLayout();
+  syncTheme();
 }
 
 void TaskDetailPanel::buildLayout() {
@@ -46,9 +49,8 @@ void TaskDetailPanel::buildLayout() {
 
   // Tab bar
   auto* tabBar = new QWidget(this);
+  detailTabBar_ = tabBar;
   tabBar->setObjectName(QStringLiteral("DetailTabBar"));
-  tabBar->setStyleSheet(
-      QStringLiteral("#DetailTabBar{background:#f9fafb;border-top:1px solid #e5e7eb;}"));
   auto* tabLayout = new QHBoxLayout(tabBar);
   tabLayout->setContentsMargins(8, 4, 8, 4);
   tabLayout->setSpacing(4);
@@ -56,17 +58,12 @@ void TaskDetailPanel::buildLayout() {
   const QStringList labels = {QStringLiteral("普通"), QStringLiteral("Tracker"),
                               QStringLiteral("用户"), QStringLiteral("HTTP源"),
                               QStringLiteral("内容"), QStringLiteral("速度")};
-  const QStringList icons = {QStringLiteral("📋"), QStringLiteral("📡"), QStringLiteral("👥"),
-                             QStringLiteral("🌐"), QStringLiteral("📁"), QStringLiteral("📈")};
 
   for (int i = 0; i < 6; ++i) {
-    tabButtons_[i] = new QPushButton(icons[i] + QStringLiteral(" ") + labels[i], tabBar);
+    tabButtons_[i] = new QPushButton(labels[i], tabBar);
+    tabButtons_[i]->setObjectName(QStringLiteral("DetailTabButton"));
     tabButtons_[i]->setCheckable(true);
     tabButtons_[i]->setFlat(true);
-    tabButtons_[i]->setStyleSheet(QStringLiteral(
-        "QPushButton{padding:4px 10px;border-radius:4px;font-size:12px;color:#4b5563;}"
-        "QPushButton:checked{background:#e0e7ff;color:#3730a3;font-weight:700;}"
-        "QPushButton:hover{background:#f3f4f6;}"));
     tabLayout->addWidget(tabButtons_[i]);
     connect(tabButtons_[i], &QPushButton::clicked, this, [this, i]() { switchTab(i); });
   }
@@ -131,6 +128,15 @@ void TaskDetailPanel::clear() {
   peersPage_->clear();
   httpSourcePage_->clear();
   contentPage_->clear();
+}
+
+void TaskDetailPanel::syncTheme() {
+  if (detailTabBar_ == nullptr) {
+    return;
+  }
+  const auto st = pfd::core::ConfigService::loadAppSettings();
+  const EffectiveUiTheme t = UiTheme::resolveEffectiveTheme(st.ui_theme);
+  detailTabBar_->setStyleSheet(UiTheme::detailTabBarStyleSheet(t));
 }
 
 }  // namespace pfd::ui

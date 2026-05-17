@@ -93,6 +93,7 @@ RssItem itemFromJson(const QJsonObject& o) {
   it.accepted = o[QStringLiteral("accepted")].toBool(false);
   // queued is a runtime-only transient state, never restore it from disk.
   it.queued = false;
+  it.rss_auto_waitlisted = false;
   it.last_auto_decision =
       static_cast<AutoDownloadDecision>(o[QStringLiteral("last_auto_decision")].toInt(0));
   it.last_auto_reason_code = o[QStringLiteral("last_auto_reason_code")].toString();
@@ -139,40 +140,6 @@ RssRule ruleFromJson(const QJsonObject& o) {
   r.category = o[QStringLiteral("category")].toString();
   r.tags_csv = o[QStringLiteral("tags_csv")].toString();
   return r;
-}
-
-// ─── Series serialization ───
-
-QJsonObject seriesToJson(const SeriesSubscription& s) {
-  QJsonObject o;
-  o[QStringLiteral("id")] = s.id;
-  o[QStringLiteral("name")] = s.name;
-  o[QStringLiteral("aliases")] = QJsonArray::fromStringList(s.aliases);
-  o[QStringLiteral("quality_keywords")] = QJsonArray::fromStringList(s.quality_keywords);
-  o[QStringLiteral("enabled")] = s.enabled;
-  o[QStringLiteral("auto_download_enabled")] = s.auto_download_enabled;
-  o[QStringLiteral("season")] = s.season;
-  o[QStringLiteral("last_episode_num")] = s.last_episode_num;
-  o[QStringLiteral("last_episode")] = s.last_episode;
-  o[QStringLiteral("save_path")] = s.save_path;
-  return o;
-}
-
-SeriesSubscription seriesFromJson(const QJsonObject& o) {
-  SeriesSubscription s;
-  s.id = o[QStringLiteral("id")].toString();
-  s.name = o[QStringLiteral("name")].toString();
-  for (const auto& v : o[QStringLiteral("aliases")].toArray())
-    s.aliases.push_back(v.toString());
-  for (const auto& v : o[QStringLiteral("quality_keywords")].toArray())
-    s.quality_keywords.push_back(v.toString());
-  s.enabled = o[QStringLiteral("enabled")].toBool(true);
-  s.auto_download_enabled = o[QStringLiteral("auto_download_enabled")].toBool(false);
-  s.season = o[QStringLiteral("season")].toInt(-1);
-  s.last_episode_num = o[QStringLiteral("last_episode_num")].toInt(0);
-  s.last_episode = o[QStringLiteral("last_episode")].toString();
-  s.save_path = o[QStringLiteral("save_path")].toString();
-  return s;
 }
 
 // ─── Generic envelope IO ───
@@ -239,9 +206,6 @@ std::vector<RssItem> RssRepository::loadItems() const {
 std::vector<RssRule> RssRepository::loadRules() const {
   return loadEnvelope<RssRule>(rulesPath(), ruleFromJson);
 }
-std::vector<SeriesSubscription> RssRepository::loadSeries() const {
-  return loadEnvelope<SeriesSubscription>(seriesPath(), seriesFromJson);
-}
 
 bool RssRepository::saveFeeds(const std::vector<RssFeed>& feeds) const {
   return saveEnvelope(feedsPath(), feeds, feedToJson);
@@ -251,9 +215,6 @@ bool RssRepository::saveItems(const std::vector<RssItem>& items) const {
 }
 bool RssRepository::saveRules(const std::vector<RssRule>& rules) const {
   return saveEnvelope(rulesPath(), rules, ruleToJson);
-}
-bool RssRepository::saveSeries(const std::vector<SeriesSubscription>& series) const {
-  return saveEnvelope(seriesPath(), series, seriesToJson);
 }
 
 RssSettings RssRepository::loadSettings() const {
@@ -269,10 +230,16 @@ RssSettings RssRepository::loadSettings() const {
   s.refresh_interval_minutes = o[QStringLiteral("refresh_interval_minutes")].toInt(30);
   s.max_auto_downloads_per_refresh =
       o[QStringLiteral("max_auto_downloads_per_refresh")].toInt(kAutoDownloadMaxPerRefresh);
+  s.max_concurrent_auto_downloads =
+      o[QStringLiteral("max_concurrent_auto_downloads")].toInt(kRssDefaultConcurrentAutoDownloads);
+  s.max_auto_download_backlog =
+      o[QStringLiteral("max_auto_download_backlog")].toInt(kRssDefaultAutoDownloadBacklog);
   s.history_max_items = o[QStringLiteral("history_max_items")].toInt(5000);
   s.history_max_age_days = o[QStringLiteral("history_max_age_days")].toInt(90);
   s.refresh_interval_minutes = std::clamp(s.refresh_interval_minutes, 5, 1440);
   s.max_auto_downloads_per_refresh = std::clamp(s.max_auto_downloads_per_refresh, 1, 100);
+  s.max_concurrent_auto_downloads = std::clamp(s.max_concurrent_auto_downloads, 1, 50);
+  s.max_auto_download_backlog = std::clamp(s.max_auto_download_backlog, 1, 500);
   s.history_max_items = std::clamp(s.history_max_items, 100, 100000);
   s.history_max_age_days = std::clamp(s.history_max_age_days, 0, 3650);
   s.external_player_command = o[QStringLiteral("external_player_command")].toString().trimmed();
@@ -284,6 +251,8 @@ bool RssRepository::saveSettings(const RssSettings& s) const {
   o[QStringLiteral("global_auto_download")] = s.global_auto_download;
   o[QStringLiteral("refresh_interval_minutes")] = s.refresh_interval_minutes;
   o[QStringLiteral("max_auto_downloads_per_refresh")] = s.max_auto_downloads_per_refresh;
+  o[QStringLiteral("max_concurrent_auto_downloads")] = s.max_concurrent_auto_downloads;
+  o[QStringLiteral("max_auto_download_backlog")] = s.max_auto_download_backlog;
   o[QStringLiteral("history_max_items")] = s.history_max_items;
   o[QStringLiteral("history_max_age_days")] = s.history_max_age_days;
   o[QStringLiteral("external_player_command")] = s.external_player_command.trimmed();
@@ -300,9 +269,6 @@ QString RssRepository::itemsPath() const {
 }
 QString RssRepository::rulesPath() const {
   return QDir(data_dir_).filePath(QStringLiteral("rss_rules.json"));
-}
-QString RssRepository::seriesPath() const {
-  return QDir(data_dir_).filePath(QStringLiteral("rss_series.json"));
 }
 QString RssRepository::settingsPath() const {
   return QDir(data_dir_).filePath(QStringLiteral("rss_settings.json"));

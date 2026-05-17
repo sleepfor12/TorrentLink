@@ -26,9 +26,20 @@ public:
     QString cookie_rules;
   };
 
+  /// 与 libtorrent 会话代理一致；启用且 host 非空时用于 RSS / HTTP 拉取。
+  struct HttpProxyConfig {
+    bool enabled{false};
+    QString type{QStringLiteral("socks5")};
+    QString host;
+    int port{1080};
+    QString user;
+    QString password;
+  };
+
   RssFetcher() = default;
 
   void setRequestHeaders(RequestHeaders headers);
+  void setHttpProxy(HttpProxyConfig proxy);
 
   [[nodiscard]] FetchResult fetch(const QString& url) const {
     return fetch(url, QString());
@@ -39,6 +50,7 @@ public:
 
 private:
   RequestHeaders headers_;
+  HttpProxyConfig proxy_;
 };
 
 }  // namespace pfd::core::rss

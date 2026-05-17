@@ -7,30 +7,6 @@ This project is my graduation design project, implementing a lightweight desktop
 It is a desktop P2P downloader based on **Qt 6 (Widgets) + libtorrent (2.0.5)**, aiming to provide a stable, extensible, and maintainable BitTorrent client.
 Parts of the UI design reference qBittorrent.
 
-## Implemented Features
-
-- BitTorrent task management (add magnet / `.torrent`, pause/resume/delete, speed limits)
-- Multi-tag/category management and tag filtering
-- File priority and content tree
-- Tracker management (add/edit/remove/force reannounce)
-- Peer list
-- RSS subscription with auto-download
-- Search backend capability (UI entry is temporarily hidden)
-- System tray, download completion notifications, speed chart, and log center
-- Persistence and resume data support
-- Create `.torrent` from file/folder
-- Cookie manager and request-header injection for RSS/search requests
-- Post-download action with timed-action priority protection
-- Cross-platform CMake project layout (Linux `pkg-config` fallback, Windows prefers CMake/vcpkg)
-- GoogleTest tests (split into core tests + UI tests)
-
-## Current Progress
-
-- Architecture refactor (app/use-case/pipeline boundary cleanup) is completed in phases.
-- `AppController` is being continuously slimmed down; exit coordination and RSS queue orchestration are extracted.
-- Windows CI build + test is included and kept green as a first-class target.
-- Search tab and HTTP source tab are intentionally hidden in the current UI while backend capability is retained.
-
 ## Development Environment
 
 - OS: `Ubuntu 22.04.5 LTS`
@@ -111,15 +87,14 @@ ctest --test-dir build --output-on-failure
 
 ## Windows Adaptation Status
 
-- Included in CI: `windows-latest` (Qt + vcpkg libtorrent); **Release 构建后运行 `ctest`**（与 Linux 一样拉取 GoogleTest）。
-- Current goal: keep compilation and tests green, then gradually align runtime behavior with Linux.
-- Recommended local build setup: CMake + vcpkg (`CMAKE_TOOLCHAIN_FILE` points to the vcpkg toolchain); pass `-DCMAKE_PREFIX_PATH` to your Qt kit if `find_package(Qt6)` fails.
-- Runtime progress (in progress): first batch of advanced network options is connected (listening port, port forwarding toggle, upload slots, proxy parameters).
-- Optional embedded HTTP Tracker (experimental, P0): process-local `GET /announce` on `127.0.0.1` (see [docs/HTTP_TRACKER_PLAN.md](docs/HTTP_TRACKER_PLAN.md)); managed from app settings and `AppController`, not from the libtorrent session worker.
+- **CI:** `windows-latest` with Qt + vcpkg libtorrent; Release (and Debug) builds run **`ctest`** the same way as on Linux (GoogleTest).
+- **Status:** Windows build + automated tests are in good shape; hands-on Windows testing is **largely complete** for the current feature set. Remaining work is mostly polish and parity edge cases vs Linux, not greenfield porting.
+- **Local build:** CMake + vcpkg (`CMAKE_TOOLCHAIN_FILE`); set `-DCMAKE_PREFIX_PATH` to your Qt installation if `find_package(Qt6)` fails.
+- **Runtime:** Core session options are wired (listen port, port forwarding toggles, upload slots, proxy, IP filter list file with hot-reload, queue limits, etc.). Optional embedded HTTP Tracker remains experimental (see [docs/HTTP_TRACKER_PLAN.md](docs/HTTP_TRACKER_PLAN.md)); it is driven from app settings / `AppController`, not from the libtorrent session worker thread.
 
 ## V2 Backlog (Not Implemented Yet)
 
-- IP filtering allow/block list (currently settings only, runtime file loading is pending)
+- IP filter extensions (e.g. eMule `ipfilter.dat` binary list, per-peer “ban IP” from the UI)
 - Remote Web UI / JSON-RPC
 - Auto-archive (move completed tasks by category)
 - Online torrent search

@@ -1,6 +1,7 @@
 #include <QApplication>
 #include <QDir>
 #include <QString>
+#include <QtNetwork/QNetworkProxyFactory>
 
 #include <libtorrent/version.hpp>
 
@@ -15,7 +16,9 @@
 int main(int argc, char** argv) {
   QApplication app(argc, argv);
 
-  // 让 QSettings/QStandardPaths 拥有稳定的应用标识
+  // 使 RSS / QNetworkAccessManager 在未配置应用内代理时尽量与系统/环境 HTTP 代理一致（如
+  // http_proxy）。
+  QNetworkProxyFactory::setUseSystemConfiguration(true);
   QCoreApplication::setOrganizationName(QStringLiteral("TorrentLink"));
   QCoreApplication::setApplicationName(QStringLiteral("TorrentLink"));
 

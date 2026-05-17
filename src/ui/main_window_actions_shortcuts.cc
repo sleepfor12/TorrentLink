@@ -17,8 +17,10 @@
 #include <QtGui/QClipboard>
 #include <QtGui/QColor>
 #include <QtGui/QDesktopServices>
+#include <QtGui/QGuiApplication>
 #include <QtGui/QMouseEvent>
 #include <QtGui/QShortcut>
+#include <QtGui/QStyleHints>
 #include <QtWidgets/QAbstractItemView>
 #include <QtWidgets/QApplication>
 #include <QtWidgets/QCheckBox>
@@ -49,6 +51,7 @@
 #include "core/logger.h"
 #include "core/torrent_creator.h"
 #include "ui/main_window.h"
+#include "ui/rss/rss_module_page.h"
 
 namespace pfd::ui {
 
@@ -84,14 +87,62 @@ void MainWindow::bindSignals() {
   if (showLogAction_ != nullptr) {
     connect(showLogAction_, &QAction::triggered, this, [this]() { openLogCenter(); });
   }
+  if (showBottomStatusBarAction_ != nullptr) {
+    connect(showBottomStatusBarAction_, &QAction::toggled, this, [this](bool visible) {
+      setBottomStatusBarVisible(visible);
+      saveUiState();
+    });
+  }
+  if (showTransferDetailPanelAction_ != nullptr) {
+    connect(showTransferDetailPanelAction_, &QAction::toggled, this, [this](bool visible) {
+      setTransferDetailPanelVisible(visible);
+      saveUiState();
+    });
+  }
   if (refreshListAction_ != nullptr) {
     connect(refreshListAction_, &QAction::triggered, this, [this]() { refreshTasks(snapshots_); });
   }
-  if (themeAction_ != nullptr) {
-    connect(themeAction_, &QAction::triggered, this, [this]() {
-      QMessageBox::information(this, QStringLiteral("界面主题"),
-                               QStringLiteral("界面主题切换功能开发中。"));
+  if (themeLightAction_ != nullptr) {
+    connect(themeLightAction_, &QAction::triggered, this, [this]() {
+      auto s = pfd::core::ConfigService::loadAppSettings();
+      s.ui_theme = QStringLiteral("light");
+      (void)pfd::core::ConfigService::saveAppSettings(s);
+      syncThemeMenuChecks();
+      applyTheme();
     });
+  }
+  if (themeDarkAction_ != nullptr) {
+    connect(themeDarkAction_, &QAction::triggered, this, [this]() {
+      auto s = pfd::core::ConfigService::loadAppSettings();
+      s.ui_theme = QStringLiteral("dark");
+      (void)pfd::core::ConfigService::saveAppSettings(s);
+      syncThemeMenuChecks();
+      applyTheme();
+    });
+  }
+  if (themeSystemAction_ != nullptr) {
+    connect(themeSystemAction_, &QAction::triggered, this, [this]() {
+      auto s = pfd::core::ConfigService::loadAppSettings();
+      s.ui_theme = QStringLiteral("system");
+      (void)pfd::core::ConfigService::saveAppSettings(s);
+      syncThemeMenuChecks();
+      applyTheme();
+    });
+  }
+#if QT_VERSION >= QT_VERSION_CHECK(6, 5, 0)
+  connect(QGuiApplication::styleHints(), &QStyleHints::colorSchemeChanged, this, [this]() {
+    const QString pref = pfd::core::ConfigService::loadAppSettings().ui_theme.trimmed().toLower();
+    if (pref == QStringLiteral("system")) {
+      applyTheme();
+    }
+  });
+#endif
+  syncThemeMenuChecks();
+  if (rssModulePage_ != nullptr) {
+    connect(rssModulePage_, &pfd::ui::rss::RssModulePage::dataViewsRefreshed, this,
+            [this]() { Q_EMIT rssViewsRefreshed(); });
+    connect(rssModulePage_, &pfd::ui::rss::RssModulePage::rssNetworkRefreshFinished, this,
+            [this]() { Q_EMIT rssNetworkRefreshFinished(); });
   }
   if (helpAction_ != nullptr) {
     connect(helpAction_, &QAction::triggered, this, [this]() {
@@ -143,6 +194,8 @@ void MainWindow::bindSignals() {
     connect(taskTable_, &QTableWidget::customContextMenuRequested, this,
             [this](const QPoint& pos) { showTaskContextMenu(pos); });
   }
+
+  connect(this, &MainWindow::rssSettingsChanged, this, &MainWindow::refreshRssDataViews);
 }
 
 void MainWindow::openTorrentLinksFromMenu() {

@@ -14,6 +14,8 @@ struct MainWindowUiState {
   int sortKey{0};
   int sortOrder{0};
   int filter{0};
+  bool bottom_status_bar_visible{true};
+  bool transfer_detail_panel_visible{true};
 };
 
 struct LogCenterUiState {

@@ -1,11 +1,14 @@
 #include <QtCore/QDir>
+#include <QtCore/QSignalBlocker>
 #include <QtCore/QStringList>
+#include <QtGui/QActionGroup>
 #include <QtWidgets/QCheckBox>
 #include <QtWidgets/QComboBox>
 #include <QtWidgets/QHBoxLayout>
 #include <QtWidgets/QHeaderView>
 #include <QtWidgets/QLabel>
 #include <QtWidgets/QLineEdit>
+#include <QtWidgets/QMenu>
 #include <QtWidgets/QMenuBar>
 #include <QtWidgets/QPushButton>
 #include <QtWidgets/QTabWidget>
@@ -13,7 +16,11 @@
 #include <QtWidgets/QVBoxLayout>
 #include <QtWidgets/QWidget>
 
+#include "core/config_service.h"
+#include "ui/app_theme.h"
 #include "ui/main_window.h"
+#include "ui/pages/detail/speed_chart_page.h"
+#include "ui/pages/detail/tracker_detail_page.h"
 #include "ui/pages/transfer_page.h"
 #include "ui/rss/rss_module_page.h"
 #include "ui/widgets/bottom_status_bar.h"
@@ -28,7 +35,22 @@ void MainWindow::setupMenuBar() {
   exitAction_ = fileMenu->addAction(QStringLiteral("退出"));
   auto* toolsMenu = menuBar()->addMenu(QStringLiteral("工具"));
   preferencesAction_ = toolsMenu->addAction(QStringLiteral("首选项"));
-  themeAction_ = toolsMenu->addAction(QStringLiteral("界面主题"));
+  themeMenu_ = toolsMenu->addMenu(QStringLiteral("界面主题"));
+  themeActionGroup_ = new QActionGroup(this);
+  themeActionGroup_->setExclusive(true);
+  themeLightAction_ = themeMenu_->addAction(QStringLiteral("浅色"));
+  themeLightAction_->setCheckable(true);
+  themeDarkAction_ = themeMenu_->addAction(QStringLiteral("深色"));
+  themeDarkAction_->setCheckable(true);
+  themeSystemAction_ = themeMenu_->addAction(QStringLiteral("跟随系统"));
+  themeSystemAction_->setCheckable(true);
+#if QT_VERSION < QT_VERSION_CHECK(6, 5, 0)
+  themeSystemAction_->setToolTip(
+      QStringLiteral("当前 Qt 版本低于 6.5 时，“跟随系统”与浅色效果相同。"));
+#endif
+  themeActionGroup_->addAction(themeLightAction_);
+  themeActionGroup_->addAction(themeDarkAction_);
+  themeActionGroup_->addAction(themeSystemAction_);
   toolsMenu->addSeparator();
   logCenterAction_ = toolsMenu->addAction(QStringLiteral("日志中心"));
   toolsMenu->addSeparator();
@@ -36,6 +58,13 @@ void MainWindow::setupMenuBar() {
   manageCookiesAction_ = toolsMenu->addAction(QStringLiteral("管理 Cookies"));
   auto* viewMenu = menuBar()->addMenu(QStringLiteral("视图"));
   showLogAction_ = viewMenu->addAction(QStringLiteral("显示日志面板"));
+  showBottomStatusBarAction_ = viewMenu->addAction(QStringLiteral("显示底部状态栏"));
+  showBottomStatusBarAction_->setCheckable(true);
+  showBottomStatusBarAction_->setChecked(true);
+  showTransferDetailPanelAction_ = viewMenu->addAction(QStringLiteral("显示传输页任务详情"));
+  showTransferDetailPanelAction_->setCheckable(true);
+  showTransferDetailPanelAction_->setChecked(true);
+  viewMenu->addSeparator();
   refreshListAction_ = viewMenu->addAction(QStringLiteral("刷新任务列表"));
   auto* helpMenu = menuBar()->addMenu(QStringLiteral("帮助"));
   helpAction_ = helpMenu->addAction(QStringLiteral("使用说明"));
@@ -43,39 +72,40 @@ void MainWindow::setupMenuBar() {
 }
 
 void MainWindow::applyTheme() {
-  setStyleSheet(QStringLiteral(
-      "QMainWindow{background:#f5f7fb;}"
-      "QTabWidget::pane{border:0;background:transparent;}"
-      "QTabBar::tab{background:#ffffff;border:1px solid #e7ebf3;border-bottom:0;"
-      "padding:10px 14px;margin-right:6px;border-top-left-radius:10px;border-top-right-radius:10px;"
-      "color:#41516d;font-weight:700;}"
-      "QTabBar::tab:selected{background:#ffffff;color:#1677ff;border-color:#d6e3ff;}"
-      "QTabBar::tab:!selected{background:#f8fbff;}"
-      "QWidget#TopBar{background:#ffffff;border:1px solid #e7ebf3;border-radius:12px;}"
-      "QWidget#SideBar{background:#ffffff;border:1px solid #e7ebf3;border-radius:12px;}"
-      "QLineEdit{background:#f9fbff;border:1px solid #d8e2f0;border-radius:10px;"
-      "padding:8px 12px;color:#1f2937;}"
-      "QLineEdit:focus{border:1px solid #409eff;}"
-      "QPushButton{background:#eef3ff;color:#2b3a55;border:1px solid #d6e3ff;border-radius:10px;"
-      "padding:8px 14px;font-weight:600;}"
-      "QPushButton:hover{background:#e4edff;}"
-      "QPushButton#PrimaryButton{background:#1677ff;color:#ffffff;border:1px solid #1677ff;}"
-      "QPushButton#PrimaryButton:hover{background:#3d8bff;}"
-      "QPushButton#FilterButton{background:#f5f8ff;color:#41516d;border:1px solid "
-      "#d9e5ff;border-radius:14px;}"
-      "QPushButton#FilterButton:checked{background:#1677ff;color:#ffffff;border:1px solid #1677ff;}"
-      "QWidget#StatCard{background:#ffffff;border:1px solid #e7ebf3;border-radius:12px;}"
-      "QWidget#BottomStatusBar{background:#ffffff;border:1px solid #e7ebf3;border-radius:12px;}"
-      "QLabel#BottomStatusLabel{color:#41516d;font-size:12px;font-weight:600;}"
-      "QLabel#StatTitle{color:#6b7280;font-size:12px;}"
-      "QLabel#StatValue{color:#1f2937;font-size:22px;font-weight:700;}"
-      "QTableWidget{background:#ffffff;border:1px solid #e7ebf3;border-radius:12px;"
-      "gridline-color:#eff3f9;selection-background-color:#2f6fed;selection-color:#ffffff;}"
-      "QTableWidget::item:selected{color:#ffffff;}"
-      "QHeaderView::section{background:#f8fbff;color:#50607a;border:none;border-bottom:1px solid "
-      "#e7ebf3;"
-      "padding:8px;font-weight:600;}"
-      ""));
+  const auto st = pfd::core::ConfigService::loadAppSettings();
+  const EffectiveUiTheme t = UiTheme::resolveEffectiveTheme(st.ui_theme);
+  setStyleSheet(UiTheme::mainWindowStyleSheet(t));
+  for (SpeedChartPage* chart : findChildren<SpeedChartPage*>()) {
+    if (chart != nullptr) {
+      chart->syncChartTheme();
+    }
+  }
+  for (TrackerDetailPage* tracker : findChildren<TrackerDetailPage*>()) {
+    if (tracker != nullptr) {
+      tracker->syncTheme();
+    }
+  }
+  if (transferPage_ != nullptr) {
+    transferPage_->syncDetailTheme();
+  }
+}
+
+void MainWindow::syncThemeMenuChecks() {
+  if (themeLightAction_ == nullptr || themeDarkAction_ == nullptr ||
+      themeSystemAction_ == nullptr) {
+    return;
+  }
+  const QString pref = pfd::core::ConfigService::loadAppSettings().ui_theme.trimmed().toLower();
+  const QSignalBlocker b0(themeLightAction_);
+  const QSignalBlocker b1(themeDarkAction_);
+  const QSignalBlocker b2(themeSystemAction_);
+  if (pref == QStringLiteral("dark")) {
+    themeDarkAction_->setChecked(true);
+  } else if (pref == QStringLiteral("system")) {
+    themeSystemAction_->setChecked(true);
+  } else {
+    themeLightAction_->setChecked(true);
+  }
 }
 
 void MainWindow::buildLayout() {

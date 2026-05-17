@@ -10,7 +10,10 @@
 #include <QtWidgets/QSpinBox>
 #include <QtWidgets/QVBoxLayout>
 
+#include <algorithm>
+
 #include "core/rss/rss_service.h"
+#include "core/rss/rss_types.h"
 
 namespace pfd::ui::rss {
 
@@ -47,6 +50,18 @@ void RssSettingsPage::buildLayout() {
   maxAutoDownloadsSpin_->setRange(1, 100);
   maxAutoDownloadsSpin_->setSuffix(QStringLiteral(" 条"));
   dlForm->addRow(QStringLiteral("每次刷新最大自动下载数："), maxAutoDownloadsSpin_);
+
+  maxConcurrentAutoDownloadsSpin_ = new QSpinBox(dlGroup);
+  maxConcurrentAutoDownloadsSpin_->setRange(1, 50);
+  maxConcurrentAutoDownloadsSpin_->setSuffix(QStringLiteral(" 个"));
+  dlForm->addRow(QStringLiteral("RSS 同时自动下载数："), maxConcurrentAutoDownloadsSpin_);
+
+  maxAutoDownloadBacklogSpin_ = new QSpinBox(dlGroup);
+  maxAutoDownloadBacklogSpin_->setRange(1, 500);
+  maxAutoDownloadBacklogSpin_->setSuffix(QStringLiteral(" 条"));
+  maxAutoDownloadBacklogSpin_->setToolTip(QStringLiteral(
+      "仅跟踪最新的一部分候选条目用于自动入队，避免大量符合条件条目占用内存与 UI 刷新开销。"));
+  dlForm->addRow(QStringLiteral("自动下载排队上限："), maxAutoDownloadBacklogSpin_);
 
   root->addWidget(dlGroup);
 
@@ -89,9 +104,8 @@ void RssSettingsPage::buildLayout() {
   pathForm->setSpacing(8);
 
   auto* pathHint = new QLabel(
-      QStringLiteral(
-          "RSS 规则和剧集订阅中保存路径留空时，将使用全局的『默认下载目录』。\n"
-          "可在主菜单 - 首选项 - 下载 中修改，或在规则/剧集表单中用『浏览』指定独立路径。"),
+      QStringLiteral("RSS 规则中保存路径留空时，将使用全局的『默认下载目录』。\n"
+                     "可在主菜单 - 首选项 - 下载 中修改，或在规则表单中用『浏览』指定独立路径。"),
       pathGroup);
   pathHint->setWordWrap(true);
   pathHint->setStyleSheet(QStringLiteral("color:#6b7280;font-size:12px;"));
@@ -128,6 +142,8 @@ void RssSettingsPage::loadFromService() {
   globalAutoDownloadCheck_->setChecked(s.global_auto_download);
   refreshIntervalSpin_->setValue(s.refresh_interval_minutes);
   maxAutoDownloadsSpin_->setValue(s.max_auto_downloads_per_refresh);
+  maxConcurrentAutoDownloadsSpin_->setValue(std::clamp(s.max_concurrent_auto_downloads, 1, 50));
+  maxAutoDownloadBacklogSpin_->setValue(std::clamp(s.max_auto_download_backlog, 1, 500));
   historyMaxItemsSpin_->setValue(s.history_max_items);
   historyMaxAgeSpin_->setValue(s.history_max_age_days);
   playerCommandEdit_->setText(s.external_player_command);
@@ -141,11 +157,14 @@ void RssSettingsPage::onSave() {
   s.global_auto_download = globalAutoDownloadCheck_->isChecked();
   s.refresh_interval_minutes = refreshIntervalSpin_->value();
   s.max_auto_downloads_per_refresh = maxAutoDownloadsSpin_->value();
+  s.max_concurrent_auto_downloads = maxConcurrentAutoDownloadsSpin_->value();
+  s.max_auto_download_backlog = maxAutoDownloadBacklogSpin_->value();
   s.history_max_items = historyMaxItemsSpin_->value();
   s.history_max_age_days = historyMaxAgeSpin_->value();
   s.external_player_command = playerCommandEdit_->text().trimmed();
 
   service_->applySettings(s);
+  service_->refreshAutoDownloadDiagnostics();
   service_->saveState();
 
   Q_EMIT settingsSaved();

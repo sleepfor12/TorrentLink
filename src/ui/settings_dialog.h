@@ -42,6 +42,7 @@ private:
   void syncDownloadCompleteActionAvailability();
   void browseDownloadDir();
   void browseLogDir();
+  void browseIpFilterFile();
 
   QLineEdit* downloadDirEdit_{nullptr};
   QPushButton* browseDownloadDirBtn_{nullptr};
@@ -84,6 +85,7 @@ private:
   QComboBox* encryptionModeBox_{nullptr};
   QCheckBox* ipFilterEnabledCheck_{nullptr};
   QLineEdit* ipFilterPathEdit_{nullptr};
+  QPushButton* ipFilterBrowseBtn_{nullptr};
   QCheckBox* proxyEnabledCheck_{nullptr};
   QComboBox* proxyTypeBox_{nullptr};
   QLineEdit* proxyHostEdit_{nullptr};
@@ -93,6 +95,7 @@ private:
 
   QCheckBox* autoApplyTrackersCheck_{nullptr};
   QPlainTextEdit* defaultTrackersEdit_{nullptr};
+  QComboBox* uiThemeBox_{nullptr};
   QSpinBox* magnetMaxInflightSpin_{nullptr};
   QCheckBox* bottomStatusEnabledCheck_{nullptr};
   QSpinBox* bottomStatusRefreshMsSpin_{nullptr};
@@ -109,6 +112,8 @@ private:
   QCheckBox* rssGlobalAutoDownloadCheck_{nullptr};
   QSpinBox* rssRefreshIntervalSpin_{nullptr};
   QSpinBox* rssMaxAutoDownloadsSpin_{nullptr};
+  QSpinBox* rssMaxConcurrentAutoDownloadsSpin_{nullptr};
+  QSpinBox* rssMaxAutoDownloadBacklogSpin_{nullptr};
   QSpinBox* rssHistoryMaxItemsSpin_{nullptr};
   QSpinBox* rssHistoryMaxAgeSpin_{nullptr};
   QLineEdit* rssPlayerCommandEdit_{nullptr};

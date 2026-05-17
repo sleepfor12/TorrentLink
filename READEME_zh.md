@@ -7,30 +7,6 @@ English version: [README.md](README.md)
 这是一个基于 **Qt 6（Widgets）+ libtorrent（2.0.5）** 的桌面端 P2P 下载器，目标是实现一个稳定、可扩展、易维护的 BitTorrent 客户端。
 在部分 UI 设计上参考了 qBittorrent。
 
-## 已实现功能
-
-- BitTorrent 下载管理（添加 magnet / `.torrent`、暂停/恢复/删除、限速）
-- 多标签/分类管理与标签过滤
-- 文件优先级与内容树
-- Tracker 管理（添加/编辑/移除/强制汇报）
-- Peer 列表
-- RSS 订阅自动下载
-- 搜索后端能力（UI 入口当前临时隐藏）
-- 系统托盘、下载完成通知、速度图表、日志中心
-- 持久化与 Resume Data 断点续传
-- 生成 Torrent（文件/文件夹）
-- Cookies 管理与 RSS/搜索请求头注入
-- 下载完成后动作（含“定时动作优先”保护）
-- CMake 跨平台工程（Linux `pkg-config` 回退，Windows 优先 CMake/vcpkg）
-- GoogleTest 自动化测试（核心测试与 UI 测试拆分）
-
-## 当前进度
-
-- 分阶段的架构解耦重构已完成主线目标（应用层/用例层/流水线边界更清晰）。
-- `AppController` 正在持续瘦身，已拆出退出协调与 RSS 队列编排。
-- Windows 已纳入 CI 的构建与测试闭环，并持续做兼容修复。
-- 当前版本中“搜索页”和“HTTP 源页”入口是有意隐藏，后端能力仍保留。
-
 ## 开发环境
 
 - 操作系统：`Ubuntu 22.04.5 LTS`
@@ -111,14 +87,14 @@ ctest --test-dir build --output-on-failure
 
 ## Windows 适配状态
 
-- 已纳入 CI：`windows-latest`（Qt + vcpkg libtorrent）。
-- 当前目标：先保证稳定编译，再逐步推进运行时行为与 Linux 对齐。
-- 本地构建建议：使用 CMake + vcpkg（`CMAKE_TOOLCHAIN_FILE` 指向 vcpkg 工具链）。
-- 运行时推进中：高级网络项已接通第一批（监听端口、端口转发开关、上传槽位、代理参数）。
+- **CI：**`windows-latest`（Qt + vcpkg libtorrent）；Release / Debug 构建后与 Linux 一样执行 **`ctest`**（GoogleTest）。
+- **现状：**Windows 下编译与自动化测试已稳定；当前版本的**本地 Windows 实测已基本完成**，剩余多为与 Linux 的细节对齐与体验优化，而非从零适配。
+- **本地构建：**CMake + vcpkg（`CMAKE_TOOLCHAIN_FILE`）；若找不到 Qt，请设置 `-DCMAKE_PREFIX_PATH` 指向本机 Qt 安装根目录。
+- **运行时：**会话侧网络相关选项已接通（监听端口、端口转发开关、上传槽位、代理、基于文本文件的 **IP 过滤**及规则文件变更后的热重载、队列上限等）。内置 HTTP Tracker 仍为实验性能力，见 [docs/HTTP_TRACKER_PLAN.md](docs/HTTP_TRACKER_PLAN.md)。
 
 ## V2 Backlog（未实现）
 
-- IP 过滤/黑白名单（当前仅设置项，runtime 文件加载待补齐）
+- IP 过滤扩展（如 eMule `ipfilter.dat` 二进制列表、传输列表右键「禁止该 IP」写入规则等）
 - 远程 Web UI / JSON-RPC
 - 自动归档（完成后按分类移动）
 - 在线种子搜索

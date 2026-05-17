@@ -324,8 +324,7 @@ void RssRulesPage::updateSwitchStatus() {
     if (r.enabled)
       ++rulesEnabled;
   }
-
-  QString text = QStringLiteral("自动下载链路：全局%1  ·  %2 个订阅源已开启  ·  %3 条规则已启用")
+  QString text = QStringLiteral("自动下载链路：全局%1  ·  订阅源(自动)%2  ·  规则(启用)%3")
                      .arg(global ? QStringLiteral("【开】") : QStringLiteral("【关】"))
                      .arg(feedsEnabled)
                      .arg(rulesEnabled);
@@ -335,7 +334,7 @@ void RssRulesPage::updateSwitchStatus() {
   } else if (feedsEnabled == 0) {
     text += QStringLiteral("  ⚠ 无订阅源开启自动下载");
   } else if (rulesEnabled == 0) {
-    text += QStringLiteral("  ⚠ 无已启用规则");
+    text += QStringLiteral("  ⚠ 无已启用规则，RSS 自动下载不会匹配条目");
   }
 
   globalSwitch_->setText(text);

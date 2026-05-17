@@ -22,8 +22,11 @@ public:
   void saveTasksNow() const;
 
 private:
+  static int resumeIntervalFromTaskIntervalMs(int taskIntervalMs);
+
   QObject* owner_{nullptr};
-  QTimer* autoSaveTimer_{nullptr};
+  QTimer* taskSaveTimer_{nullptr};
+  QTimer* resumeSaveTimer_{nullptr};
   int intervalMs_{5000};
   SaveTasksFn saveTasksFn_;
   SaveResumeDataFn saveResumeDataFn_;

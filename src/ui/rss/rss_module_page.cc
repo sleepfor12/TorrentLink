@@ -6,7 +6,6 @@
 #include "ui/rss/rss_feeds_page.h"
 #include "ui/rss/rss_items_page.h"
 #include "ui/rss/rss_rules_page.h"
-#include "ui/rss/rss_series_page.h"
 
 namespace pfd::ui::rss {
 
@@ -18,7 +17,6 @@ void RssModulePage::setService(pfd::core::rss::RssService* service) {
   feedsPage_->setService(service);
   itemsPage_->setService(service);
   rulesPage_->setService(service);
-  seriesPage_->setService(service);
 }
 
 void RssModulePage::setItemsPageUiHelpers(
@@ -40,9 +38,7 @@ void RssModulePage::refreshDataViews() {
   if (rulesPage_) {
     rulesPage_->refreshTable();
   }
-  if (seriesPage_) {
-    seriesPage_->refreshTable();
-  }
+  Q_EMIT dataViewsRefreshed();
 }
 
 void RssModulePage::refreshItemsTaskProgress() {
@@ -60,11 +56,21 @@ void RssModulePage::buildLayout() {
   feedsPage_ = new RssFeedsPage(tabs_);
   itemsPage_ = new RssItemsPage(tabs_);
   rulesPage_ = new RssRulesPage(tabs_);
-  seriesPage_ = new RssSeriesPage(tabs_);
+  connect(
+      itemsPage_, &RssItemsPage::rssFeedsReloaded, this,
+      [this]() {
+        refreshDataViews();
+        Q_EMIT rssNetworkRefreshFinished();
+      },
+      Qt::QueuedConnection);
+  connect(
+      feedsPage_, &RssFeedsPage::rssFeedsDataChanged, this, [this]() { refreshDataViews(); },
+      Qt::QueuedConnection);
+  connect(feedsPage_, &RssFeedsPage::rssNetworkRefreshFinished, this,
+          &RssModulePage::rssNetworkRefreshFinished);
   tabs_->addTab(feedsPage_, QStringLiteral("订阅源"));
   tabs_->addTab(itemsPage_, QStringLiteral("条目流"));
   tabs_->addTab(rulesPage_, QStringLiteral("自动规则"));
-  tabs_->addTab(seriesPage_, QStringLiteral("剧集订阅"));
   root->addWidget(tabs_);
 }
 

@@ -24,8 +24,6 @@ add_library(torrentlink_core STATIC
   rss/rss_opml.cc
   rss/rss_rule_engine.h
   rss/rss_rule_engine.cc
-  rss/rss_series_tracker.h
-  rss/rss_series_tracker.cc
   rss/rss_service.h
   rss/rss_service.cc
   save_path_policy.h

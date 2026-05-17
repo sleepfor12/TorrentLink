@@ -1,6 +1,7 @@
 #ifndef PFD_UI_PAGES_TRANSFER_PAGE_H
 #define PFD_UI_PAGES_TRANSFER_PAGE_H
 
+#include <QtCore/QList>
 #include <QtCore/QSet>
 #include <QtWidgets/QWidget>
 
@@ -17,10 +18,10 @@
 class QPushButton;
 class QComboBox;
 class QLineEdit;
-class QVBoxLayout;
 class QTableWidget;
 class QLabel;
 class QSplitter;
+class QWidget;
 
 namespace pfd::ui {
 
@@ -85,6 +86,11 @@ public:
   [[nodiscard]] QByteArray taskHeaderSaveState() const;
   void restoreTaskHeaderState(const QByteArray& state);
 
+  void syncDetailTheme();
+
+  /// 显示/隐藏任务列表下方的详情区（普通/Tracker/速度等统计与图表）。
+  void setDetailPanelVisible(bool visible);
+
   QTableWidget* taskTable() const {
     return taskTable_;
   }
@@ -103,6 +109,7 @@ Q_SIGNALS:
 private:
   void buildLayout();
   void bindSignals();
+  void updateFilterMoreUiForCurrentFilter();
   void updateStats(const std::vector<pfd::core::TaskSnapshot>& snapshots);
   static bool matchFilter(const pfd::core::TaskSnapshot& snapshot, TaskFilter filter);
 
@@ -121,6 +128,9 @@ private:
   QPushButton* filterDownloadPausedBtn_{nullptr};
   QPushButton* filterMovingBtn_{nullptr};
   QPushButton* filterErrorDetailBtn_{nullptr};
+  QPushButton* filterMoreExpandBtn_{nullptr};
+  QWidget* filterMorePanel_{nullptr};
+  std::vector<QPushButton*> allFilterButtons_;
 
   QLineEdit* nameSearchEdit_{nullptr};
   QComboBox* sortKeyBox_{nullptr};
@@ -133,16 +143,19 @@ private:
   QSplitter* splitter_{nullptr};
   TaskDetailPanel* detailPanel_{nullptr};
 
-  QVBoxLayout* tagFilterLayout_{nullptr};
-  QList<QPushButton*> tagFilterButtons_;
-  QString activeTagFilter_;
-  QSet<QString> lastTagSet_;
-
   std::vector<pfd::core::TaskSnapshot> displayedSnapshots_;
   pfd::base::TaskId lastFocusedTaskId_;
   pfd::base::TaskId memoryTaskId_;
   bool isMemoryMode_{false};
+  QList<int> savedDetailSplitterSizes_;
 
+  struct TableSelectionState {
+    QSet<pfd::base::TaskId> selectedIds;
+    pfd::base::TaskId anchorId;
+  };
+
+  [[nodiscard]] TableSelectionState captureTableSelection() const;
+  void restoreTableSelection(const TableSelectionState& prev);
   void updateDetailForSelection();
   int indexOfTask(const pfd::base::TaskId& id) const;
 };

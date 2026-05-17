@@ -1,5 +1,7 @@
 #include "ui/settings_dialog.h"
 
+#include <QtCore/QFileInfo>
+#include <QtCore/qglobal.h>
 #include <QtNetwork/QHostAddress>
 #include <QtNetwork/QTcpServer>
 #include <QtWidgets/QCheckBox>
@@ -18,12 +20,14 @@
 #include <QtWidgets/QSpinBox>
 #include <QtWidgets/QTabWidget>
 #include <QtWidgets/QVBoxLayout>
+#include <QtWidgets/QWidget>
 
 #include <algorithm>
 
 #include "core/app_settings.h"
 #include "core/config_service.h"
 #include "core/rss/rss_types.h"
+#include "ui/app_theme.h"
 
 namespace pfd::ui {
 
@@ -33,119 +37,11 @@ SettingsDialog::SettingsDialog(QWidget* parent) : QDialog(parent) {
   resize(920, 680);
   setMinimumSize(860, 620);
   setObjectName(QStringLiteral("settingsDialog"));
-  setStyleSheet(QStringLiteral("QDialog#settingsDialog {"
-                               "  background: #f5f7fb;"
-                               "}"
-                               "QTabWidget::pane {"
-                               "  border: 1px solid #dfe3eb;"
-                               "  border-radius: 10px;"
-                               "  background: #ffffff;"
-                               "  top: -1px;"
-                               "}"
-                               "QTabBar::tab {"
-                               "  background: #eef1f7;"
-                               "  color: #3a4150;"
-                               "  border: 1px solid #dfe3eb;"
-                               "  border-bottom: none;"
-                               "  border-top-left-radius: 8px;"
-                               "  border-top-right-radius: 8px;"
-                               "  padding: 9px 16px;"
-                               "  margin-right: 6px;"
-                               "  font-weight: 500;"
-                               "}"
-                               "QTabBar::tab:selected {"
-                               "  background: #ffffff;"
-                               "  color: #1f6feb;"
-                               "}"
-                               "QGroupBox {"
-                               "  border: 1px solid #e4e8f0;"
-                               "  border-radius: 10px;"
-                               "  margin-top: 10px;"
-                               "  padding: 12px;"
-                               "  background: #ffffff;"
-                               "  font-weight: 600;"
-                               "}"
-                               "QGroupBox::title {"
-                               "  subcontrol-origin: margin;"
-                               "  left: 12px;"
-                               "  padding: 0 4px;"
-                               "  color: #2f3542;"
-                               "}"
-                               "QFormLayout {"
-                               "  spacing: 10px;"
-                               "}"
-                               "QLineEdit, QPlainTextEdit {"
-                               "  border: 1px solid #d0d7e2;"
-                               "  border-radius: 8px;"
-                               "  background: #ffffff;"
-                               "  padding: 4px 8px;"
-                               "  min-height: 18px;"
-                               "}"
-                               "QLineEdit:focus, QPlainTextEdit:focus {"
-                               "  border: 1px solid #1f6feb;"
-                               "}"
-                               "QComboBox, QSpinBox, QDoubleSpinBox {"
-                               "  color: #1f2937;"
-                               "  background: #ffffff;"
-                               "}"
-                               "QComboBox::drop-down, QSpinBox::up-button, QSpinBox::down-button, "
-                               "QDoubleSpinBox::up-button, QDoubleSpinBox::down-button {"
-                               "  background: transparent;"
-                               "}"
-                               "QComboBox QAbstractItemView {"
-                               "  border: 1px solid #d0d7e2;"
-                               "  background: #ffffff;"
-                               "  color: #1f2937;"
-                               "  padding: 2px;"
-                               "  outline: 0;"
-                               "}"
-                               "QComboBox QAbstractItemView::item {"
-                               "  min-height: 22px;"
-                               "  padding: 2px 8px;"
-                               "}"
-                               "QComboBox QAbstractItemView::item:selected {"
-                               "  background: #1f6feb;"
-                               "  color: #ffffff;"
-                               "}"
-                               "QTabBar QToolButton {"
-                               "  border: 1px solid #d0d7e2;"
-                               "  background: #ffffff;"
-                               "  color: #1f2937;"
-                               "  border-radius: 6px;"
-                               "  padding: 2px;"
-                               "  min-width: 18px;"
-                               "}"
-                               "QPushButton {"
-                               "  border: 1px solid #d0d7e2;"
-                               "  border-radius: 8px;"
-                               "  background: #ffffff;"
-                               "  padding: 7px 14px;"
-                               "}"
-                               "QPushButton:hover {"
-                               "  background: #f3f6fb;"
-                               "}"
-                               "QDialogButtonBox QPushButton {"
-                               "  min-width: 92px;"
-                               "}"
-                               "QDialogButtonBox QPushButton[text=\"确定\"] {"
-                               "  background: #1f6feb;"
-                               "  color: #ffffff;"
-                               "  border-color: #1f6feb;"
-                               "}"
-                               "QDialogButtonBox QPushButton[text=\"确定\"]:hover {"
-                               "  background: #1760cf;"
-                               "}"
-                               "QLabel {"
-                               "  color: #4c5566;"
-                               "  qproperty-wordWrap: true;"
-                               "}"
-                               "QLabel[class=\"sectionHint\"] {"
-                               "  color: #6a7280;"
-                               "  padding-left: 2px;"
-                               "}"
-                               "QCheckBox {"
-                               "  spacing: 7px;"
-                               "}"));
+  {
+    const auto disk = pfd::core::ConfigService::loadAppSettings();
+    const EffectiveUiTheme eff = UiTheme::resolveEffectiveTheme(disk.ui_theme);
+    setStyleSheet(UiTheme::settingsDialogStyleSheet(eff));
+  }
   buildLayout();
   wireSignals();
 }
@@ -206,6 +102,8 @@ pfd::core::AppSettings SettingsDialog::currentSettings() const {
   s.proxy_password = proxyPasswordEdit_ != nullptr ? proxyPasswordEdit_->text() : QString();
   s.close_behavior = closeBehaviorBox_ != nullptr ? closeBehaviorBox_->currentData().toString()
                                                   : QStringLiteral("minimize");
+  s.ui_theme = uiThemeBox_ != nullptr ? uiThemeBox_->currentData().toString().trimmed().toLower()
+                                      : QStringLiteral("system");
   s.start_minimized = startMinimizedCheck_ != nullptr && startMinimizedCheck_->isChecked();
   s.timed_action = timedActionBox_ != nullptr ? timedActionBox_->currentData().toString()
                                               : QStringLiteral("none");
@@ -236,6 +134,12 @@ pfd::core::rss::RssSettings SettingsDialog::currentRssSettings() const {
       rssRefreshIntervalSpin_ != nullptr ? rssRefreshIntervalSpin_->value() : 30;
   s.max_auto_downloads_per_refresh =
       rssMaxAutoDownloadsSpin_ != nullptr ? rssMaxAutoDownloadsSpin_->value() : 10;
+  s.max_concurrent_auto_downloads = rssMaxConcurrentAutoDownloadsSpin_ != nullptr
+                                        ? rssMaxConcurrentAutoDownloadsSpin_->value()
+                                        : pfd::core::rss::kRssDefaultConcurrentAutoDownloads;
+  s.max_auto_download_backlog = rssMaxAutoDownloadBacklogSpin_ != nullptr
+                                    ? rssMaxAutoDownloadBacklogSpin_->value()
+                                    : pfd::core::rss::kRssDefaultAutoDownloadBacklog;
   s.history_max_items =
       rssHistoryMaxItemsSpin_ != nullptr ? rssHistoryMaxItemsSpin_->value() : 5000;
   s.history_max_age_days = rssHistoryMaxAgeSpin_ != nullptr ? rssHistoryMaxAgeSpin_->value() : 90;
@@ -408,6 +312,9 @@ void SettingsDialog::setSettings(const pfd::core::AppSettings& s) {
     ipFilterPathEdit_->setText(s.ip_filter_path);
     ipFilterPathEdit_->setEnabled(s.ip_filter_enabled);
   }
+  if (ipFilterBrowseBtn_ != nullptr) {
+    ipFilterBrowseBtn_->setEnabled(s.ip_filter_enabled);
+  }
   if (proxyEnabledCheck_ != nullptr) {
     proxyEnabledCheck_->setChecked(s.proxy_enabled);
   }
@@ -449,6 +356,15 @@ void SettingsDialog::setSettings(const pfd::core::AppSettings& s) {
   if (startMinimizedCheck_ != nullptr) {
     startMinimizedCheck_->setChecked(s.start_minimized);
   }
+  if (uiThemeBox_ != nullptr) {
+    const QString ut = s.ui_theme.trimmed().toLower();
+    for (int i = 0; i < uiThemeBox_->count(); ++i) {
+      if (uiThemeBox_->itemData(i).toString() == ut) {
+        uiThemeBox_->setCurrentIndex(i);
+        break;
+      }
+    }
+  }
   if (timedActionBox_ != nullptr) {
     const QString timedAction = s.timed_action.trimmed().toLower();
     for (int i = 0; i < timedActionBox_->count(); ++i) {
@@ -484,6 +400,10 @@ void SettingsDialog::setSettings(const pfd::core::AppSettings& s) {
     httpCookieHeaderEdit_->setPlainText(s.http_cookie_header);
   }
   httpCookieRules_ = s.http_cookie_rules;
+  {
+    const EffectiveUiTheme eff = UiTheme::resolveEffectiveTheme(s.ui_theme);
+    setStyleSheet(UiTheme::settingsDialogStyleSheet(eff));
+  }
   syncDownloadCompleteActionAvailability();
 }
 
@@ -496,6 +416,13 @@ void SettingsDialog::setRssSettings(const pfd::core::rss::RssSettings& s) {
   }
   if (rssMaxAutoDownloadsSpin_ != nullptr) {
     rssMaxAutoDownloadsSpin_->setValue(s.max_auto_downloads_per_refresh);
+  }
+  if (rssMaxConcurrentAutoDownloadsSpin_ != nullptr) {
+    rssMaxConcurrentAutoDownloadsSpin_->setValue(
+        std::clamp(s.max_concurrent_auto_downloads, 1, 50));
+  }
+  if (rssMaxAutoDownloadBacklogSpin_ != nullptr) {
+    rssMaxAutoDownloadBacklogSpin_->setValue(std::clamp(s.max_auto_download_backlog, 1, 500));
   }
   if (rssHistoryMaxItemsSpin_ != nullptr) {
     rssHistoryMaxItemsSpin_->setValue(s.history_max_items);
@@ -789,11 +716,21 @@ void SettingsDialog::buildLayout() {
   netAdvancedForm->setVerticalSpacing(10);
   ipFilterEnabledCheck_ = new QCheckBox(QStringLiteral("启用 IP 过滤"), netAdvancedGroup);
   netAdvancedForm->addRow(QStringLiteral("IP 过滤"), ipFilterEnabledCheck_);
-  ipFilterPathEdit_ = new QLineEdit(netAdvancedGroup);
+  auto* ipFilterPathRow = new QWidget(netAdvancedGroup);
+  auto* ipFilterPathLayout = new QHBoxLayout(ipFilterPathRow);
+  ipFilterPathLayout->setContentsMargins(0, 0, 0, 0);
+  ipFilterPathLayout->setSpacing(8);
+  ipFilterPathEdit_ = new QLineEdit(ipFilterPathRow);
   ipFilterPathEdit_->setPlaceholderText(
       QStringLiteral("IPv4/IPv6 文本规则：单行 IP、CIDR、或 起始 - 结束（# 注释）"));
-  netAdvancedForm->addRow(QStringLiteral("规则文件"), ipFilterPathEdit_);
+  ipFilterBrowseBtn_ = new QPushButton(QStringLiteral("浏览…"), ipFilterPathRow);
+  ipFilterPathLayout->addWidget(ipFilterPathEdit_, 1);
+  ipFilterPathLayout->addWidget(ipFilterBrowseBtn_);
+  netAdvancedForm->addRow(QStringLiteral("规则文件"), ipFilterPathRow);
   proxyEnabledCheck_ = new QCheckBox(QStringLiteral("启用代理"), netAdvancedGroup);
+  proxyEnabledCheck_->setToolTip(
+      QStringLiteral("与 BT 会话使用相同代理；RSS 订阅与 RSS 中的 .torrent 链接下载也会走此代理。\n"
+                     "关闭时，HTTP 请求会尝试跟随系统/环境代理（Linux 上常见为 http_proxy 等）。"));
   netAdvancedForm->addRow(QStringLiteral("代理"), proxyEnabledCheck_);
   proxyTypeBox_ = new QComboBox(netAdvancedGroup);
   proxyTypeBox_->addItem(QStringLiteral("SOCKS5"), QStringLiteral("socks5"));
@@ -837,6 +774,14 @@ void SettingsDialog::buildLayout() {
   rssMaxAutoDownloadsSpin_->setRange(1, 100);
   rssMaxAutoDownloadsSpin_->setSuffix(QStringLiteral(" 条"));
   rssDlForm->addRow(QStringLiteral("每次刷新最大自动下载数"), rssMaxAutoDownloadsSpin_);
+  rssMaxConcurrentAutoDownloadsSpin_ = new QSpinBox(rssDlGroup);
+  rssMaxConcurrentAutoDownloadsSpin_->setRange(1, 50);
+  rssMaxConcurrentAutoDownloadsSpin_->setSuffix(QStringLiteral(" 个"));
+  rssDlForm->addRow(QStringLiteral("RSS 同时自动下载数"), rssMaxConcurrentAutoDownloadsSpin_);
+  rssMaxAutoDownloadBacklogSpin_ = new QSpinBox(rssDlGroup);
+  rssMaxAutoDownloadBacklogSpin_->setRange(1, 500);
+  rssMaxAutoDownloadBacklogSpin_->setSuffix(QStringLiteral(" 条"));
+  rssDlForm->addRow(QStringLiteral("自动下载排队上限"), rssMaxAutoDownloadBacklogSpin_);
   rssLayout->addWidget(rssDlGroup);
 
   auto* rssRefreshGroup = new QGroupBox(QStringLiteral("RSS 刷新"), rssTab);
@@ -878,7 +823,7 @@ void SettingsDialog::buildLayout() {
   rssLayout->addWidget(rssPlayerGroup);
 
   auto* rssHint = new QLabel(
-      QStringLiteral("提示：订阅源、规则、剧集页中的行为仍在各自页面配置，本页为 RSS 全局行为。"),
+      QStringLiteral("提示：订阅源与规则页中的行为仍在各自页面配置，本页为 RSS 全局行为。"),
       rssTab);
   rssHint->setProperty("class", QStringLiteral("sectionHint"));
   rssLayout->addWidget(rssHint);
@@ -966,6 +911,16 @@ void SettingsDialog::buildLayout() {
   uiForm->setFieldGrowthPolicy(QFormLayout::ExpandingFieldsGrow);
   uiForm->setFormAlignment(Qt::AlignTop);
   uiForm->setVerticalSpacing(10);
+  uiThemeBox_ = new QComboBox(uiGroup);
+  uiThemeBox_->addItem(QStringLiteral("浅色"), QStringLiteral("light"));
+  uiThemeBox_->addItem(QStringLiteral("深色"), QStringLiteral("dark"));
+  uiThemeBox_->addItem(QStringLiteral("跟随系统"), QStringLiteral("system"));
+#if QT_VERSION < QT_VERSION_CHECK(6, 5, 0)
+  uiThemeBox_->setItemData(2, QStringLiteral("Qt 6.5 以下无法读取系统深浅，此项效果等同于浅色。"),
+                           Qt::ToolTipRole);
+  uiThemeBox_->setItemText(2, QStringLiteral("跟随系统（Qt<6.5 时等同浅色）"));
+#endif
+  uiForm->addRow(QStringLiteral("界面主题"), uiThemeBox_);
   magnetMaxInflightSpin_ = new QSpinBox(uiGroup);
   magnetMaxInflightSpin_->setRange(5, 10);
   magnetMaxInflightSpin_->setValue(8);
@@ -992,6 +947,14 @@ void SettingsDialog::buildLayout() {
   taskAutoSaveMsSpin_->setSingleStep(1000);
   taskAutoSaveMsSpin_->setValue(5000);
   persistForm->addRow(QStringLiteral("任务自动保存间隔"), taskAutoSaveMsSpin_);
+  auto* persistResumeHint = new QLabel(
+      QStringLiteral(
+          "提示：tasks.json 按上述间隔写入；libtorrent 恢复数据（.rd）约为 10 倍间隔（30 秒～5 "
+          "分钟），减轻磁盘与后台压力。"),
+      persistGroup);
+  persistResumeHint->setWordWrap(true);
+  persistResumeHint->setProperty("class", QStringLiteral("sectionHint"));
+  persistForm->addRow(persistResumeHint);
   restoreStartPausedCheck_ =
       new QCheckBox(QStringLiteral("启动时恢复的任务默认暂停（下次启动生效）"), persistGroup);
   restoreStartPausedCheck_->setChecked(true);
@@ -1071,9 +1034,20 @@ void SettingsDialog::wireSignals() {
     syncDownloadCompleteActionAvailability();
   }
   if (ipFilterEnabledCheck_ != nullptr && ipFilterPathEdit_ != nullptr) {
-    connect(ipFilterEnabledCheck_, &QCheckBox::toggled, this,
-            [this](bool checked) { ipFilterPathEdit_->setEnabled(checked); });
-    ipFilterPathEdit_->setEnabled(ipFilterEnabledCheck_->isChecked());
+    connect(ipFilterEnabledCheck_, &QCheckBox::toggled, this, [this](bool checked) {
+      ipFilterPathEdit_->setEnabled(checked);
+      if (ipFilterBrowseBtn_ != nullptr) {
+        ipFilterBrowseBtn_->setEnabled(checked);
+      }
+    });
+    const bool on = ipFilterEnabledCheck_->isChecked();
+    ipFilterPathEdit_->setEnabled(on);
+    if (ipFilterBrowseBtn_ != nullptr) {
+      ipFilterBrowseBtn_->setEnabled(on);
+    }
+  }
+  if (ipFilterBrowseBtn_ != nullptr) {
+    connect(ipFilterBrowseBtn_, &QPushButton::clicked, this, [this]() { browseIpFilterFile(); });
   }
   if (proxyEnabledCheck_ != nullptr) {
     connect(proxyEnabledCheck_, &QCheckBox::toggled, this, [this](bool checked) {
@@ -1139,6 +1113,22 @@ void SettingsDialog::browseLogDir() {
       QFileDialog::getExistingDirectory(this, QStringLiteral("选择日志保存目录"), base);
   if (!dir.isEmpty() && logDirEdit_ != nullptr) {
     logDirEdit_->setText(dir);
+  }
+}
+
+void SettingsDialog::browseIpFilterFile() {
+  const QString base =
+      ipFilterPathEdit_ != nullptr ? ipFilterPathEdit_->text().trimmed() : QString();
+  QFileInfo fi(base);
+  const QString startDir = fi.isAbsolute() && fi.isFile() ? fi.absolutePath() : QString();
+  const QString path =
+      QFileDialog::getOpenFileName(this, QStringLiteral("选择 IP 过滤规则文件"), startDir,
+                                   QStringLiteral("文本规则 (*.txt);;所有文件 (*)"));
+  if (!path.isEmpty() && ipFilterPathEdit_ != nullptr) {
+    ipFilterPathEdit_->setText(path);
+    if (ipFilterEnabledCheck_ != nullptr && !ipFilterEnabledCheck_->isChecked()) {
+      ipFilterEnabledCheck_->setChecked(true);
+    }
   }
 }
 

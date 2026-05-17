@@ -27,6 +27,8 @@ class QTextEdit;
 class QLabel;
 class QAction;
 class QTabWidget;
+class QMenu;
+class QActionGroup;
 
 namespace pfd::ui {
 
@@ -128,10 +130,18 @@ public:
   void notifyTaskAlreadyInList(const QString& displayName = {});
   void refreshTasks(const std::vector<pfd::core::TaskSnapshot>& snapshots);
   void updateBottomStatus(int dhtNodes, qint64 downloadRate, qint64 uploadRate);
+  void setBottomStatusBarVisible(bool visible);
+  [[nodiscard]] bool bottomStatusBarVisible() const;
+  void setTransferDetailPanelVisible(bool visible);
+  [[nodiscard]] bool transferDetailPanelVisible() const;
 
 Q_SIGNALS:
   void settingsChanged();
   void rssSettingsChanged();
+  /// RSS 模块表格已刷新（含条目流诊断更新后）。
+  void rssViewsRefreshed();
+  /// 用户或 UI 触发的网络拉取已完成（全部刷新 / 条目流重载等），用于全量自动下载检测。
+  void rssNetworkRefreshFinished();
 
 protected:
   bool eventFilter(QObject* watched, QEvent* event) override;
@@ -159,6 +169,8 @@ private:
   void openTorrentLinksFromMenu();
   void openCreateTorrentDialog();
   void openCookieManagerDialog();
+  void syncThemeMenuChecks();
+  void applyTransferBottomPanelsVisible();
   void showTaskContextMenu(const QPoint& pos);
   void syncContentHandlers();
   void syncTrackerHandlers();
@@ -175,12 +187,20 @@ private:
   bool forceQuit_{false};
   qint64 lastRssProgressRefreshMs_{0};
   QAction* preferencesAction_{nullptr};
-  QAction* themeAction_{nullptr};
+  QMenu* themeMenu_{nullptr};
+  QActionGroup* themeActionGroup_{nullptr};
+  QAction* themeLightAction_{nullptr};
+  QAction* themeDarkAction_{nullptr};
+  QAction* themeSystemAction_{nullptr};
   QAction* logCenterAction_{nullptr};
   QAction* helpAction_{nullptr};
   QAction* aboutAction_{nullptr};
   QAction* showLogAction_{nullptr};
+  QAction* showBottomStatusBarAction_{nullptr};
+  QAction* showTransferDetailPanelAction_{nullptr};
   QAction* refreshListAction_{nullptr};
+  bool bottomStatusBarVisible_{true};
+  bool transferDetailPanelVisible_{true};
   QAction* openTorrentFileAction_{nullptr};
   QAction* openTorrentLinksAction_{nullptr};
   QAction* createTorrentAction_{nullptr};

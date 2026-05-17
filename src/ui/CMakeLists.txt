@@ -1,4 +1,6 @@
 add_library(torrentlink_ui STATIC
+  app_theme.h
+  app_theme.cc
   input_ime_utils.h
   input_ime_utils.cc
   main_window.h
@@ -16,8 +18,6 @@ add_library(torrentlink_ui STATIC
   rss/rss_items_page.cc
   rss/rss_rules_page.h
   rss/rss_rules_page.cc
-  rss/rss_series_page.h
-  rss/rss_series_page.cc
   rss/rss_settings_page.h
   rss/rss_settings_page.cc
   search_tab.h

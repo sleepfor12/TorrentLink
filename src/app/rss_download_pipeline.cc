@@ -84,37 +84,35 @@ void RssDownloadPipeline::schedulePumpRssTorrent(StartRssTorrentFn startFn) {
 }
 
 void RssDownloadPipeline::pumpMagnetQueueOnUi(StartMagnetFn startFn) {
-  for (;;) {
-    MagnetQueueItem item;
-    {
-      std::lock_guard<std::mutex> lk(magnetMu_);
-      magnetPumpScheduled_ = false;
-      if (magnetInFlight_ >= magnetMaxInFlight_ || magnetQueue_.empty()) {
-        return;
-      }
-      item = magnetQueue_.front();
-      magnetQueue_.pop_front();
-      ++magnetInFlight_;
+  MagnetQueueItem item;
+  {
+    std::lock_guard<std::mutex> lk(magnetMu_);
+    magnetPumpScheduled_ = false;
+    if (magnetInFlight_ >= magnetMaxInFlight_ || magnetQueue_.empty()) {
+      return;
     }
-    startFn(std::move(item));
+    item = magnetQueue_.front();
+    magnetQueue_.pop_front();
+    ++magnetInFlight_;
   }
+  // 每次仅在 UI 线程处理一条；下一条由 finishMagnet → schedulePumpMagnet 在下一轮事件循环启动，
+  // 避免一批 RSS 自动下载在同一次事件里连续 addMagnet + 刷新界面导致卡顿。
+  startFn(std::move(item));
 }
 
 void RssDownloadPipeline::pumpRssTorrentUrlQueueOnUi(StartRssTorrentFn startFn) {
-  for (;;) {
-    RssTorrentUrlQueueItem item;
-    {
-      std::lock_guard<std::mutex> lk(rssTorrentMu_);
-      rssTorrentPumpScheduled_ = false;
-      if (rssTorrentInFlight_ >= rssTorrentMaxInFlight_ || rssTorrentQueue_.empty()) {
-        return;
-      }
-      item = rssTorrentQueue_.front();
-      rssTorrentQueue_.pop_front();
-      ++rssTorrentInFlight_;
+  RssTorrentUrlQueueItem item;
+  {
+    std::lock_guard<std::mutex> lk(rssTorrentMu_);
+    rssTorrentPumpScheduled_ = false;
+    if (rssTorrentInFlight_ >= rssTorrentMaxInFlight_ || rssTorrentQueue_.empty()) {
+      return;
     }
-    startFn(std::move(item));
+    item = rssTorrentQueue_.front();
+    rssTorrentQueue_.pop_front();
+    ++rssTorrentInFlight_;
   }
+  startFn(std::move(item));
 }
 
 }  // namespace pfd::app

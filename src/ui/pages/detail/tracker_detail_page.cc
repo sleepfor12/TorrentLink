@@ -9,9 +9,12 @@
 #include <QtGui/QHideEvent>
 #include <QtGui/QShowEvent>
 #include <QtWidgets/QApplication>
+#include <QtWidgets/QHBoxLayout>
 #include <QtWidgets/QHeaderView>
 #include <QtWidgets/QInputDialog>
+#include <QtWidgets/QLabel>
 #include <QtWidgets/QMenu>
+#include <QtWidgets/QPushButton>
 #include <QtWidgets/QScrollBar>
 #include <QtWidgets/QTreeWidget>
 #include <QtWidgets/QTreeWidgetItem>
@@ -23,7 +26,9 @@
 
 #include "base/format.h"
 #include "base/input_sanitizer.h"
+#include "core/config_service.h"
 #include "core/logger.h"
+#include "ui/app_theme.h"
 
 namespace pfd::ui {
 
@@ -196,6 +201,7 @@ void TrackerDetailPage::setHandlers(QueryTrackersFn queryFn, AddTrackerFn addFn,
   removeFn_ = std::move(removeFn);
   reannounceFn_ = std::move(reannounceFn);
   reannounceAllFn_ = std::move(reannounceAllFn);
+  updateToolbarState();
 }
 
 void TrackerDetailPage::setSnapshot(const pfd::core::TaskSnapshot& snap) {
@@ -203,13 +209,47 @@ void TrackerDetailPage::setSnapshot(const pfd::core::TaskSnapshot& snap) {
     return;
   }
   taskId_ = snap.taskId;
+  updateToolbarState();
   reload();
 }
 
 void TrackerDetailPage::clear() {
   taskId_ = {};
+  updateToolbarState();
   if (tree_)
     tree_->clear();
+}
+
+void TrackerDetailPage::syncTheme() {
+  applyTreeStyle();
+  updateToolbarState();
+  if (!taskId_.isNull()) {
+    reload();
+  }
+}
+
+void TrackerDetailPage::applyTreeStyle() {
+  if (tree_ == nullptr) {
+    return;
+  }
+  const auto st = pfd::core::ConfigService::loadAppSettings();
+  const pfd::ui::EffectiveUiTheme t = pfd::ui::UiTheme::resolveEffectiveTheme(st.ui_theme);
+  tree_->setStyleSheet(pfd::ui::UiTheme::trackerTreeStyleSheet(t));
+  if (hintLabel_ != nullptr) {
+    const QString c = (t == pfd::ui::EffectiveUiTheme::Dark) ? QStringLiteral("#94a3b8")
+                                                             : QStringLiteral("#64748b");
+    hintLabel_->setStyleSheet(QStringLiteral("color:%1;font-size:12px;padding-top:2px;").arg(c));
+  }
+}
+
+void TrackerDetailPage::updateToolbarState() {
+  const bool has = !taskId_.isNull();
+  if (addTrackerBtn_ != nullptr) {
+    addTrackerBtn_->setEnabled(has && static_cast<bool>(addFn_));
+  }
+  if (reannounceAllBtn_ != nullptr) {
+    reannounceAllBtn_->setEnabled(has && static_cast<bool>(reannounceAllFn_));
+  }
 }
 
 void TrackerDetailPage::showEvent(QShowEvent* event) {
@@ -230,9 +270,39 @@ void TrackerDetailPage::hideEvent(QHideEvent* event) {
 }
 
 void TrackerDetailPage::buildLayout() {
+  setObjectName(QStringLiteral("TrackerDetailRoot"));
   auto* root = new QVBoxLayout(this);
-  root->setContentsMargins(6, 6, 6, 6);
-  root->setSpacing(6);
+  root->setContentsMargins(10, 10, 10, 10);
+  root->setSpacing(8);
+
+  auto* toolbar = new QWidget(this);
+  auto* tb = new QHBoxLayout(toolbar);
+  tb->setContentsMargins(0, 0, 0, 0);
+  tb->setSpacing(8);
+
+  addTrackerBtn_ = new QPushButton(QStringLiteral("添加 Tracker"), toolbar);
+  addTrackerBtn_->setObjectName(QStringLiteral("PrimaryButton"));
+  addTrackerBtn_->setToolTip(QStringLiteral("向当前任务添加 Tracker URL（需先选中任务）"));
+  connect(addTrackerBtn_, &QPushButton::clicked, this, [this]() { actionAddTracker(); });
+
+  reannounceAllBtn_ = new QPushButton(QStringLiteral("全部重新汇报"), toolbar);
+  reannounceAllBtn_->setToolTip(QStringLiteral("向所有 Tracker 发送重新 announce 请求"));
+  connect(reannounceAllBtn_, &QPushButton::clicked, this, [this]() {
+    if (!taskId_.isNull()) {
+      actionReannounceAll();
+    }
+  });
+
+  hintLabel_ = new QLabel(
+      QStringLiteral("提示：右键表格可复制 URL、编辑或移除；展开行查看各 Announce 端点与倒计时。"),
+      toolbar);
+  hintLabel_->setWordWrap(true);
+  hintLabel_->setMinimumWidth(120);
+
+  tb->addWidget(addTrackerBtn_, 0);
+  tb->addWidget(reannounceAllBtn_, 0);
+  tb->addWidget(hintLabel_, 1);
+  root->addWidget(toolbar);
 
   tree_ = new QTreeWidget(this);
   tree_->setColumnCount(10);
@@ -244,19 +314,18 @@ void TrackerDetailPage::buildLayout() {
   tree_->setAlternatingRowColors(true);
   tree_->setAnimated(true);
   tree_->setUniformRowHeights(true);
-  tree_->setIndentation(20);
+  tree_->setIndentation(22);
   tree_->setRootIsDecorated(true);
   tree_->setContextMenuPolicy(Qt::CustomContextMenu);
-  tree_->setStyleSheet(QStringLiteral(
-      "QTreeWidget{border:1px solid #e7ebf3;border-radius:4px;background:#ffffff;"
-      "alternate-background-color:#f6f8fc;outline:0;}"
-      "QTreeWidget::item{padding:3px 6px;border:none;}"
-      "QTreeWidget::item:selected,QTreeWidget::item:selected:active{"
-      "background:#2f6fed;color:#ffffff;}"
-      "QHeaderView::section{background:#f8fbff;color:#50607a;border:none;border-bottom:1px solid "
-      "#e7ebf3;padding:8px;font-weight:600;}"));
+  tree_->setMinimumHeight(160);
+  applyTreeStyle();
   tree_->header()->setSectionResizeMode(0, QHeaderView::Stretch);
   tree_->header()->setSectionResizeMode(1, QHeaderView::ResizeToContents);
+  for (int col : {2, 3, 4, 5, 6, 8, 9}) {
+    tree_->header()->setSectionResizeMode(col, QHeaderView::ResizeToContents);
+  }
+  tree_->header()->setSectionResizeMode(7, QHeaderView::Interactive);
+  tree_->header()->resizeSection(7, 200);
   if (!gTrackerHeaderState.isEmpty()) {
     tree_->header()->restoreState(gTrackerHeaderState);
   }
@@ -294,6 +363,8 @@ void TrackerDetailPage::buildLayout() {
       reload();
     }
   });
+
+  updateToolbarState();
 }
 
 QString TrackerDetailPage::statusText(pfd::core::TaskTrackerStatusDto s) {
@@ -321,8 +392,22 @@ QString TrackerDetailPage::announceText(int seconds) {
   return pfd::base::formatDuration(seconds);
 }
 
-static QColor statusColor(pfd::core::TaskTrackerStatusDto s) {
+static QColor trackerStatusColor(pfd::core::TaskTrackerStatusDto s,
+                                 pfd::ui::EffectiveUiTheme theme) {
   using T = pfd::core::TaskTrackerStatusDto;
+  if (theme == pfd::ui::EffectiveUiTheme::Dark) {
+    switch (s) {
+      case T::kWorking:
+        return QColor(74, 222, 128);
+      case T::kUpdating:
+        return QColor(96, 165, 250);
+      case T::kCannotConnect:
+        return QColor(248, 113, 113);
+      case T::kNotWorking:
+      default:
+        return QColor(148, 163, 184);
+    }
+  }
   switch (s) {
     case T::kWorking:
       return QColor(22, 163, 74);
@@ -366,6 +451,8 @@ void TrackerDetailPage::reload() {
   tree_->clear();
   if (taskId_.isNull() || !queryFn_)
     return;
+  const pfd::ui::EffectiveUiTheme themeEff =
+      pfd::ui::UiTheme::resolveEffectiveTheme(pfd::core::ConfigService::loadAppSettings().ui_theme);
   const auto data = queryFn_(taskId_);
   LOG_DEBUG(QStringLiteral("[ui.tracker] reload taskId=%1 fixed=%2 trackers=%3")
                 .arg(taskId_.toString())
@@ -373,7 +460,8 @@ void TrackerDetailPage::reload() {
                 .arg(data.trackers.size()));
 
   QTreeWidgetItem* toSelect = nullptr;
-  const auto appendRow = [this, &expandedUrls, &selectedUrl, &selectedType, &selectedEndpointText,
+  const auto appendRow = [this, themeEff, &expandedUrls, &selectedUrl, &selectedType,
+                          &selectedEndpointText,
                           &toSelect](const pfd::core::TaskTrackerRowDto& r, int type) {
     auto* item = new TrackerTreeItem(tree_);
     const QString display0 = type == kFixed ? qbStyleFixedLabel(r.url) : r.url;
@@ -396,10 +484,14 @@ void TrackerDetailPage::reload() {
     item->setText(6, countText(r.downloads));
     item->setText(kColMsg, r.message);
     if (type == kFixed) {
-      item->setForeground(0, QBrush(QColor(71, 85, 105)));
-      item->setForeground(3, QBrush(QColor(100, 116, 139)));
+      const QColor fg0 =
+          themeEff == pfd::ui::EffectiveUiTheme::Dark ? QColor(148, 163, 184) : QColor(71, 85, 105);
+      const QColor fg3 = themeEff == pfd::ui::EffectiveUiTheme::Dark ? QColor(100, 116, 139)
+                                                                     : QColor(100, 116, 139);
+      item->setForeground(0, QBrush(fg0));
+      item->setForeground(3, QBrush(fg3));
     } else {
-      item->setForeground(3, QBrush(statusColor(r.status)));
+      item->setForeground(3, QBrush(trackerStatusColor(r.status, themeEff)));
     }
     applyTrackerItemLayout(item);
     const bool expanded = expandedUrls.contains(r.url);
@@ -422,7 +514,7 @@ void TrackerDetailPage::reload() {
       child->setData(0, kRoleUrl, r.url);
       child->setData(kColNext, kRoleNextAnnounce, ep.nextAnnounceSec);
       child->setData(kColMin, kRoleMinAnnounce, ep.minAnnounceSec);
-      child->setForeground(3, QBrush(statusColor(ep.status)));
+      child->setForeground(3, QBrush(trackerStatusColor(ep.status, themeEff)));
       applyTrackerItemLayout(child);
       if (toSelect == nullptr && selectedType == kEndpoint && selectedUrl == r.url &&
           selectedEndpointText == child->text(0) && expanded) {
@@ -478,10 +570,23 @@ void TrackerDetailPage::applySavedSortIndicator() {
   if (sortColumn_ < 0 || sortColumn_ >= tree_->columnCount()) {
     sortColumn_ = 0;
   }
+  QSet<QString> expandedBeforeSort;
+  for (int i = 0; i < tree_->topLevelItemCount(); ++i) {
+    QTreeWidgetItem* it = tree_->topLevelItem(i);
+    if (it != nullptr && it->isExpanded()) {
+      expandedBeforeSort.insert(it->data(0, kRoleUrl).toString());
+    }
+  }
   const Qt::SortOrder ord = sortAscending_ ? Qt::AscendingOrder : Qt::DescendingOrder;
   tree_->header()->setSortIndicator(sortColumn_, ord);
   tree_->sortByColumn(sortColumn_, ord);
   pinFixedRowsToTop();
+  for (int i = 0; i < tree_->topLevelItemCount(); ++i) {
+    QTreeWidgetItem* it = tree_->topLevelItem(i);
+    if (it != nullptr && expandedBeforeSort.contains(it->data(0, kRoleUrl).toString())) {
+      it->setExpanded(true);
+    }
+  }
 }
 
 void TrackerDetailPage::pinFixedRowsToTop() {
@@ -554,6 +659,9 @@ void TrackerDetailPage::updateAnnounceCellsForItem(QTreeWidgetItem* urlRow) {
     return;
   if (urlRow->childCount() == 0)
     return;
+  // 排序开启时修改「下一个/最小 announce」列会触发整树重排，导致刚展开的行立刻收起。
+  const bool sortWasOn = tree_->isSortingEnabled();
+  tree_->setSortingEnabled(false);
   const auto [mn, mm] = minNextMinAmongChildren(urlRow);
   urlRow->setData(kColNext, kRoleNextAnnounce, mn);
   urlRow->setData(kColMin, kRoleMinAnnounce, mm);
@@ -564,11 +672,21 @@ void TrackerDetailPage::updateAnnounceCellsForItem(QTreeWidgetItem* urlRow) {
     urlRow->setText(kColNext, mn >= 0 ? announceText(mn) : QStringLiteral("N/A"));
     urlRow->setText(kColMin, mm >= 0 ? announceText(mm) : QStringLiteral("N/A"));
   }
+  tree_->setSortingEnabled(sortWasOn);
 }
 
 void TrackerDetailPage::decrementAnnounceCountdowns() {
   if (!tree_)
     return;
+  QSet<QString> expandedRows;
+  for (int i = 0; i < tree_->topLevelItemCount(); ++i) {
+    QTreeWidgetItem* tl = tree_->topLevelItem(i);
+    if (tl != nullptr && tl->isExpanded()) {
+      expandedRows.insert(tl->data(0, kRoleUrl).toString());
+    }
+  }
+  const bool sortWasOn = tree_->isSortingEnabled();
+  tree_->setSortingEnabled(false);
   for (QTreeWidgetItemIterator it(tree_); *it != nullptr; ++it) {
     auto* item = *it;
     const int typ = item->data(0, kRoleType).toInt();
@@ -593,6 +711,13 @@ void TrackerDetailPage::decrementAnnounceCountdowns() {
     tl->setData(kColNext, kRoleNextAnnounce, mn);
     tl->setData(kColMin, kRoleMinAnnounce, mm);
     updateAnnounceCellsForItem(tl);
+  }
+  tree_->setSortingEnabled(sortWasOn);
+  for (int i = 0; i < tree_->topLevelItemCount(); ++i) {
+    QTreeWidgetItem* tl = tree_->topLevelItem(i);
+    if (tl != nullptr && expandedRows.contains(tl->data(0, kRoleUrl).toString())) {
+      tl->setExpanded(true);
+    }
   }
 }
 

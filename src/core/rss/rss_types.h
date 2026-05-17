@@ -41,6 +41,8 @@ struct RssItem {
   bool downloaded{false};
   bool accepted{false};
   bool queued{false};
+  /// 仅内存态（不落盘）：满足自动下载条件但因「同时自动下载数」已满而尚未投递到传输队列。
+  bool rss_auto_waitlisted{false};
   AutoDownloadDecision last_auto_decision{AutoDownloadDecision::kUnknown};
   QString last_auto_reason_code;
   QString last_auto_reason_text;
@@ -63,19 +65,6 @@ struct RssRule {
   QString tags_csv;
 };
 
-struct SeriesSubscription {
-  QString id;
-  QString name;
-  QStringList aliases;
-  QStringList quality_keywords;
-  bool enabled{true};
-  bool auto_download_enabled{false};
-  int season{-1};
-  int last_episode_num{0};
-  QString last_episode;
-  QString save_path;
-};
-
 struct RuleMatchResult {
   QString rule_id;
   QString rule_name;
@@ -83,21 +72,10 @@ struct RuleMatchResult {
   QString reason;
 };
 
-struct EpisodeInfo {
-  QString series_name;
-  int season{-1};
-  int episode{-1};
-  QString quality;
-  QString raw_title;
-};
-
 /// 非空 item_id 时由 AppController 在下载流程结束时回调 applyRssDownloadSettlement。
 struct RssDownloadSettlement {
   QString item_id;
   QString record_save_path;
-  QString series_sub_id;
-  int series_episode{-1};
-  int series_season{-1};
 };
 
 struct AutoDownloadRequest {
@@ -119,11 +97,27 @@ struct AutoDownloadRequest {
 };
 
 inline constexpr int kAutoDownloadMaxPerRefresh = 10;
+inline constexpr int kRssDefaultConcurrentAutoDownloads = 3;
+inline constexpr int kRssDefaultAutoDownloadBacklog = 50;
+inline constexpr int kRssDefaultRefreshIntervalMinutes = 30;
+
+/// 自动下载候选范围：`kAllEligible` 为按诊断可派发的候选（受批量/并发/排队上限约束）；
+/// `kNewItemsOnly`
+/// 仅本轮刷新新入库条目（测试或专用增量逻辑；定时器勿单独依赖以免无新条目时不派发）。
+enum class RssAutoDownloadScope {
+  kAllEligible = 0,
+  kNewItemsOnly,
+};
 
 struct RssSettings {
   bool global_auto_download{false};
-  int refresh_interval_minutes{30};
+  int refresh_interval_minutes{kRssDefaultRefreshIntervalMinutes};
   int max_auto_downloads_per_refresh{kAutoDownloadMaxPerRefresh};
+  /// 与「下载选中」相同路径；限制同时投递到传输流程的 RSS 条目数（见
+  /// `RssItem::queued`），超出部分标记 `rss_auto_waitlisted` 并在有空槽时继续派发。
+  int max_concurrent_auto_downloads{kRssDefaultConcurrentAutoDownloads};
+  /// 同时跟踪/等待自动入队的最大候选条目数（按发布时间优先），超出者不进入排队 scratch。
+  int max_auto_download_backlog{kRssDefaultAutoDownloadBacklog};
   int history_max_items{5000};
   int history_max_age_days{90};
   QString external_player_command;

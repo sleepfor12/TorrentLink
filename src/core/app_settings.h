@@ -66,6 +66,8 @@ struct AppSettings {
   // --- 界面行为 ---
   // "minimize" | "quit"
   QString close_behavior{QStringLiteral("minimize")};
+  // "light" | "dark" | "system"（非法值在 load 时回退为 light）
+  QString ui_theme{QStringLiteral("system")};
   bool start_minimized{false};
 
   // --- 定时动作 ---

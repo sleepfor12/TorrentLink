@@ -36,12 +36,14 @@ public:
   void setPeerHandlers(PeerListPage::QueryPeersFn queryFn);
   void setHttpSourceHandlers(HttpSourcePage::QueryWebSeedsFn queryFn);
   void clear();
+  void syncTheme();
 
 private:
   void buildLayout();
   void switchTab(int index);
 
   QStackedWidget* stack_{nullptr};
+  QWidget* detailTabBar_{nullptr};
   QPushButton* tabButtons_[6]{};
   int currentTab_{0};
 

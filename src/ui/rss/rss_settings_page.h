@@ -35,6 +35,8 @@ private:
   QCheckBox* globalAutoDownloadCheck_{nullptr};
   QSpinBox* refreshIntervalSpin_{nullptr};
   QSpinBox* maxAutoDownloadsSpin_{nullptr};
+  QSpinBox* maxConcurrentAutoDownloadsSpin_{nullptr};
+  QSpinBox* maxAutoDownloadBacklogSpin_{nullptr};
   QSpinBox* historyMaxItemsSpin_{nullptr};
   QSpinBox* historyMaxAgeSpin_{nullptr};
   QLineEdit* playerCommandEdit_{nullptr};
