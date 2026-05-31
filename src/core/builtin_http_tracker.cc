@@ -18,6 +18,7 @@
 
 #include "core/bencode_minimal.h"
 #include "core/logger.h"
+#include "core/network_util.h"
 
 namespace pfd::core {
 namespace detail {
@@ -212,7 +213,8 @@ public:
   ~TrackerWorker() override = default;
 
 public slots:
-  void applyConfig(bool enabled, quint16 port) {
+  void applyConfig(bool enabled, quint16 port, const QString& bind_mode) {
+    bind_mode_ = normalizeBuiltinTrackerBindMode(bind_mode);
     if (server_.isListening()) {
       server_.close();
     }
@@ -220,15 +222,33 @@ public slots:
       LOG_INFO(QStringLiteral("[builtin-tracker] stopped"));
       return;
     }
-    const QHostAddress addr(QHostAddress::LocalHost);
+    const QHostAddress addr = resolveBuiltinTrackerBindAddress(bind_mode_);
     if (!server_.listen(addr, port)) {
-      LOG_ERROR(QStringLiteral("[builtin-tracker] listen failed on 127.0.0.1:%1 (%2)")
+      LOG_ERROR(QStringLiteral("[builtin-tracker] listen failed on %1:%2 (%3)")
+                    .arg(addr.toString())
                     .arg(port)
                     .arg(server_.errorString()));
       return;
     }
-    LOG_INFO(QStringLiteral("[builtin-tracker] listening on http://127.0.0.1:%1/announce")
-                 .arg(server_.serverPort()));
+    const quint16 actual = static_cast<quint16>(server_.serverPort());
+    if (bind_mode_ == QStringLiteral("lan")) {
+      const QString lan_ip = primaryPrivateIPv4Address();
+      if (lan_ip.isEmpty()) {
+        LOG_INFO(
+            QStringLiteral("[builtin-tracker] listening bind=lan port=%1 local=http://127.0.0.1:%1/"
+                           "announce (no private IPv4 detected for lan URL)")
+                .arg(actual));
+      } else {
+        LOG_INFO(QStringLiteral("[builtin-tracker] listening bind=lan port=%1 local=http://127.0."
+                                "0.1:%1/announce lan=http://%2:%1/announce")
+                     .arg(actual)
+                     .arg(lan_ip));
+      }
+    } else {
+      LOG_INFO(QStringLiteral("[builtin-tracker] listening bind=localhost port=%1 "
+                              "local=http://127.0.0.1:%1/announce")
+                   .arg(actual));
+    }
   }
 
   void shutdown() {
@@ -239,6 +259,10 @@ public slots:
   /// 仅在工作线程调用；跨线程请用 QMetaObject::invokeMethod(..., "queryPort", ...)。
   Q_INVOKABLE quint16 queryPort() const {
     return server_.isListening() ? static_cast<quint16>(server_.serverPort()) : 0;
+  }
+
+  Q_INVOKABLE QString queryBindMode() const {
+    return bind_mode_;
   }
 
 private:
@@ -396,6 +420,7 @@ private:
   }
 
   QTcpServer server_;
+  QString bind_mode_{QStringLiteral("localhost")};
   PeerTable table_;
   QTimer* cleanup_{nullptr};
   QHash<QTcpSocket*, QByteArray> read_buffers_;
@@ -406,6 +431,7 @@ private:
 struct BuiltinHttpTracker::Impl {
   QThread* thread{nullptr};
   detail::TrackerWorker* worker{nullptr};
+  QString bind_mode{QStringLiteral("localhost")};
 };
 
 BuiltinHttpTracker::BuiltinHttpTracker(QObject* parent)
@@ -427,12 +453,14 @@ BuiltinHttpTracker::~BuiltinHttpTracker() {
   }
 }
 
-void BuiltinHttpTracker::apply(bool enabled, quint16 port) {
+void BuiltinHttpTracker::apply(const BuiltinTrackerConfig& cfg) {
   if (!impl_ || !impl_->worker) {
     return;
   }
+  impl_->bind_mode = normalizeBuiltinTrackerBindMode(cfg.bind_mode);
   QMetaObject::invokeMethod(impl_->worker, "applyConfig", Qt::BlockingQueuedConnection,
-                            Q_ARG(bool, enabled), Q_ARG(quint16, port));
+                            Q_ARG(bool, cfg.enabled), Q_ARG(quint16, cfg.port),
+                            Q_ARG(QString, impl_->bind_mode));
 }
 
 quint16 BuiltinHttpTracker::serverPort() const {
@@ -443,6 +471,13 @@ quint16 BuiltinHttpTracker::serverPort() const {
   QMetaObject::invokeMethod(impl_->worker, "queryPort", Qt::BlockingQueuedConnection,
                             Q_RETURN_ARG(quint16, out));
   return out;
+}
+
+QString BuiltinHttpTracker::bindMode() const {
+  if (!impl_) {
+    return QStringLiteral("localhost");
+  }
+  return impl_->bind_mode;
 }
 
 }  // namespace pfd::core

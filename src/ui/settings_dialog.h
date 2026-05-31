@@ -80,6 +80,7 @@ private:
   QCheckBox* enableLsdCheck_{nullptr};
   QSpinBox* monitorPortSpin_{nullptr};
   QCheckBox* builtinTrackerEnabledCheck_{nullptr};
+  QComboBox* builtinTrackerBindModeBox_{nullptr};
   QSpinBox* builtinTrackerPortSpin_{nullptr};
   QCheckBox* builtinTrackerPortForwardingCheck_{nullptr};
   QComboBox* encryptionModeBox_{nullptr};

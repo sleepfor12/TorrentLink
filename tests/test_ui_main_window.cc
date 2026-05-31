@@ -46,8 +46,10 @@ TEST(UiMainWindowTest, AppliesNonEmptyThemeStyleSheet) {
   EXPECT_TRUE(w.styleSheet().contains(QStringLiteral("QMainWindow")));
 }
 
-TEST(UiMainWindowTest, HidesHttpSourceDetailTabButton) {
+TEST(UiMainWindowTest, ShowsHttpSourceDetailTabButton) {
   pfd::ui::MainWindow w;
+  w.setTransferDetailPanelVisible(true);
+  w.show();
   const auto buttons = w.findChildren<QPushButton*>();
   bool foundHttpSourceButton = false;
   for (QPushButton* btn : buttons) {
@@ -56,7 +58,7 @@ TEST(UiMainWindowTest, HidesHttpSourceDetailTabButton) {
     }
     if (btn->text().contains(QStringLiteral("HTTP源"))) {
       foundHttpSourceButton = true;
-      EXPECT_FALSE(btn->isVisible());
+      EXPECT_TRUE(btn->isVisible());
     }
   }
   EXPECT_TRUE(foundHttpSourceButton);

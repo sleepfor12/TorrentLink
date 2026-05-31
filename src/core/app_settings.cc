@@ -6,6 +6,8 @@
 
 #include <algorithm>
 
+#include "core/network_util.h"
+
 namespace pfd::core {
 
 QString AppSettings::settingsFilePath() {
@@ -71,6 +73,9 @@ AppSettings AppSettings::load() {
   out.builtin_tracker_enabled =
       s.value(QStringLiteral("protocol/builtin_tracker_enabled"), false).toBool();
   out.builtin_tracker_port = s.value(QStringLiteral("protocol/builtin_tracker_port"), 0).toInt();
+  out.builtin_tracker_bind_mode = normalizeBuiltinTrackerBindMode(
+      s.value(QStringLiteral("protocol/builtin_tracker_bind_mode"), QStringLiteral("localhost"))
+          .toString());
   out.builtin_tracker_port_forwarding =
       s.value(QStringLiteral("protocol/builtin_tracker_port_forwarding"), false).toBool();
   out.encryption_mode =
@@ -222,6 +227,8 @@ void AppSettings::save(const AppSettings& in) {
   s.setValue(QStringLiteral("protocol/monitor_port"), in.monitor_port);
   s.setValue(QStringLiteral("protocol/builtin_tracker_enabled"), in.builtin_tracker_enabled);
   s.setValue(QStringLiteral("protocol/builtin_tracker_port"), in.builtin_tracker_port);
+  s.setValue(QStringLiteral("protocol/builtin_tracker_bind_mode"),
+             pfd::core::normalizeBuiltinTrackerBindMode(in.builtin_tracker_bind_mode));
   s.setValue(QStringLiteral("protocol/builtin_tracker_port_forwarding"),
              in.builtin_tracker_port_forwarding);
   s.setValue(QStringLiteral("protocol/encryption_mode"), in.encryption_mode.trimmed().toLower());

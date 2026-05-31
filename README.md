@@ -7,6 +7,15 @@ This project is my graduation design project, implementing a lightweight desktop
 It is a desktop P2P downloader based on **Qt 6 (Widgets) + libtorrent (2.0.5)**, aiming to provide a stable, extensible, and maintainable BitTorrent client.
 Parts of the UI design reference qBittorrent.
 
+## Features
+
+- **Transfers:** open `.torrent` files and magnet links; pause/resume; categories, tags, and queue controls.
+- **Task detail panel** (View → show transfer task details): General, Tracker, Peers, **HTTP sources** (Web Seed URLs, BEP17/BEP19), Content, Speed.
+- **RSS:** feeds, rules, auto-download, OPML import/export.
+- **Network (Preferences → Connection):** rate limits, listen port, UPnP/NAT-PMP, connection encryption; **SOCKS5/HTTP proxy** (BitTorrent session + RSS/HTTP); **IP filter** (text rule file with hot-reload).
+- **Built-in HTTP Tracker (experimental):** embedded BEP3 `GET /announce` service; bind to **localhost** or **LAN** (`Tools → Preferences → Connection → Discovery`). Port forwarding (UPnP/NAT-PMP) is not implemented yet.
+- **Tools:** create torrent (including Web Seed URLs), cookie manager, log center, light/dark/system theme.
+
 ## Development Environment
 
 - OS: `Ubuntu 22.04.5 LTS`
@@ -90,16 +99,15 @@ ctest --test-dir build --output-on-failure
 - **CI:** `windows-latest` with Qt + vcpkg libtorrent; Release (and Debug) builds run **`ctest`** the same way as on Linux (GoogleTest).
 - **Status:** Windows build + automated tests are in good shape; hands-on Windows testing is **largely complete** for the current feature set. Remaining work is mostly polish and parity edge cases vs Linux, not greenfield porting.
 - **Local build:** CMake + vcpkg (`CMAKE_TOOLCHAIN_FILE`); set `-DCMAKE_PREFIX_PATH` to your Qt installation if `find_package(Qt6)` fails.
-- **Runtime:** Core session options are wired (listen port, port forwarding toggles, upload slots, proxy, IP filter list file with hot-reload, queue limits, etc.). Optional embedded HTTP Tracker remains experimental (see [docs/HTTP_TRACKER_PLAN.md](docs/HTTP_TRACKER_PLAN.md)); it is driven from app settings / `AppController`, not from the libtorrent session worker thread.
+- **Runtime:** Core session options are wired (listen port, port forwarding toggles, upload slots, **SOCKS5/HTTP proxy**, **IP filter** text file with hot-reload, queue limits, etc.). The optional embedded HTTP Tracker is experimental: enable it under **Tools → Preferences → Connection → Discovery** (`localhost` or `lan` bind); check logs for `[builtin-tracker]` / `builtin tracker ready` announce URLs. It runs in `AppController`, not on the libtorrent session worker thread.
 
-## V2 Backlog (Not Implemented Yet)
+## Testing HTTP Sources (Web Seed panel)
 
-- IP filter extensions (e.g. eMule `ipfilter.dat` binary list, per-peer “ban IP” from the UI)
-- Remote Web UI / JSON-RPC
-- Auto-archive (move completed tasks by category)
-- Online torrent search
-- Diagnostic bundle export
-- Auto-start on boot
+1. Build and run the app; open a torrent that includes Web Seeds (`url-list` / `httpseeds` in the metainfo).
+2. Select the task on the **Transfer** tab; enable **View → Show transfer task details**.
+3. Open the **HTTP sources** tab in the bottom detail bar — you should see URL and type columns (BEP17 / BEP19).
+
+You can also use **Tools → Create torrent** and add one Web Seed URL per line when generating a `.torrent` for manual testing.
 
 ## Author Information
 

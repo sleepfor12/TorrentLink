@@ -26,6 +26,7 @@
 
 #include "core/app_settings.h"
 #include "core/config_service.h"
+#include "core/network_util.h"
 #include "core/rss/rss_types.h"
 #include "ui/app_theme.h"
 
@@ -86,6 +87,9 @@ pfd::core::AppSettings SettingsDialog::currentSettings() const {
       builtinTrackerEnabledCheck_ != nullptr && builtinTrackerEnabledCheck_->isChecked();
   s.builtin_tracker_port =
       builtinTrackerPortSpin_ != nullptr ? builtinTrackerPortSpin_->value() : 0;
+  s.builtin_tracker_bind_mode = builtinTrackerBindModeBox_ != nullptr
+                                    ? builtinTrackerBindModeBox_->currentData().toString()
+                                    : QStringLiteral("localhost");
   s.builtin_tracker_port_forwarding = builtinTrackerPortForwardingCheck_ != nullptr &&
                                       builtinTrackerPortForwardingCheck_->isChecked();
   s.encryption_mode = encryptionModeBox_ != nullptr ? encryptionModeBox_->currentData().toString()
@@ -292,9 +296,22 @@ void SettingsDialog::setSettings(const pfd::core::AppSettings& s) {
     builtinTrackerPortSpin_->setValue(std::clamp(s.builtin_tracker_port, 0, 65535));
     builtinTrackerPortSpin_->setEnabled(s.builtin_tracker_enabled);
   }
+  if (builtinTrackerBindModeBox_ != nullptr) {
+    const QString mode = pfd::core::normalizeBuiltinTrackerBindMode(s.builtin_tracker_bind_mode);
+    for (int i = 0; i < builtinTrackerBindModeBox_->count(); ++i) {
+      if (builtinTrackerBindModeBox_->itemData(i).toString() == mode) {
+        builtinTrackerBindModeBox_->setCurrentIndex(i);
+        break;
+      }
+    }
+    builtinTrackerBindModeBox_->setEnabled(s.builtin_tracker_enabled);
+  }
   if (builtinTrackerPortForwardingCheck_ != nullptr) {
     builtinTrackerPortForwardingCheck_->setChecked(s.builtin_tracker_port_forwarding);
-    builtinTrackerPortForwardingCheck_->setEnabled(s.builtin_tracker_enabled);
+    const bool pfEnabled =
+        s.builtin_tracker_enabled && pfd::core::normalizeBuiltinTrackerBindMode(
+                                         s.builtin_tracker_bind_mode) == QStringLiteral("lan");
+    builtinTrackerPortForwardingCheck_->setEnabled(pfEnabled);
   }
   if (encryptionModeBox_ != nullptr) {
     const QString v = s.encryption_mode.trimmed().toLower();
@@ -684,15 +701,27 @@ void SettingsDialog::buildLayout() {
   monitorPortSpin_->setToolTip(QStringLiteral(
       "非 0 时在主监听端口之外额外绑定一组 IPv4/IPv6 监听套接字（用于分离观察或兼容旧配置）。"));
   discoverForm->addRow(QStringLiteral("监控端口"), monitorPortSpin_);
+  builtinTrackerBindModeBox_ = new QComboBox(discoverGroup);
+  builtinTrackerBindModeBox_->addItem(QStringLiteral("仅本机 (127.0.0.1)"),
+                                      QStringLiteral("localhost"));
+  builtinTrackerBindModeBox_->addItem(QStringLiteral("局域网 (0.0.0.0)"), QStringLiteral("lan"));
+  builtinTrackerBindModeBox_->setToolTip(
+      QStringLiteral("「局域网」时同一网段内其他设备可通过本机 IP 访问 Tracker；"
+                     "「仅本机」时只监听 127.0.0.1。"));
   builtinTrackerEnabledCheck_ = new QCheckBox(QStringLiteral("启用内置 Tracker"), discoverGroup);
   builtinTrackerEnabledCheck_->setToolTip(
-      QStringLiteral("当前版本尚未实现嵌入式 HTTP Tracker；保存后会在日志中提示，不影响下载。"));
+      QStringLiteral("实验性嵌入式 HTTP Tracker（P0）：支持 GET /announce（compact IPv4）。"
+                     "启用后保存，在日志中查找 [builtin-tracker] 获取 announce URL；"
+                     "端口转发（UPnP/NAT-PMP）尚未实现。"));
   builtinTrackerPortSpin_ = new QSpinBox(discoverGroup);
   builtinTrackerPortSpin_->setRange(0, 65535);
   builtinTrackerPortSpin_->setSpecialValueText(QStringLiteral("自动"));
   builtinTrackerPortSpin_->setValue(0);
   builtinTrackerPortForwardingCheck_ =
       new QCheckBox(QStringLiteral("对内置 Tracker 启用端口转发"), discoverGroup);
+  builtinTrackerPortForwardingCheck_->setToolTip(
+      QStringLiteral("需绑定「局域网」；UPnP/NAT-PMP 端口映射尚未实现（P1）。"));
+  discoverForm->addRow(QStringLiteral("内置 Tracker 绑定"), builtinTrackerBindModeBox_);
   discoverForm->addRow(QStringLiteral("内置 Tracker"), builtinTrackerEnabledCheck_);
   discoverForm->addRow(QStringLiteral("内置 Tracker 端口"), builtinTrackerPortSpin_);
   discoverForm->addRow(QStringLiteral("内置 Tracker 转发"), builtinTrackerPortForwardingCheck_);
@@ -1075,17 +1104,31 @@ void SettingsDialog::wireSignals() {
       proxyPasswordEdit_->setEnabled(enabled);
   }
   if (builtinTrackerEnabledCheck_ != nullptr) {
-    connect(builtinTrackerEnabledCheck_, &QCheckBox::toggled, this, [this](bool checked) {
-      if (builtinTrackerPortSpin_ != nullptr)
-        builtinTrackerPortSpin_->setEnabled(checked);
-      if (builtinTrackerPortForwardingCheck_ != nullptr)
-        builtinTrackerPortForwardingCheck_->setEnabled(checked);
-    });
-    const bool enabled = builtinTrackerEnabledCheck_->isChecked();
-    if (builtinTrackerPortSpin_ != nullptr)
-      builtinTrackerPortSpin_->setEnabled(enabled);
-    if (builtinTrackerPortForwardingCheck_ != nullptr)
-      builtinTrackerPortForwardingCheck_->setEnabled(enabled);
+    const auto syncBuiltinTrackerControls = [this]() {
+      const bool trackerOn =
+          builtinTrackerEnabledCheck_ != nullptr && builtinTrackerEnabledCheck_->isChecked();
+      const QString bindMode = builtinTrackerBindModeBox_ != nullptr
+                                   ? pfd::core::normalizeBuiltinTrackerBindMode(
+                                         builtinTrackerBindModeBox_->currentData().toString())
+                                   : QStringLiteral("localhost");
+      const bool lanBind = bindMode == QStringLiteral("lan");
+      if (builtinTrackerPortSpin_ != nullptr) {
+        builtinTrackerPortSpin_->setEnabled(trackerOn);
+      }
+      if (builtinTrackerBindModeBox_ != nullptr) {
+        builtinTrackerBindModeBox_->setEnabled(trackerOn);
+      }
+      if (builtinTrackerPortForwardingCheck_ != nullptr) {
+        builtinTrackerPortForwardingCheck_->setEnabled(trackerOn && lanBind);
+      }
+    };
+    connect(builtinTrackerEnabledCheck_, &QCheckBox::toggled, this,
+            [syncBuiltinTrackerControls](bool) { syncBuiltinTrackerControls(); });
+    if (builtinTrackerBindModeBox_ != nullptr) {
+      connect(builtinTrackerBindModeBox_, &QComboBox::currentIndexChanged, this,
+              [syncBuiltinTrackerControls](int) { syncBuiltinTrackerControls(); });
+    }
+    syncBuiltinTrackerControls();
   }
   if (randomListenPortBtn_ != nullptr && listenPortSpin_ != nullptr) {
     connect(randomListenPortBtn_, &QPushButton::clicked, this, [this]() {

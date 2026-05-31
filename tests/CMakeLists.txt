@@ -33,6 +33,7 @@ set(PFD_TESTS_CORE
   test_rss_opml.cc
   test_save_path_policy.cc
   test_task_add_builder.cc
+  test_network_util.cc
   test_builtin_http_tracker.cc
 )
 

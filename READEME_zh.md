@@ -7,6 +7,15 @@ English version: [README.md](README.md)
 这是一个基于 **Qt 6（Widgets）+ libtorrent（2.0.5）** 的桌面端 P2P 下载器，目标是实现一个稳定、可扩展、易维护的 BitTorrent 客户端。
 在部分 UI 设计上参考了 qBittorrent。
 
+## 功能概览
+
+- **传输：**打开 `.torrent` 与磁力链接；暂停/继续；分类、标签与队列控制。
+- **任务详情**（视图 → 显示传输页任务详情）：普通、Tracker、用户、**HTTP源**（Web Seed，BEP17/BEP19）、内容、速度。
+- **RSS：**订阅源、规则、自动下载、OPML 导入/导出。
+- **网络（工具 → 首选项 → 连接）：**限速、监听端口、UPnP/NAT-PMP、连接加密；**SOCKS5/HTTP 代理**（BitTorrent 会话 + RSS/HTTP）；**IP 过滤**（文本规则文件，支持热重载）。
+- **内置 HTTP Tracker（实验性）：**嵌入式 BEP3 `GET /announce`；绑定 **仅本机** 或 **局域网**（首选项 → 连接 → 发现与端口映射）。UPnP/NAT-PMP 端口映射尚未实现。
+- **工具：**生成 Torrent（可填 Web Seed）、管理 Cookies、日志中心、浅色/深色/跟随系统主题。
+
 ## 开发环境
 
 - 操作系统：`Ubuntu 22.04.5 LTS`
@@ -90,10 +99,19 @@ ctest --test-dir build --output-on-failure
 - **CI：**`windows-latest`（Qt + vcpkg libtorrent）；Release / Debug 构建后与 Linux 一样执行 **`ctest`**（GoogleTest）。
 - **现状：**Windows 下编译与自动化测试已稳定；当前版本的**本地 Windows 实测已基本完成**，剩余多为与 Linux 的细节对齐与体验优化，而非从零适配。
 - **本地构建：**CMake + vcpkg（`CMAKE_TOOLCHAIN_FILE`）；若找不到 Qt，请设置 `-DCMAKE_PREFIX_PATH` 指向本机 Qt 安装根目录。
-- **运行时：**会话侧网络相关选项已接通（监听端口、端口转发开关、上传槽位、代理、基于文本文件的 **IP 过滤**及规则文件变更后的热重载、队列上限等）。内置 HTTP Tracker 仍为实验性能力，见 [docs/HTTP_TRACKER_PLAN.md](docs/HTTP_TRACKER_PLAN.md)。
+- **运行时：**会话侧网络相关选项已接通（监听端口、端口转发开关、上传槽位、**SOCKS5/HTTP 代理**、基于文本文件的 **IP 过滤**及规则文件变更后的热重载、队列上限等）。内置 HTTP Tracker 为实验性能力：在 **工具 → 首选项 → 连接 → 发现与端口映射** 中启用并选择绑定范围（仅本机 / 局域网）；保存后在日志中查找 `[builtin-tracker]` 或 `builtin tracker ready` 获取 announce URL。Tracker 由 `AppController` 管理，不在 libtorrent 会话线程内运行。
+
+## 测试 HTTP 源面板
+
+1. 编译运行后，打开带有 Web Seed 的 torrent（元信息中含 `url-list` 或 `httpseeds`）。
+2. 在 **传输** 页选中任务；勾选 **视图 → 显示传输页任务详情**。
+3. 在底部详情栏打开 **HTTP源** Tab，应看到 URL 与类型（BEP17 / BEP19）两列。
+
+也可通过 **工具 → 生成 Torrent**，在 Web Seed 栏每行填一个 URL，生成 `.torrent` 后自行测试。
 
 ## V2 Backlog（未实现）
 
+- 内置 HTTP Tracker：UPnP/NAT-PMP 端口映射、`scrape`、状态 UI
 - IP 过滤扩展（如 eMule `ipfilter.dat` 二进制列表、传输列表右键「禁止该 IP」写入规则等）
 - 远程 Web UI / JSON-RPC
 - 自动归档（完成后按分类移动）

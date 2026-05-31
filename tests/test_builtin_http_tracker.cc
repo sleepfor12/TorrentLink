@@ -7,6 +7,7 @@
 
 #include "core/bencode_minimal.h"
 #include "core/builtin_http_tracker.h"
+#include "core/network_util.h"
 
 namespace {
 
@@ -144,9 +145,14 @@ TEST(BuiltinHttpTrackerBencode, AnnounceOkWithOneCompactPeer) {
 
 TEST(BuiltinHttpTracker, SmokeAnnounceLocalhostTwoPeers) {
   pfd::core::BuiltinHttpTracker tr(nullptr);
-  tr.apply(true, 0);
+  pfd::core::BuiltinTrackerConfig cfg;
+  cfg.enabled = true;
+  cfg.port = 0;
+  cfg.bind_mode = QStringLiteral("localhost");
+  tr.apply(cfg);
   const quint16 port = tr.serverPort();
   ASSERT_NE(port, 0u);
+  EXPECT_EQ(tr.bindMode(), QStringLiteral("localhost"));
 
   const QByteArray ih(20, '\x01');
   const QByteArray pid_a(20, '\xaa');
@@ -186,12 +192,52 @@ TEST(BuiltinHttpTracker, SmokeAnnounceLocalhostTwoPeers) {
     EXPECT_TRUE(body.contains(compact_a)) << QString::fromLatin1(body.toHex()).toStdString();
   }
 
-  tr.apply(false, 0);
+  tr.apply(pfd::core::BuiltinTrackerConfig{});
+}
+
+TEST(BuiltinHttpTracker, SmokeAnnounceLanBinding) {
+  pfd::core::BuiltinHttpTracker tr(nullptr);
+  pfd::core::BuiltinTrackerConfig cfg;
+  cfg.enabled = true;
+  cfg.port = 0;
+  cfg.bind_mode = QStringLiteral("lan");
+  tr.apply(cfg);
+  const quint16 port = tr.serverPort();
+  ASSERT_NE(port, 0u);
+  EXPECT_EQ(tr.bindMode(), QStringLiteral("lan"));
+
+  const QByteArray ih(20, '\x03');
+  const QByteArray pid(20, '\xdd');
+  QTcpSocket s;
+  s.connectToHost(QHostAddress::LocalHost, port);
+  ASSERT_TRUE(s.waitForConnected(3000));
+  s.write(buildAnnounceGetRequest(ih, pid, 40002, 1, 0));
+  s.flush();
+  ASSERT_TRUE(s.waitForReadyRead(5000));
+  const QByteArray body = httpBody(s.readAll());
+  ASSERT_FALSE(body.isEmpty());
+  EXPECT_TRUE(body.contains("interval"));
+
+  const QString lan_ip = pfd::core::primaryPrivateIPv4Address();
+  if (!lan_ip.isEmpty()) {
+    QTcpSocket lan;
+    lan.connectToHost(lan_ip, port);
+    ASSERT_TRUE(lan.waitForConnected(3000)) << lan_ip.toStdString();
+    lan.write(buildAnnounceGetRequest(ih, pid, 40003, 1, 0));
+    lan.flush();
+    ASSERT_TRUE(lan.waitForReadyRead(5000));
+    EXPECT_FALSE(httpBody(lan.readAll()).isEmpty());
+  }
+
+  tr.apply(pfd::core::BuiltinTrackerConfig{});
 }
 
 TEST(BuiltinHttpTracker, RejectsCompactZero) {
   pfd::core::BuiltinHttpTracker tr(nullptr);
-  tr.apply(true, 0);
+  pfd::core::BuiltinTrackerConfig cfg;
+  cfg.enabled = true;
+  cfg.port = 0;
+  tr.apply(cfg);
   const quint16 port = tr.serverPort();
   ASSERT_NE(port, 0u);
 
@@ -209,5 +255,5 @@ TEST(BuiltinHttpTracker, RejectsCompactZero) {
   const QByteArray body = httpBody(resp);
   EXPECT_TRUE(body.contains(QByteArrayLiteral("compact=1 required")))
       << QString::fromLatin1(body.toHex()).toStdString();
-  tr.apply(false, 0);
+  tr.apply(pfd::core::BuiltinTrackerConfig{});
 }

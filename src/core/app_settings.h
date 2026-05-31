@@ -46,6 +46,8 @@ struct AppSettings {
   int monitor_port{0};  // 0=禁用
   bool builtin_tracker_enabled{false};
   int builtin_tracker_port{0};  // 0=自动/禁用指定端口
+  /// `localhost` | `lan`
+  QString builtin_tracker_bind_mode{QStringLiteral("localhost")};
   bool builtin_tracker_port_forwarding{false};
 
   // --- 加密策略 ---

@@ -38,6 +38,7 @@
 #include "core/config_service.h"
 #include "core/libtorrent_compat.h"
 #include "core/logger.h"
+#include "core/network_util.h"
 #include "core/rss/rss_fetcher.h"
 #include "core/save_path_policy.h"
 #include "core/task_add_builder.h"
@@ -451,12 +452,53 @@ void AppController::applyBuiltinHttpTrackerFromSettings(const pfd::core::AppSett
     builtinHttpTracker_ =
         std::make_unique<pfd::core::BuiltinHttpTracker>(static_cast<QObject*>(app_));
   }
-  const quint16 port = static_cast<quint16>(std::clamp(s.builtin_tracker_port, 0, 65535));
-  builtinHttpTracker_->apply(s.builtin_tracker_enabled, port);
-  if (s.builtin_tracker_enabled && s.builtin_tracker_port_forwarding) {
+  pfd::core::BuiltinTrackerConfig cfg;
+  cfg.enabled = s.builtin_tracker_enabled;
+  cfg.port = static_cast<quint16>(std::clamp(s.builtin_tracker_port, 0, 65535));
+  cfg.bind_mode = pfd::core::normalizeBuiltinTrackerBindMode(s.builtin_tracker_bind_mode);
+
+  if (cfg.enabled && cfg.port != 0) {
+    const int listen = std::clamp(s.listen_port, 0, 65535);
+    const int monitor = std::clamp(s.monitor_port, 0, 65535);
+    if (cfg.port == static_cast<quint16>(listen) ||
+        (monitor > 0 && cfg.port == static_cast<quint16>(monitor))) {
+      LOG_WARN(
+          QStringLiteral(
+              "builtin tracker: port %1 conflicts with BitTorrent listen/monitor port; tracker not "
+              "started.")
+              .arg(cfg.port));
+      cfg.enabled = false;
+    }
+  }
+
+  builtinHttpTracker_->apply(cfg);
+
+  if (cfg.enabled) {
+    const quint16 actual = builtinHttpTracker_->serverPort();
+    if (actual != 0) {
+      const QString bind = builtinHttpTracker_->bindMode();
+      if (bind == QStringLiteral("lan")) {
+        const QString lan_ip = pfd::core::primaryPrivateIPv4Address();
+        if (lan_ip.isEmpty()) {
+          logInfo(QStringLiteral("builtin tracker ready: http://127.0.0.1:%1/announce (bind=lan)")
+                      .arg(actual));
+        } else {
+          logInfo(QStringLiteral("builtin tracker ready: local=http://127.0.0.1:%1/announce "
+                                 "lan=http://%2:%1/announce")
+                      .arg(actual)
+                      .arg(lan_ip));
+        }
+      } else {
+        logInfo(QStringLiteral("builtin tracker ready: http://127.0.0.1:%1/announce").arg(actual));
+      }
+    }
+  }
+
+  const QString bind = builtinHttpTracker_->bindMode();
+  if (s.builtin_tracker_enabled && s.builtin_tracker_port_forwarding &&
+      bind == QStringLiteral("lan")) {
     logInfo(QStringLiteral(
-        "builtin tracker: port forwarding from preferences is not applied in P0 (listen "
-        "127.0.0.1 only)."));
+        "builtin tracker: port forwarding is not implemented yet (UPnP/NAT-PMP planned for P1)."));
   }
 }
 
