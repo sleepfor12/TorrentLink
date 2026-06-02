@@ -2,6 +2,7 @@
 #include <QtCore/QSignalBlocker>
 #include <QtCore/QStringList>
 #include <QtGui/QActionGroup>
+#include <QtWidgets/QAbstractItemView>
 #include <QtWidgets/QCheckBox>
 #include <QtWidgets/QComboBox>
 #include <QtWidgets/QHBoxLayout>
@@ -14,8 +15,6 @@
 #include <QtWidgets/QTabWidget>
 #include <QtWidgets/QTableWidget>
 #include <QtWidgets/QVBoxLayout>
-#include <QtWidgets/QAbstractItemView>
-#include <QtWidgets/QTableWidget>
 
 #include "core/config_service.h"
 #include "ui/app_theme.h"

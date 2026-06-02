@@ -13,8 +13,8 @@
 #include <chrono>
 #include <sstream>
 
-#include "core/logger.h"
 #include "base/text_encoding.h"
+#include "core/logger.h"
 #include "lt/session_ids.h"
 #include "lt/session_ops.h"
 
@@ -140,8 +140,8 @@ mapTrackerStatus(const libtorrent::announce_entry& ae) {
   QStringList parts;
   for (const auto& ih : ep.info_hashes) {
     if (!ih.message.empty()) {
-      parts.append(pfd::base::sanitizeHumanReadableText(
-          pfd::base::QStringFromStdBytes(ih.message)));
+      parts.append(
+          pfd::base::sanitizeHumanReadableText(pfd::base::QStringFromStdBytes(ih.message)));
     } else if (ih.last_error) {
       parts.append(pfd::base::sanitizeHumanReadableText(
           pfd::base::QStringFromStdBytes(ih.last_error.message())));

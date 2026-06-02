@@ -36,6 +36,7 @@
 #include <QtWidgets/QLineEdit>
 #include <QtWidgets/QMenu>
 #include <QtWidgets/QMessageBox>
+#include <QtWidgets/QPlainTextEdit>
 #include <QtWidgets/QProgressBar>
 #include <QtWidgets/QPushButton>
 #include <QtWidgets/QTableWidget>
@@ -50,6 +51,7 @@
 #include "core/config_service.h"
 #include "core/logger.h"
 #include "core/torrent_creator.h"
+#include "ui/app_theme.h"
 #include "ui/main_window.h"
 #include "ui/rss/rss_module_page.h"
 
@@ -200,14 +202,24 @@ void MainWindow::bindSignals() {
 
 void MainWindow::openTorrentLinksFromMenu() {
   QDialog dlg(this);
+  dlg.setObjectName(QStringLiteral("openTorrentLinksDialog"));
   dlg.setWindowTitle(QStringLiteral("打开 Torrent 链接"));
   dlg.setModal(true);
   dlg.resize(720, 420);
+  {
+    const auto st = pfd::core::ConfigService::loadAppSettings();
+    const EffectiveUiTheme eff = UiTheme::resolveEffectiveTheme(st.ui_theme);
+    dlg.setStyleSheet(UiTheme::auxiliaryDialogStyleSheet(dlg.objectName(), eff));
+  }
   auto* layout = new QVBoxLayout(&dlg);
   layout->addWidget(new QLabel(
-      QStringLiteral("每行一个链接（磁力链接 magnet:?xt=...），可一次添加多个。"), &dlg));
-  auto* edit = new QTextEdit(&dlg);
+      QStringLiteral("每行一个磁力链接（magnet:?xt=...）；长链接不换行，可左右滚动查看"), &dlg));
+  auto* edit = new QPlainTextEdit(&dlg);
   edit->setPlaceholderText(QStringLiteral("magnet:?xt=urn:btih:...\nmagnet:?xt=urn:btih:..."));
+  edit->setLineWrapMode(QPlainTextEdit::NoWrap);
+  edit->setHorizontalScrollBarPolicy(Qt::ScrollBarAsNeeded);
+  edit->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
+  edit->setTabChangesFocus(true);
   layout->addWidget(edit, 1);
   auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dlg);
   QObject::connect(buttons, &QDialogButtonBox::accepted, &dlg, &QDialog::accept);

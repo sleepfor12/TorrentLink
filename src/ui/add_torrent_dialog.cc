@@ -1,5 +1,6 @@
 #include "ui/add_torrent_dialog.h"
 
+#include <QTimer>
 #include <QtCore/QDateTime>
 #include <QtCore/QDir>
 #include <QtCore/QFileInfo>
@@ -94,6 +95,39 @@ AddTorrentDialog::runForMagnetMetadata(QWidget* parent, const MagnetInput& in,
   return dlg.result();
 }
 
+std::optional<AddTorrentDialog::Result>
+AddTorrentDialog::runForMagnetLinkPending(QWidget* parent, const MagnetBootstrap& bootstrap,
+                                          const QString& defaultSavePath,
+                                          const MetadataPoller& poller) {
+  AddTorrentDialog dlg(parent);
+  dlg.beginMagnetPending(bootstrap, defaultSavePath);
+
+  QTimer pollTimer(&dlg);
+  pollTimer.setInterval(100);
+  QObject::connect(&pollTimer, &QTimer::timeout, &dlg, [&dlg, poller]() {
+    if (dlg.isMetadataReady() || dlg.metadataFetchFailed()) {
+      return;
+    }
+    const MetadataPollResult poll = poller();
+    if (poll.state == MetadataPollState::kPending) {
+      return;
+    }
+    if (poll.state == MetadataPollState::kFailed) {
+      dlg.setMetadataFetchFailed();
+      return;
+    }
+    dlg.applyMagnetMetadata(poll.input);
+  });
+  pollTimer.start();
+
+  const int rc = dlg.exec();
+  pollTimer.stop();
+  if (rc != QDialog::Accepted || !dlg.isMetadataReady()) {
+    return std::nullopt;
+  }
+  return dlg.result();
+}
+
 AddTorrentDialog::AddTorrentDialog(QWidget* parent) : QDialog(parent) {
   setObjectName(QStringLiteral("addTorrentDialog"));
   setModal(true);
@@ -156,12 +190,124 @@ bool AddTorrentDialog::loadTorrentFile(const QString& torrentFilePath) {
   return true;
 }
 
+void AddTorrentDialog::beginMagnetPending(const MagnetBootstrap& bootstrap,
+                                          const QString& defaultSavePath) {
+  metadataReady_ = false;
+  metadataFailed_ = false;
+
+  torrentName_ = bootstrap.displayName.trimmed();
+  if (torrentName_.isEmpty()) {
+    torrentName_ = bootstrap.infoHashV1.trimmed();
+  }
+  if (torrentName_.isEmpty()) {
+    torrentName_ = bootstrap.infoHashV2.trimmed();
+  }
+  if (torrentName_.isEmpty()) {
+    torrentName_ = QStringLiteral("磁力链接");
+  }
+  setWindowTitle(torrentName_);
+  if (title_ != nullptr) {
+    title_->setText(torrentName_);
+  }
+
+  totalBytes_ = 0;
+  creationDate_ = 0;
+  comment_.clear();
+  hashV1_ = bootstrap.infoHashV1;
+  hashV2_ = bootstrap.infoHashV2;
+  fileSizes_.clear();
+
+  if (savePathEdit_ != nullptr) {
+    savePathEdit_->setText(defaultSavePath);
+  }
+  applyMetaInfoToUi();
+  if (infoSize_ != nullptr) {
+    infoSize_->setText(QStringLiteral("正在获取元数据…"));
+  }
+  showMetadataLoadingPlaceholder();
+  if (selectedSizeLabel_ != nullptr) {
+    selectedSizeLabel_->setText(QStringLiteral("正在获取文件列表…"));
+  }
+  setMetadataControlsEnabled(false);
+  if (acceptBtn_ != nullptr) {
+    acceptBtn_->setEnabled(false);
+  }
+}
+
+void AddTorrentDialog::applyMagnetMetadata(const MagnetInput& in) {
+  if (!loadMagnetMetadata(in)) {
+    setMetadataFetchFailed();
+    return;
+  }
+  metadataReady_ = true;
+  metadataFailed_ = false;
+  setMetadataControlsEnabled(true);
+  if (acceptBtn_ != nullptr) {
+    acceptBtn_->setEnabled(true);
+  }
+}
+
+void AddTorrentDialog::setMetadataFetchFailed() {
+  metadataReady_ = false;
+  metadataFailed_ = true;
+  if (infoSize_ != nullptr) {
+    infoSize_->setText(QStringLiteral("获取元数据失败"));
+  }
+  if (selectedSizeLabel_ != nullptr) {
+    selectedSizeLabel_->setText(QStringLiteral("无法获取文件列表，请检查网络或稍后重试"));
+  }
+  showMetadataLoadingPlaceholder();
+  setMetadataControlsEnabled(false);
+  if (acceptBtn_ != nullptr) {
+    acceptBtn_->setEnabled(false);
+  }
+}
+
+void AddTorrentDialog::setMetadataControlsEnabled(bool enabled) {
+  if (filterEdit_ != nullptr) {
+    filterEdit_->setEnabled(enabled);
+  }
+  if (selectAllBtn_ != nullptr) {
+    selectAllBtn_->setEnabled(enabled);
+  }
+  if (selectNoneBtn_ != nullptr) {
+    selectNoneBtn_->setEnabled(enabled);
+  }
+  if (fileTree_ != nullptr) {
+    fileTree_->setEnabled(enabled);
+  }
+}
+
+void AddTorrentDialog::showMetadataLoadingPlaceholder() {
+  if (fileTree_ == nullptr) {
+    return;
+  }
+  fileTree_->clear();
+  fileTree_->setColumnCount(3);
+  fileTree_->setHeaderLabels(
+      {QStringLiteral("文件"), QStringLiteral("大小"), QStringLiteral("下载")});
+  auto* item = new QTreeWidgetItem(fileTree_);
+  item->setText(0, QStringLiteral("正在获取文件列表…"));
+  item->setText(1, QStringLiteral("--"));
+  item->setFlags(item->flags() & ~Qt::ItemIsUserCheckable);
+  item->setDisabled(true);
+}
+
 bool AddTorrentDialog::loadMagnetMetadata(const MagnetInput& in) {
-  if (in.name.trimmed().isEmpty() || in.filePaths.size() != in.fileSizes.size()) {
+  if (in.filePaths.empty() || in.filePaths.size() != in.fileSizes.size()) {
     return false;
   }
 
-  torrentName_ = in.name;
+  torrentName_ = in.name.trimmed();
+  if (torrentName_.isEmpty()) {
+    torrentName_ = in.infoHashV1.trimmed();
+  }
+  if (torrentName_.isEmpty()) {
+    torrentName_ = in.infoHashV2.trimmed();
+  }
+  if (torrentName_.isEmpty()) {
+    torrentName_ = QStringLiteral("未命名任务");
+  }
   setWindowTitle(torrentName_);
   if (title_ != nullptr) {
     title_->setText(torrentName_);
@@ -331,7 +477,12 @@ void AddTorrentDialog::buildLayout() {
   root->addWidget(splitter, 1);
 
   auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, this);
-  connect(buttons, &QDialogButtonBox::accepted, this, &QDialog::accept);
+  acceptBtn_ = buttons->button(QDialogButtonBox::Ok);
+  connect(buttons, &QDialogButtonBox::accepted, this, [this]() {
+    if (metadataReady_) {
+      accept();
+    }
+  });
   connect(buttons, &QDialogButtonBox::rejected, this, &QDialog::reject);
   root->addWidget(buttons);
 }

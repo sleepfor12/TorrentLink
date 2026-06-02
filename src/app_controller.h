@@ -96,10 +96,29 @@ private:
   void logInfo(const QString& msg) const;
   void logError(const QString& msg) const;
 
+  [[nodiscard]] static pfd::ui::AddTorrentDialog::MagnetInput
+  magnetInputFromMetadata(const pfd::lt::SessionWorker::MagnetMetadata& meta);
+  void submitPreparedMagnetAdd(const pfd::lt::SessionWorker::MagnetMetadata& meta,
+                               const pfd::ui::AddTorrentDialog::Result& ui);
+  void submitTorrentFileFromDialog(const QString& torrentFilePath,
+                                   const pfd::ui::AddTorrentDialog::Result& ui);
+  [[nodiscard]] bool presentMagnetAddDialogViaExportedTorrent(
+      const pfd::lt::SessionWorker::MagnetMetadata& meta, const QString& defaultSavePath,
+      const pfd::core::rss::RssDownloadSettlement& rssSettlement);
+  [[nodiscard]] bool
+  showMagnetAddDialogAndSubmit(const pfd::lt::SessionWorker::MagnetMetadata& meta,
+                               const QString& defaultSavePath,
+                               const pfd::core::rss::RssDownloadSettlement& rssSettlement);
+  void submitMagnetDialogResult(const pfd::lt::SessionWorker::MagnetMetadata& meta,
+                                const pfd::ui::AddTorrentDialog::Result& ui,
+                                const pfd::core::rss::RssDownloadSettlement& rssSettlement);
+
   void enqueueMagnet(const QString& uri, const QString& savePath,
                      const pfd::core::rss::RssDownloadSettlement& rssSettlement = {},
                      bool skipInteractiveAdd = false, const QString& category = {},
                      const QString& tagsCsv = {});
+  /// 与「打开 Torrent 文件」相同：拉取元数据后弹出 AddTorrentDialog 供选择文件与选项。
+  void presentInteractiveMagnetAdd(const QString& uri, const QString& savePathHint = {});
   void startOneMagnetOnUi(pfd::app::RssDownloadPipeline::MagnetQueueItem item);
   void enqueueRssTorrentUrl(const QString& url, const QString& savePath,
                             const QString& referer = {},

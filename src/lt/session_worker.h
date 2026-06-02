@@ -106,6 +106,8 @@ public:
     QString comment;
     std::vector<QString> filePaths;
     std::vector<qint64> fileSizes;
+    /// 元数据就绪后导出的临时 .torrent，供 UI 走与本地文件相同的添加流程。
+    QString exportedTorrentPath;
   };
 
   struct PeerSnapshot {
@@ -143,7 +145,8 @@ public:
   void addMagnet(const QString& uri, const QString& savePath, const QStringList& trackers = {});
   // 预取磁力链接元数据（用于弹出文件选择页），超时返回空；成功返回文件列表等信息。
   [[nodiscard]] std::optional<MagnetMetadata>
-  prepareMagnetMetadata(const QString& uri, const QString& tempSavePath, int timeout_ms);
+  prepareMagnetMetadata(const QString& uri, const QString& tempSavePath, int timeout_ms,
+                        const QStringList& trackers = {});
   // 用户取消选择页后，清理临时磁力任务。
   void cancelPreparedMagnet(const pfd::base::TaskId& taskId);
   // 用户确认选择页后，使用已缓存的 metadata 重新添加并应用选项与文件优先级。

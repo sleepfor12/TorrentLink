@@ -20,14 +20,19 @@ struct session;
 
 namespace pfd::lt::session_ops {
 
+struct PendingMagnetMetaEntry {
+  std::shared_ptr<std::promise<std::optional<SessionWorker::MagnetMetadata>>> done;
+  QString tempSavePath;
+  QString magnetUri;
+};
+
 struct Context {
   std::map<QString, libtorrent::torrent_handle>& handlesByTaskId;
   int& defaultPerTorrentConnectionsLimit;
   std::map<QString, int>& perTaskConnectionsLimit;
   std::map<QString, SessionWorker::AddTorrentOptions>& pendingAddOpts;
   std::map<QString, pfd::lt::AddTorrentTorrentInfoConstPtr>& preparedTorrentInfo;
-  std::map<QString, std::shared_ptr<std::promise<std::optional<SessionWorker::MagnetMetadata>>>>&
-      pendingMagnetMeta;
+  std::map<QString, PendingMagnetMetaEntry>& pendingMagnetMeta;
   int& pendingResumeDataSaves;
   int& completedResumeDataSaves;
   QString& resumeDataDir;

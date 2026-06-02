@@ -46,16 +46,13 @@ bool isValidUtf8(const char* data, int size) {
         return false;
       }
     }
-    if (need == 2 && c == 0xE0u &&
-        static_cast<unsigned char>(data[i + 1]) < 0xA0u) {
+    if (need == 2 && c == 0xE0u && static_cast<unsigned char>(data[i + 1]) < 0xA0u) {
       return false;
     }
-    if (need == 3 && c == 0xF0u &&
-        static_cast<unsigned char>(data[i + 1]) < 0x90u) {
+    if (need == 3 && c == 0xF0u && static_cast<unsigned char>(data[i + 1]) < 0x90u) {
       return false;
     }
-    if (need == 3 && c == 0xF4u &&
-        static_cast<unsigned char>(data[i + 1]) > 0x8Fu) {
+    if (need == 3 && c == 0xF4u && static_cast<unsigned char>(data[i + 1]) > 0x8Fu) {
       return false;
     }
     i += need + 1;

@@ -8,6 +8,8 @@
 #include <libtorrent/alert.hpp>
 #include <libtorrent/alert_types.hpp>
 #include <libtorrent/announce_entry.hpp>
+#include <libtorrent/bencode.hpp>
+#include <libtorrent/create_torrent.hpp>
 #include <libtorrent/download_priority.hpp>
 #include <libtorrent/magnet_uri.hpp>
 #include <libtorrent/session.hpp>
@@ -36,6 +38,158 @@
 #include "lt/task_alert_adapter.h"
 
 namespace pfd::lt {
+
+namespace {
+
+QString exportTorrentInfoToFile(const libtorrent::torrent_info& ti, const QString& dir,
+                                const QString& key) {
+  libtorrent::create_torrent ct(ti);
+  const libtorrent::entry generated = ct.generate();
+  std::vector<char> encoded;
+  encoded.reserve(256 * 1024);
+  libtorrent::bencode(std::back_inserter(encoded), generated);
+  const QString path = QDir(dir).filePath(key + QStringLiteral(".torrent"));
+  QFile file(path);
+  if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
+    return {};
+  }
+  if (file.write(encoded.data(), static_cast<qint64>(encoded.size())) !=
+      static_cast<qint64>(encoded.size())) {
+    return {};
+  }
+  return path;
+}
+
+QString magnetDisplayNameFallback(const QString& magnetUri, const QString& infoHashKey) {
+  libtorrent::error_code ec;
+  const libtorrent::add_torrent_params atp =
+      libtorrent::parse_magnet_uri(magnetUri.toStdString(), ec);
+  if (!ec) {
+    const QString dn = QString::fromStdString(atp.name).trimmed();
+    if (!dn.isEmpty()) {
+      return dn;
+    }
+  }
+  if (!infoHashKey.isEmpty()) {
+    return infoHashKey.left(16);
+  }
+  return QStringLiteral("未命名任务");
+}
+
+void fillMagnetMetadataFromTorrentInfo(SessionWorker::MagnetMetadata& m,
+                                       const libtorrent::torrent_info& ti) {
+  m.name = QString::fromStdString(ti.name()).trimmed();
+  m.comment = QString::fromStdString(ti.comment());
+  m.creationDate = static_cast<qint64>(ti.creation_date());
+  m.totalBytes = 0;
+  const auto& fs = ti.files();
+  const int n = fs.num_files();
+  m.filePaths.clear();
+  m.fileSizes.clear();
+  m.filePaths.reserve(static_cast<size_t>(n));
+  m.fileSizes.reserve(static_cast<size_t>(n));
+  for (int i = 0; i < n; ++i) {
+    const auto idx = libtorrent::file_index_t{i};
+    const qint64 sz = static_cast<qint64>(fs.file_size(idx));
+    m.totalBytes += sz;
+    m.filePaths.push_back(QString::fromStdString(fs.file_path(idx)));
+    m.fileSizes.push_back(sz);
+  }
+  if (ti.info_hashes().has_v1()) {
+    std::ostringstream oss;
+    oss << ti.info_hashes().v1;
+    m.infoHashV1 = QString::fromStdString(oss.str());
+  }
+  if (ti.info_hashes().has_v2()) {
+    std::ostringstream oss;
+    oss << ti.info_hashes().v2;
+    m.infoHashV2 = QString::fromStdString(oss.str());
+  }
+}
+
+bool isValidMagnetMetadata(const SessionWorker::MagnetMetadata& m) {
+  return !m.filePaths.empty() && m.filePaths.size() == m.fileSizes.size();
+}
+
+void configureHandleForMagnetMetadataFetch(const libtorrent::torrent_handle& handle) {
+  if (!handle.is_valid()) {
+    return;
+  }
+  handle.unset_flags(libtorrent::torrent_flags::auto_managed);
+  handle.unset_flags(libtorrent::torrent_flags::paused);
+  handle.set_flags(libtorrent::torrent_flags::upload_mode);
+  if (bool(handle.status().flags & libtorrent::torrent_flags::paused)) {
+    handle.resume();
+  }
+}
+
+bool tryFulfillPendingMagnetMeta(
+    const QString& key, const libtorrent::torrent_handle& handle,
+    std::map<QString, session_ops::PendingMagnetMetaEntry>& pendingMagnetMeta,
+    std::map<QString, AddTorrentTorrentInfoConstPtr>& preparedTorrentInfo) {
+  auto itPending = pendingMagnetMeta.find(key);
+  if (itPending == pendingMagnetMeta.end() || itPending->second.done == nullptr) {
+    return false;
+  }
+  if (!handle.is_valid() || !handle.status().has_metadata) {
+    return false;
+  }
+
+  auto& entry = itPending->second;
+  std::shared_ptr<const libtorrent::torrent_info> ti = handle.torrent_file();
+  if (!ti) {
+    ti = handle.torrent_file_with_hashes();
+  }
+  if (!ti) {
+    entry.done->set_value(std::nullopt);
+    pendingMagnetMeta.erase(itPending);
+    return true;
+  }
+
+  SessionWorker::MagnetMetadata m;
+  m.taskId = session_ids::taskIdFromInfoHashes(handle.info_hashes());
+  preparedTorrentInfo[key] = ti;
+  fillMagnetMetadataFromTorrentInfo(m, *ti);
+  if (m.name.trimmed().isEmpty()) {
+    m.name = magnetDisplayNameFallback(entry.magnetUri, key);
+  }
+  if (!isValidMagnetMetadata(m)) {
+    entry.done->set_value(std::nullopt);
+    pendingMagnetMeta.erase(itPending);
+    return true;
+  }
+  m.exportedTorrentPath = exportTorrentInfoToFile(*ti, entry.tempSavePath, key);
+  entry.done->set_value(std::make_optional(std::move(m)));
+  pendingMagnetMeta.erase(itPending);
+  return true;
+}
+
+void pollPendingMagnetMetadata(
+    std::map<QString, libtorrent::torrent_handle>& handlesByTaskId,
+    std::map<QString, session_ops::PendingMagnetMetaEntry>& pendingMagnetMeta,
+    std::map<QString, AddTorrentTorrentInfoConstPtr>& preparedTorrentInfo) {
+  if (pendingMagnetMeta.empty()) {
+    return;
+  }
+  std::vector<QString> keys;
+  keys.reserve(pendingMagnetMeta.size());
+  for (const auto& [key, _] : pendingMagnetMeta) {
+    keys.push_back(key);
+  }
+  for (const QString& key : keys) {
+    if (pendingMagnetMeta.find(key) == pendingMagnetMeta.end()) {
+      continue;
+    }
+    const auto hIt = handlesByTaskId.find(key);
+    if (hIt == handlesByTaskId.end() || !hIt->second.is_valid()) {
+      continue;
+    }
+    configureHandleForMagnetMetadataFetch(hIt->second);
+    tryFulfillPendingMagnetMeta(key, hIt->second, pendingMagnetMeta, preparedTorrentInfo);
+  }
+}
+
+}  // namespace
 
 struct SessionWorker::Impl {
   using AddMagnetCmd = session_cmds::AddMagnetCmd;
@@ -92,8 +246,7 @@ struct SessionWorker::Impl {
   std::map<QString, int> perTaskConnectionsLimit;
   std::map<QString, SessionWorker::AddTorrentOptions> pendingAddOpts;
   std::map<QString, AddTorrentTorrentInfoConstPtr> preparedTorrentInfo;
-  std::map<QString, std::shared_ptr<std::promise<std::optional<SessionWorker::MagnetMetadata>>>>
-      pendingMagnetMeta;
+  std::map<QString, session_ops::PendingMagnetMetaEntry> pendingMagnetMeta;
   int pendingResumeDataSaves{0};
   int completedResumeDataSaves{0};
   QString resumeDataDir;
@@ -302,43 +455,20 @@ struct SessionWorker::Impl {
         if (auto* meta = libtorrent::alert_cast<libtorrent::metadata_received_alert>(a);
             meta != nullptr) {
           const auto ih = meta->handle.info_hashes();
-          const auto id = session_ids::taskIdFromInfoHashes(ih);
-          const QString key = session_ids::taskIdKey(id);
-          auto itPromise = pendingMagnetMeta.find(key);
-          if (itPromise != pendingMagnetMeta.end() && itPromise->second != nullptr) {
-            SessionWorker::MagnetMetadata m;
-            m.taskId = id;
-            if (auto ti = meta->handle.torrent_file_with_hashes(); ti) {
-              preparedTorrentInfo[key] = ti;
-              m.name = QString::fromStdString(ti->name());
-              m.comment = QString::fromStdString(ti->comment());
-              m.creationDate = static_cast<qint64>(ti->creation_date());
-              m.totalBytes = 0;
-              const auto& fs = ti->files();
-              const int n = fs.num_files();
-              m.filePaths.reserve(static_cast<size_t>(n));
-              m.fileSizes.reserve(static_cast<size_t>(n));
-              for (int i = 0; i < n; ++i) {
-                const auto idx = libtorrent::file_index_t{i};
-                const qint64 sz = static_cast<qint64>(fs.file_size(idx));
-                m.totalBytes += sz;
-                m.filePaths.push_back(QString::fromStdString(fs.file_path(idx)));
-                m.fileSizes.push_back(sz);
-              }
-              if (ti->info_hashes().has_v1()) {
-                std::ostringstream oss;
-                oss << ti->info_hashes().v1;
-                m.infoHashV1 = QString::fromStdString(oss.str());
-              }
-              if (ti->info_hashes().has_v2()) {
-                std::ostringstream oss;
-                oss << ti->info_hashes().v2;
-                m.infoHashV2 = QString::fromStdString(oss.str());
-              }
-            }
-            itPromise->second->set_value(std::make_optional(std::move(m)));
-            pendingMagnetMeta.erase(itPromise);
+          const QString key = session_ids::taskIdKey(session_ids::taskIdFromInfoHashes(ih));
+          tryFulfillPendingMagnetMeta(key, meta->handle, pendingMagnetMeta, preparedTorrentInfo);
+          continue;
+        }
+        if (auto* failed = libtorrent::alert_cast<libtorrent::metadata_failed_alert>(a);
+            failed != nullptr) {
+          const QString key = session_ids::taskIdKey(
+              session_ids::taskIdFromInfoHashes(failed->handle.info_hashes()));
+          auto itPending = pendingMagnetMeta.find(key);
+          if (itPending != pendingMagnetMeta.end() && itPending->second.done != nullptr) {
+            itPending->second.done->set_value(std::nullopt);
+            pendingMagnetMeta.erase(itPending);
           }
+          continue;
         }
 
         // --- resume data handling ---
@@ -377,7 +507,11 @@ struct SessionWorker::Impl {
             const auto id = session_ids::taskIdFromInfoHashes(add->params.info_hashes);
             const QString key = session_ids::taskIdKey(id);
             handlesByTaskId[key] = add->handle;
-            add->handle.resume();
+            if (pendingMagnetMeta.find(key) != pendingMagnetMeta.end()) {
+              configureHandleForMagnetMetadataFetch(add->handle);
+            } else {
+              add->handle.resume();
+            }
             const auto itOpts = pendingAddOpts.find(key);
             if (itOpts != pendingAddOpts.end()) {
               if (itOpts->second.add_to_top_queue) {
@@ -415,6 +549,7 @@ struct SessionWorker::Impl {
         }
         views.insert(views.end(), v.begin(), v.end());
       }
+      pollPendingMagnetMetadata(handlesByTaskId, pendingMagnetMeta, preparedTorrentInfo);
       AlertsCallback cb;
       {
         std::lock_guard<std::mutex> lk(mu);
@@ -453,7 +588,7 @@ void SessionWorker::addMagnet(const QString& uri, const QString& savePath,
 
 std::optional<SessionWorker::MagnetMetadata>
 SessionWorker::prepareMagnetMetadata(const QString& uri, const QString& tempSavePath,
-                                     int timeout_ms) {
+                                     int timeout_ms, const QStringList& trackers) {
   libtorrent::error_code ec;
   libtorrent::add_torrent_params atp =
       libtorrent::parse_magnet_uri(uri.trimmed().toStdString(), ec);
@@ -467,6 +602,7 @@ SessionWorker::prepareMagnetMetadata(const QString& uri, const QString& tempSave
   Impl::PrepareMagnetMetadataCmd cmd;
   cmd.uri = uri;
   cmd.tempSavePath = tempSavePath;
+  cmd.trackers = trackers;
   cmd.timeout_ms = timeout_ms;
   cmd.done = done;
   impl_->enqueue(std::move(cmd));

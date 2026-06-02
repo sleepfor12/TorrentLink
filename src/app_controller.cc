@@ -8,6 +8,7 @@
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QMessageBox>
 #include <QMetaObject>
 #include <QPointer>
 #include <QProcess>
@@ -28,6 +29,7 @@
 
 #include <algorithm>
 #include <future>
+#include <sstream>
 #include <vector>
 
 #include "app/task_query_mapper.h"
@@ -45,6 +47,7 @@
 #include "core/task_event.h"
 #include "core/task_snapshot.h"
 #include "lt/session_ids.h"
+#include "ui/add_torrent_dialog.h"
 
 namespace pfd::app {
 
@@ -518,7 +521,308 @@ void AppController::submitArgvMagnet(const QString& magnet) {
     upsertKnownTaskMagnet(pfd::lt::session_ids::taskIdFromInfoHashes(atp.info_hashes), trimmed);
   }
   logInfo(QStringLiteral("Magnet URI from argv detected."));
-  enqueueMagnet(trimmed, QString());
+  presentInteractiveMagnetAdd(trimmed, QString());
+}
+
+pfd::ui::AddTorrentDialog::MagnetInput
+AppController::magnetInputFromMetadata(const pfd::lt::SessionWorker::MagnetMetadata& meta) {
+  pfd::ui::AddTorrentDialog::MagnetInput in;
+  in.name = meta.name;
+  in.totalBytes = meta.totalBytes;
+  in.creationDate = meta.creationDate;
+  in.infoHashV1 = meta.infoHashV1;
+  in.infoHashV2 = meta.infoHashV2;
+  in.comment = meta.comment;
+  in.filePaths = meta.filePaths;
+  in.fileSizes = meta.fileSizes;
+  return in;
+}
+
+void AppController::submitPreparedMagnetAdd(const pfd::lt::SessionWorker::MagnetMetadata& meta,
+                                            const pfd::ui::AddTorrentDialog::Result& ui) {
+  if (const auto catErr = pfd::base::validateCategory(ui.category); catErr.hasError()) {
+    logError(QStringLiteral("Category rejected: %1").arg(catErr.message()));
+    worker_->cancelPreparedMagnet(meta.taskId);
+    return;
+  }
+  if (const auto tagsErr = pfd::base::validateTagsCsv(ui.tagsCsv); tagsErr.hasError()) {
+    logError(QStringLiteral("Tags rejected: %1").arg(tagsErr.message()));
+    worker_->cancelPreparedMagnet(meta.taskId);
+    return;
+  }
+  if (!ui.savePath.trimmed().isEmpty()) {
+    if (const auto pathErr = pfd::base::validatePath(ui.savePath); pathErr.hasError()) {
+      logError(QStringLiteral("Save path rejected: %1").arg(pathErr.message()));
+      worker_->cancelPreparedMagnet(meta.taskId);
+      return;
+    }
+  }
+
+  pfd::core::TaskAddInput tai;
+  tai.name = ui.name;
+  tai.savePath = ui.savePath;
+  tai.layout = static_cast<pfd::core::ContentLayout>(static_cast<int>(ui.layout));
+  tai.startTorrent = ui.startTorrent;
+  tai.stopCondition = ui.stopCondition;
+  tai.sequentialDownload = ui.sequentialDownload;
+  tai.skipHashCheck = ui.skipHashCheck;
+  tai.addToTopQueue = ui.addToTopQueue;
+  tai.category = ui.category;
+  tai.tagsCsv = ui.tagsCsv;
+  tai.fileWanted = ui.fileWanted;
+  const auto built = pfd::core::buildTaskAdd(tai, savePathPolicy_);
+
+  const QStringList trackers =
+      autoApplyDefaultTrackers_ ? pfd::base::sanitizeTrackers(defaultTrackers_) : QStringList{};
+  pfd::lt::SessionWorker::AddTorrentOptions opts;
+  opts.file_priorities = built.opts.file_priorities;
+  opts.start_torrent = built.opts.start_torrent;
+  opts.stop_when_ready = built.opts.stop_when_ready;
+  opts.sequential_download = built.opts.sequential_download;
+  opts.skip_hash_check = built.opts.skip_hash_check;
+  opts.add_to_top_queue = built.opts.add_to_top_queue;
+  opts.category = built.opts.category;
+  opts.tags_csv = built.opts.tags_csv;
+
+  worker_->finalizePreparedMagnet(meta.taskId, built.finalSavePath, trackers, opts);
+  applyTaskMetaUpdate(meta.taskId, ui.name, built.finalSavePath, ui.category, ui.tagsCsv);
+  logInfo(QStringLiteral("Magnet submitted with selection. name=%1 savePath=%2 selected=%3/%4")
+              .arg(ui.name, built.finalSavePath)
+              .arg(ui.selectedBytes)
+              .arg(ui.totalBytes));
+}
+
+void AppController::submitTorrentFileFromDialog(const QString& torrentFilePath,
+                                                const pfd::ui::AddTorrentDialog::Result& ui) {
+  const auto fileErr = pfd::base::validateTorrentFilePath(torrentFilePath);
+  if (fileErr.hasError()) {
+    logError(QStringLiteral("Torrent file rejected: %1").arg(fileErr.message()));
+    return;
+  }
+  if (!ui.savePath.trimmed().isEmpty()) {
+    const auto pathErr = pfd::base::validatePath(ui.savePath);
+    if (pathErr.hasError()) {
+      logError(QStringLiteral("Save path rejected: %1").arg(pathErr.message()));
+      return;
+    }
+  }
+  if (const auto catErr = pfd::base::validateCategory(ui.category); catErr.hasError()) {
+    logError(QStringLiteral("Category rejected: %1").arg(catErr.message()));
+    return;
+  }
+  if (const auto tagsErr = pfd::base::validateTagsCsv(ui.tagsCsv); tagsErr.hasError()) {
+    logError(QStringLiteral("Tags rejected: %1").arg(tagsErr.message()));
+    return;
+  }
+
+  pfd::core::TaskAddInput tai;
+  tai.name = ui.name;
+  tai.savePath = ui.savePath;
+  tai.layout = static_cast<pfd::core::ContentLayout>(static_cast<int>(ui.layout));
+  tai.startTorrent = ui.startTorrent;
+  tai.stopCondition = ui.stopCondition;
+  tai.sequentialDownload = ui.sequentialDownload;
+  tai.skipHashCheck = ui.skipHashCheck;
+  tai.addToTopQueue = ui.addToTopQueue;
+  tai.category = ui.category;
+  tai.tagsCsv = ui.tagsCsv;
+  tai.fileWanted = ui.fileWanted;
+  const auto built = pfd::core::buildTaskAdd(tai, savePathPolicy_);
+
+  const QStringList trackers =
+      autoApplyDefaultTrackers_ ? pfd::base::sanitizeTrackers(defaultTrackers_) : QStringList{};
+
+  pfd::lt::SessionWorker::AddTorrentOptions opts;
+  opts.file_priorities = built.opts.file_priorities;
+  opts.start_torrent = built.opts.start_torrent;
+  opts.stop_when_ready = built.opts.stop_when_ready;
+  opts.sequential_download = built.opts.sequential_download;
+  opts.skip_hash_check = built.opts.skip_hash_check;
+  opts.add_to_top_queue = built.opts.add_to_top_queue;
+  opts.category = built.opts.category;
+  opts.tags_csv = built.opts.tags_csv;
+
+  worker_->addTorrentFileWithOptions(torrentFilePath, built.finalSavePath, trackers, opts);
+  logInfo(
+      QStringLiteral("Torrent submitted with file selection. name=%1 savePath=%2 selected=%3/%4")
+          .arg(ui.name, built.finalSavePath)
+          .arg(ui.selectedBytes)
+          .arg(ui.totalBytes));
+}
+
+bool AppController::presentMagnetAddDialogViaExportedTorrent(
+    const pfd::lt::SessionWorker::MagnetMetadata& meta, const QString& defaultSavePath,
+    const pfd::core::rss::RssDownloadSettlement& rssSettlement) {
+  const QString torrentPath = meta.exportedTorrentPath.trimmed();
+  if (torrentPath.isEmpty() || !QFileInfo::exists(torrentPath)) {
+    return false;
+  }
+  if (window_ == nullptr) {
+    worker_->cancelPreparedMagnet(meta.taskId);
+    QFile::remove(torrentPath);
+    settleRssDownloadIfNeeded(rssSettlement, false);
+    return false;
+  }
+
+  worker_->cancelPreparedMagnet(meta.taskId);
+  const auto uiOpt =
+      pfd::ui::AddTorrentDialog::runForTorrentFile(window_, torrentPath, defaultSavePath);
+  if (!uiOpt.has_value()) {
+    QFile::remove(torrentPath);
+    logInfo(QStringLiteral("已取消添加磁力链接：%1").arg(meta.name));
+    settleRssDownloadIfNeeded(rssSettlement, false);
+    return false;
+  }
+  submitTorrentFileFromDialog(torrentPath, *uiOpt);
+  QFile::remove(torrentPath);
+  settleRssDownloadIfNeeded(rssSettlement, true, savePathPolicy_.resolve(uiOpt->savePath));
+  return true;
+}
+
+bool AppController::showMagnetAddDialogAndSubmit(
+    const pfd::lt::SessionWorker::MagnetMetadata& meta, const QString& defaultSavePath,
+    const pfd::core::rss::RssDownloadSettlement& rssSettlement) {
+  if (presentMagnetAddDialogViaExportedTorrent(meta, defaultSavePath, rssSettlement)) {
+    return true;
+  }
+  if (window_ == nullptr) {
+    worker_->cancelPreparedMagnet(meta.taskId);
+    settleRssDownloadIfNeeded(rssSettlement, false);
+    return false;
+  }
+  if (meta.filePaths.empty() || meta.filePaths.size() != meta.fileSizes.size()) {
+    worker_->cancelPreparedMagnet(meta.taskId);
+    logError(QStringLiteral("磁力链接元数据不完整，无法打开添加对话框。"));
+    if (window_ != nullptr) {
+      QMessageBox::warning(window_, QStringLiteral("无法添加链接"),
+                           QStringLiteral("磁力链接元数据不完整，无法显示文件列表。"));
+    }
+    settleRssDownloadIfNeeded(rssSettlement, false);
+    return false;
+  }
+  const auto uiOpt = pfd::ui::AddTorrentDialog::runForMagnetMetadata(
+      window_, magnetInputFromMetadata(meta), defaultSavePath);
+  if (!uiOpt.has_value()) {
+    worker_->cancelPreparedMagnet(meta.taskId);
+    logInfo(QStringLiteral("已取消添加磁力链接：%1").arg(meta.name));
+    settleRssDownloadIfNeeded(rssSettlement, false);
+    return false;
+  }
+  submitMagnetDialogResult(meta, *uiOpt, rssSettlement);
+  return true;
+}
+
+void AppController::submitMagnetDialogResult(
+    const pfd::lt::SessionWorker::MagnetMetadata& meta, const pfd::ui::AddTorrentDialog::Result& ui,
+    const pfd::core::rss::RssDownloadSettlement& rssSettlement) {
+  const QString torrentPath = meta.exportedTorrentPath.trimmed();
+  if (!torrentPath.isEmpty() && QFileInfo::exists(torrentPath)) {
+    worker_->cancelPreparedMagnet(meta.taskId);
+    submitTorrentFileFromDialog(torrentPath, ui);
+    QFile::remove(torrentPath);
+    settleRssDownloadIfNeeded(rssSettlement, true, savePathPolicy_.resolve(ui.savePath));
+    return;
+  }
+  submitPreparedMagnetAdd(meta, ui);
+  settleRssDownloadIfNeeded(rssSettlement, true, savePathPolicy_.resolve(ui.savePath));
+}
+
+void AppController::presentInteractiveMagnetAdd(const QString& uri, const QString& savePathHint) {
+  if (shuttingDown_.load(std::memory_order_acquire) || window_ == nullptr || worker_ == nullptr) {
+    return;
+  }
+  const QString trimmed = uri.trimmed();
+  const auto magnetErr = pfd::base::validateMagnetUri(trimmed);
+  if (magnetErr.hasError()) {
+    logError(QStringLiteral("Magnet URI rejected: %1").arg(magnetErr.message()));
+    QMessageBox::warning(window_, QStringLiteral("无法添加链接"),
+                         QStringLiteral("磁力链接无效：%1").arg(magnetErr.message()));
+    return;
+  }
+  libtorrent::error_code ec;
+  const auto atp = pfd::core::ltcompat::parseMagnetUri(trimmed.toStdString(), ec);
+  if (ec) {
+    QMessageBox::warning(window_, QStringLiteral("无法添加链接"),
+                         QStringLiteral("无法解析磁力链接。"));
+    return;
+  }
+  const pfd::base::TaskId taskId = pfd::lt::session_ids::taskIdFromInfoHashes(atp.info_hashes);
+  upsertKnownTaskMagnet(taskId, trimmed);
+
+  pfd::ui::AddTorrentDialog::MagnetBootstrap bootstrap;
+  bootstrap.displayName = QString::fromStdString(atp.name).trimmed();
+  if (atp.info_hashes.has_v1()) {
+    std::ostringstream oss;
+    oss << atp.info_hashes.v1;
+    bootstrap.infoHashV1 = QString::fromStdString(oss.str());
+  }
+  if (atp.info_hashes.has_v2()) {
+    std::ostringstream oss;
+    oss << atp.info_hashes.v2;
+    bootstrap.infoHashV2 = QString::fromStdString(oss.str());
+  }
+
+  const auto st = pfd::core::ConfigService::loadAppSettings();
+  const QString tempMetaPath =
+      QDir(savePathPolicy_.resolve(savePathHint)).filePath(QStringLiteral(".pfd_meta"));
+  QDir().mkpath(tempMetaPath);
+
+  const QStringList trackers =
+      autoApplyDefaultTrackers_ ? pfd::base::sanitizeTrackers(defaultTrackers_) : QStringList{};
+
+  auto metaFut =
+      std::make_shared<std::future<std::optional<pfd::lt::SessionWorker::MagnetMetadata>>>(
+          std::async(std::launch::async, [this, trimmed, tempMetaPath, trackers]() {
+            return worker_->prepareMagnetMetadata(trimmed, tempMetaPath, 120000, trackers);
+          }));
+
+  std::optional<pfd::lt::SessionWorker::MagnetMetadata> cachedMeta;
+  const pfd::ui::AddTorrentDialog::MetadataPoller poller =
+      [metaFut, &cachedMeta]() -> pfd::ui::AddTorrentDialog::MetadataPollResult {
+    using PollState = pfd::ui::AddTorrentDialog::MetadataPollState;
+    if (cachedMeta.has_value()) {
+      return {PollState::kReady, magnetInputFromMetadata(*cachedMeta)};
+    }
+    if (metaFut->wait_for(std::chrono::milliseconds(0)) != std::future_status::ready) {
+      return {PollState::kPending, {}};
+    }
+    cachedMeta = metaFut->get();
+    if (!cachedMeta.has_value()) {
+      return {PollState::kFailed, {}};
+    }
+    return {PollState::kReady, magnetInputFromMetadata(*cachedMeta)};
+  };
+
+  const auto uiOpt = pfd::ui::AddTorrentDialog::runForMagnetLinkPending(
+      window_, bootstrap, st.default_download_dir, poller);
+
+  const auto cleanupPreparedMagnet = [this, taskId, &cachedMeta, metaFut]() {
+    if (cachedMeta.has_value()) {
+      worker_->cancelPreparedMagnet(cachedMeta->taskId);
+      return;
+    }
+    if (metaFut->wait_for(std::chrono::milliseconds(0)) == std::future_status::ready) {
+      const auto meta = metaFut->get();
+      if (meta.has_value()) {
+        worker_->cancelPreparedMagnet(meta->taskId);
+      }
+      return;
+    }
+    worker_->cancelPreparedMagnet(taskId);
+  };
+
+  if (!uiOpt.has_value()) {
+    cleanupPreparedMagnet();
+    logInfo(QStringLiteral("已取消添加磁力链接：%1").arg(bootstrap.displayName));
+    return;
+  }
+  if (!cachedMeta.has_value()) {
+    cleanupPreparedMagnet();
+    logError(QStringLiteral("磁力链接元数据未就绪，无法提交。"));
+    return;
+  }
+
+  submitMagnetDialogResult(*cachedMeta, *uiOpt, {});
 }
 
 void AppController::updateRssTimerInterval() {
@@ -627,7 +931,10 @@ void AppController::startOneMagnetOnUi(pfd::app::RssDownloadPipeline::MagnetQueu
                                              resolvedSavePath, tempMetaPath, useDefaultTrackers,
                                              defaultTrackersCopy, rssS, skipInteractiveAdd,
                                              magnetSavePathRaw, magnetCategory, magnetTagsCsv]() {
-    const auto metaOpt = workerPtr->prepareMagnetMetadata(trimmed, tempMetaPath, 12000);
+    const QStringList trackersForMeta =
+        useDefaultTrackers ? pfd::base::sanitizeTrackers(defaultTrackersCopy) : QStringList{};
+    const auto metaOpt =
+        workerPtr->prepareMagnetMetadata(trimmed, tempMetaPath, 12000, trackersForMeta);
     if (shuttingDown_.load() || windowGuard.isNull()) {
       QMetaObject::invokeMethod(
           static_cast<QObject*>(app_),
@@ -668,16 +975,7 @@ void AppController::startOneMagnetOnUi(pfd::app::RssDownloadPipeline::MagnetQueu
             return;
           }
           const auto meta = *metaOpt;
-
-          pfd::ui::AddTorrentDialog::MagnetInput in;
-          in.name = meta.name;
-          in.totalBytes = meta.totalBytes;
-          in.creationDate = meta.creationDate;
-          in.infoHashV1 = meta.infoHashV1;
-          in.infoHashV2 = meta.infoHashV2;
-          in.comment = meta.comment;
-          in.filePaths = meta.filePaths;
-          in.fileSizes = meta.fileSizes;
+          const auto st = pfd::core::ConfigService::loadAppSettings();
 
           if (skipInteractiveAdd) {
             QString cat = magnetCategory.trimmed();
@@ -724,47 +1022,7 @@ void AppController::startOneMagnetOnUi(pfd::app::RssDownloadPipeline::MagnetQueu
             return;
           }
 
-          const auto uiOpt = pfd::ui::AddTorrentDialog::runForMagnetMetadata(windowGuard.data(), in,
-                                                                             resolvedSavePath);
-          if (!uiOpt.has_value()) {
-            workerPtr->cancelPreparedMagnet(meta.taskId);
-            logInfo(QStringLiteral("已取消添加磁力链接：%1").arg(meta.name));
-            settleRssDownloadIfNeeded(rssS, false);
-            finish();
-            return;
-          }
-
-          const auto& ui = *uiOpt;
-          pfd::core::TaskAddInput tai;
-          tai.name = ui.name;
-          tai.savePath = ui.savePath;
-          tai.layout = static_cast<pfd::core::ContentLayout>(static_cast<int>(ui.layout));
-          tai.startTorrent = ui.startTorrent;
-          tai.stopCondition = ui.stopCondition;
-          tai.sequentialDownload = ui.sequentialDownload;
-          tai.skipHashCheck = ui.skipHashCheck;
-          tai.addToTopQueue = ui.addToTopQueue;
-          tai.category = ui.category;
-          tai.tagsCsv = ui.tagsCsv;
-          tai.fileWanted = ui.fileWanted;
-          const auto built = pfd::core::buildTaskAdd(tai, savePathPolicy_);
-
-          const QStringList trackers = useDefaultTrackers ? defaultTrackersCopy : QStringList{};
-          pfd::lt::SessionWorker::AddTorrentOptions opts;
-          opts.file_priorities = built.opts.file_priorities;
-          opts.start_torrent = built.opts.start_torrent;
-          opts.stop_when_ready = built.opts.stop_when_ready;
-          opts.sequential_download = built.opts.sequential_download;
-          opts.skip_hash_check = built.opts.skip_hash_check;
-          opts.add_to_top_queue = built.opts.add_to_top_queue;
-          opts.category = built.opts.category;
-          opts.tags_csv = built.opts.tags_csv;
-
-          workerPtr->finalizePreparedMagnet(meta.taskId, built.finalSavePath, trackers, opts);
-          applyTaskMetaUpdate(meta.taskId, ui.name, built.finalSavePath, ui.category, ui.tagsCsv);
-          logInfo(QStringLiteral("Magnet submitted with selection. name=%1 savePath=%2")
-                      .arg(ui.name, built.finalSavePath));
-          settleRssDownloadIfNeeded(rssS, true, built.finalSavePath);
+          (void)showMagnetAddDialogAndSubmit(meta, st.default_download_dir, rssS);
           finish();
         },
         Qt::QueuedConnection);
@@ -931,25 +1189,7 @@ void AppController::bindUiCallbacks() {
 
 void AppController::bindUiAddCallbacks() {
   window_->setOnAddMagnet([this](const QString& uri, const QString& savePath) {
-    const auto trimmed = uri.trimmed();
-    const auto valErr = pfd::base::validateMagnetUri(trimmed);
-    if (valErr.hasError()) {
-      logError(QStringLiteral("Magnet URI rejected: %1").arg(valErr.message()));
-      return;
-    }
-    if (!savePath.trimmed().isEmpty()) {
-      const auto pathErr = pfd::base::validatePath(savePath);
-      if (pathErr.hasError()) {
-        logError(QStringLiteral("Save path rejected: %1").arg(pathErr.message()));
-        return;
-      }
-    }
-    libtorrent::error_code ec;
-    const auto atp = pfd::core::ltcompat::parseMagnetUri(trimmed.toStdString(), ec);
-    if (!ec) {
-      upsertKnownTaskMagnet(pfd::lt::session_ids::taskIdFromInfoHashes(atp.info_hashes), trimmed);
-    }
-    enqueueMagnet(trimmed, savePath);
+    presentInteractiveMagnetAdd(uri, savePath);
   });
 
   window_->setOnAddTorrentFile([this](const QString& filePath, const QString& savePath) {
@@ -972,65 +1212,10 @@ void AppController::bindUiAddCallbacks() {
     logInfo(QString("Torrent file added: %1 savePath=%2").arg(filePath, resolved));
   });
 
-  window_->setOnAddTorrentFileRequest([this](
-                                          const pfd::ui::MainWindow::AddTorrentFileRequest& req) {
-    const auto fileErr = pfd::base::validateTorrentFilePath(req.torrentFilePath);
-    if (fileErr.hasError()) {
-      logError(QStringLiteral("Torrent file rejected: %1").arg(fileErr.message()));
-      return;
-    }
-    if (!req.ui.savePath.trimmed().isEmpty()) {
-      const auto pathErr = pfd::base::validatePath(req.ui.savePath);
-      if (pathErr.hasError()) {
-        logError(QStringLiteral("Save path rejected: %1").arg(pathErr.message()));
-        return;
-      }
-    }
-    const auto catErr = pfd::base::validateCategory(req.ui.category);
-    if (catErr.hasError()) {
-      logError(QStringLiteral("Category rejected: %1").arg(catErr.message()));
-      return;
-    }
-    const auto tagsErr = pfd::base::validateTagsCsv(req.ui.tagsCsv);
-    if (tagsErr.hasError()) {
-      logError(QStringLiteral("Tags rejected: %1").arg(tagsErr.message()));
-      return;
-    }
-
-    pfd::core::TaskAddInput tai;
-    tai.name = req.ui.name;
-    tai.savePath = req.ui.savePath;
-    tai.layout = static_cast<pfd::core::ContentLayout>(static_cast<int>(req.ui.layout));
-    tai.startTorrent = req.ui.startTorrent;
-    tai.stopCondition = req.ui.stopCondition;
-    tai.sequentialDownload = req.ui.sequentialDownload;
-    tai.skipHashCheck = req.ui.skipHashCheck;
-    tai.addToTopQueue = req.ui.addToTopQueue;
-    tai.category = req.ui.category;
-    tai.tagsCsv = req.ui.tagsCsv;
-    tai.fileWanted = req.ui.fileWanted;
-    const auto built = pfd::core::buildTaskAdd(tai, savePathPolicy_);
-
-    const QStringList trackers =
-        autoApplyDefaultTrackers_ ? pfd::base::sanitizeTrackers(defaultTrackers_) : QStringList{};
-
-    pfd::lt::SessionWorker::AddTorrentOptions opts;
-    opts.file_priorities = built.opts.file_priorities;
-    opts.start_torrent = built.opts.start_torrent;
-    opts.stop_when_ready = built.opts.stop_when_ready;
-    opts.sequential_download = built.opts.sequential_download;
-    opts.skip_hash_check = built.opts.skip_hash_check;
-    opts.add_to_top_queue = built.opts.add_to_top_queue;
-    opts.category = built.opts.category;
-    opts.tags_csv = built.opts.tags_csv;
-
-    worker_->addTorrentFileWithOptions(req.torrentFilePath, built.finalSavePath, trackers, opts);
-    logInfo(
-        QStringLiteral("Torrent submitted with file selection. name=%1 savePath=%2 selected=%3/%4")
-            .arg(req.ui.name, built.finalSavePath)
-            .arg(req.ui.selectedBytes)
-            .arg(req.ui.totalBytes));
-  });
+  window_->setOnAddTorrentFileRequest(
+      [this](const pfd::ui::MainWindow::AddTorrentFileRequest& req) {
+        submitTorrentFileFromDialog(req.torrentFilePath, req.ui);
+      });
 }
 
 void AppController::bindUiTaskControlCallbacks() {

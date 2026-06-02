@@ -3,6 +3,7 @@
 
 #include <QtWidgets/QDialog>
 
+#include <functional>
 #include <vector>
 
 class QLineEdit;
@@ -60,18 +61,51 @@ public:
     std::vector<qint64> fileSizes;
   };
 
-  // 从 .torrent 文件打开（第一阶段先实现这个入口）
+  /// 从 magnet URI 解析出的初始展示信息（元数据到达前显示）。
+  struct MagnetBootstrap {
+    QString displayName;
+    QString infoHashV1;
+    QString infoHashV2;
+  };
+
+  enum class MetadataPollState { kPending, kReady, kFailed };
+
+  struct MetadataPollResult {
+    MetadataPollState state{MetadataPollState::kPending};
+    MagnetInput input;
+  };
+
+  using MetadataPoller = std::function<MetadataPollResult()>;
+
+  // 从 .torrent 文件打开
   static std::optional<Result> runForTorrentFile(QWidget* parent, const QString& torrentFilePath,
                                                  const QString& defaultSavePath);
+  /// 元数据已就绪时使用（RSS 等路径）。
   static std::optional<Result> runForMagnetMetadata(QWidget* parent, const MagnetInput& in,
                                                     const QString& defaultSavePath);
+  /// 立即弹出对话框，同时通过 poller 在后台检索元数据并刷新界面。
+  static std::optional<Result> runForMagnetLinkPending(QWidget* parent,
+                                                       const MagnetBootstrap& bootstrap,
+                                                       const QString& defaultSavePath,
+                                                       const MetadataPoller& poller);
 
 private:
   explicit AddTorrentDialog(QWidget* parent);
-  bool loadTorrentFile(const QString& torrentFilePath);
-  bool loadMagnetMetadata(const MagnetInput& in);
+  void beginMagnetPending(const MagnetBootstrap& bootstrap, const QString& defaultSavePath);
+  void applyMagnetMetadata(const MagnetInput& in);
+  void setMetadataFetchFailed();
+  void setMetadataControlsEnabled(bool enabled);
+  [[nodiscard]] bool isMetadataReady() const {
+    return metadataReady_;
+  }
+  [[nodiscard]] bool metadataFetchFailed() const {
+    return metadataFailed_;
+  }
   void applyMetaInfoToUi();
   void rebuildFileTree(const std::vector<QString>& filePaths);
+  void showMetadataLoadingPlaceholder();
+  bool loadTorrentFile(const QString& torrentFilePath);
+  bool loadMagnetMetadata(const MagnetInput& in);
   void buildLayout();
   void bindSignals();
   void rebuildStats();
@@ -111,6 +145,10 @@ private:
   QPushButton* selectNoneBtn_{nullptr};
   QTreeWidget* fileTree_{nullptr};
   QLabel* selectedSizeLabel_{nullptr};
+  QPushButton* acceptBtn_{nullptr};
+
+  bool metadataReady_{false};
+  bool metadataFailed_{false};
 
   // torrent data
   QString torrentName_;

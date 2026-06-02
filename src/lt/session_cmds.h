@@ -24,6 +24,7 @@ struct AddMagnetCmd {
 struct PrepareMagnetMetadataCmd {
   QString uri;
   QString tempSavePath;
+  QStringList trackers;
   int timeout_ms{8000};
   std::shared_ptr<std::promise<std::optional<SessionWorker::MagnetMetadata>>> done;
 };

@@ -96,12 +96,20 @@ bool handleOne(libtorrent::session& ses, Context& ctx,
   }
   const auto id = session_ids::taskIdFromInfoHashes(atp.info_hashes);
   const QString key = session_ids::taskIdKey(id);
-  ctx.pendingMagnetMeta[key] = c.done;
+  ctx.pendingMagnetMeta[key] = PendingMagnetMetaEntry{c.done, c.tempSavePath, trimmed};
 
-  // 临时加入 magnet：让它连接以获取 metadata，但不请求数据块
+  // 仅拉取 metadata：upload_mode 阻止下载数据块；禁止 auto_managed 以免被队列暂停
+  // （与 qBittorrent 相同：upload_mode + 非 auto_managed）。
   atp.save_path = c.tempSavePath.toStdString();
-  atp.flags |= libtorrent::torrent_flags::auto_managed;
-  atp.flags |= libtorrent::torrent_flags::upload_mode;
+  const QStringList cleanTrackers = pfd::base::sanitizeTrackers(c.trackers);
+  for (const auto& tracker : cleanTrackers) {
+    atp.trackers.push_back(tracker.toStdString());
+  }
+  // 仅拉取 metadata：upload_mode 阻止下载数据块；禁止 auto_managed 以免被队列暂停
+  // （与 qBittorrent 相同：upload_mode + 非 auto_managed）。
+  atp.flags = libtorrent::torrent_flags::upload_mode;
+  atp.flags &= ~libtorrent::torrent_flags::auto_managed;
+  atp.flags &= ~libtorrent::torrent_flags::paused;
   ses.async_add_torrent(std::move(atp));
   return true;
 }
