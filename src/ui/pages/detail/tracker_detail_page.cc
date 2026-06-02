@@ -238,7 +238,7 @@ void TrackerDetailPage::applyTreeStyle() {
   if (hintLabel_ != nullptr) {
     const QString c = (t == pfd::ui::EffectiveUiTheme::Dark) ? QStringLiteral("#94a3b8")
                                                              : QStringLiteral("#64748b");
-    hintLabel_->setStyleSheet(QStringLiteral("color:%1;font-size:12px;padding-top:2px;").arg(c));
+    hintLabel_->setStyleSheet(QStringLiteral("color:%1;font-size:13px;padding-top:2px;").arg(c));
   }
 }
 

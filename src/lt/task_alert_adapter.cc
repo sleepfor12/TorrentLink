@@ -7,6 +7,7 @@
 #include <sstream>
 
 #include "base/time_stamps.h"
+#include "base/text_encoding.h"
 #include "lt/session_ids.h"
 
 namespace pfd::lt {
@@ -62,7 +63,7 @@ std::optional<LtAlertView> adaptAlertToView(const libtorrent::alert* alert) {
     v.taskId = session_ids::taskIdFromInfoHashes(add->params.info_hashes);
     if (add->error) {
       v.type = LtAlertView::Type::kTaskError;
-      v.message = QString::fromStdString(add->error.message());
+      v.message = pfd::base::QStringFromStdBytes(add->error.message());
     } else {
       v.type = LtAlertView::Type::kTaskAdded;
       v.name = QString::fromStdString(add->params.name);
@@ -90,7 +91,7 @@ std::optional<LtAlertView> adaptAlertToView(const libtorrent::alert* alert) {
   if (auto* err = libtorrent::alert_cast<libtorrent::torrent_error_alert>(alert); err != nullptr) {
     v.taskId = session_ids::taskIdFromInfoHashes(err->handle.info_hashes());
     v.type = LtAlertView::Type::kTaskError;
-    v.message = QString::fromStdString(err->error.message());
+    v.message = pfd::base::QStringFromStdBytes(err->error.message());
     return v;
   }
 

@@ -9,6 +9,8 @@ English version: [README.md](README.md)
 
 ## 功能概览
 
+完整功能介绍: [docs/FEATURES_zh.md](docs/FEATURES_zh.md)
+
 - **传输：**打开 `.torrent` 与磁力链接；暂停/继续；分类、标签与队列控制。
 - **任务详情**（视图 → 显示传输页任务详情）：普通、Tracker、用户、**HTTP源**（Web Seed，BEP17/BEP19）、内容、速度。
 - **RSS：**订阅源、规则、自动下载、OPML 导入/导出。

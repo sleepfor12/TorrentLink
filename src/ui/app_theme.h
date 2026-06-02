@@ -4,6 +4,8 @@
 #include <QtCore/QString>
 #include <QtCore/QVariantMap>
 
+class QAbstractItemView;
+
 namespace pfd::ui {
 
 enum class EffectiveUiTheme { Light, Dark };
@@ -29,6 +31,15 @@ public:
 
   /// 任务详情底栏（#DetailTabBar + #DetailTabButton）
   [[nodiscard]] static QString detailTabBarStyleSheet(EffectiveUiTheme theme);
+
+  /// 主窗口与 RSS 等页内 QTableWidget 选中行样式（Windows 原生样式需显式 item background）
+  [[nodiscard]] static QString tableWidgetStyleSheet(EffectiveUiTheme theme);
+
+  /// 为表格/列表补全 Highlight 调色板，避免 Windows 上 QSS 选中背景被原生样式覆盖
+  static void applyItemViewSelectionPalette(QAbstractItemView* view, EffectiveUiTheme theme);
+
+  /// 略放大应用默认字体（+1pt 或 14px），改善表格/RSS 等密集界面可读性
+  static void applyApplicationFont();
 };
 
 }  // namespace pfd::ui

@@ -14,7 +14,8 @@
 #include <QtWidgets/QTabWidget>
 #include <QtWidgets/QTableWidget>
 #include <QtWidgets/QVBoxLayout>
-#include <QtWidgets/QWidget>
+#include <QtWidgets/QAbstractItemView>
+#include <QtWidgets/QTableWidget>
 
 #include "core/config_service.h"
 #include "ui/app_theme.h"
@@ -72,9 +73,15 @@ void MainWindow::setupMenuBar() {
 }
 
 void MainWindow::applyTheme() {
+  UiTheme::applyApplicationFont();
   const auto st = pfd::core::ConfigService::loadAppSettings();
   const EffectiveUiTheme t = UiTheme::resolveEffectiveTheme(st.ui_theme);
   setStyleSheet(UiTheme::mainWindowStyleSheet(t));
+  for (QAbstractItemView* view : findChildren<QAbstractItemView*>()) {
+    if (view != nullptr) {
+      UiTheme::applyItemViewSelectionPalette(view, t);
+    }
+  }
   for (SpeedChartPage* chart : findChildren<SpeedChartPage*>()) {
     if (chart != nullptr) {
       chart->syncChartTheme();

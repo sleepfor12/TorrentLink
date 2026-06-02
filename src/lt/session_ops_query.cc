@@ -14,6 +14,7 @@
 #include <sstream>
 
 #include "core/logger.h"
+#include "base/text_encoding.h"
 #include "lt/session_ids.h"
 #include "lt/session_ops.h"
 
@@ -139,9 +140,11 @@ mapTrackerStatus(const libtorrent::announce_entry& ae) {
   QStringList parts;
   for (const auto& ih : ep.info_hashes) {
     if (!ih.message.empty()) {
-      parts.append(QString::fromStdString(ih.message));
+      parts.append(pfd::base::sanitizeHumanReadableText(
+          pfd::base::QStringFromStdBytes(ih.message)));
     } else if (ih.last_error) {
-      parts.append(QString::fromStdString(ih.last_error.message()));
+      parts.append(pfd::base::sanitizeHumanReadableText(
+          pfd::base::QStringFromStdBytes(ih.last_error.message())));
     }
   }
   if (parts.isEmpty()) {

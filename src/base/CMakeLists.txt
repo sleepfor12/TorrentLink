@@ -29,6 +29,8 @@ add_library(torrentlink_base STATIC
   throttle.cc
   debounce.h
   debounce.cc
+  text_encoding.h
+  text_encoding.cc
 )
 
 target_include_directories(torrentlink_base

@@ -22,8 +22,8 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
   setWindowTitle(QStringLiteral("TorrentLink"));
   resize(1180, 760);
   setupMenuBar();
-  applyTheme();
   buildLayout();
+  applyTheme();
   bindSignals();
   loadSettingsToUi();
   loadUiState();

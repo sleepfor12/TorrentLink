@@ -1,6 +1,6 @@
 ## Overview
 
-中文版: [READEME_zh.md](READEME_zh.md)
+中文版: [READEME_zh.md](READEME_zh.md) · 功能详解: [docs/FEATURES_zh.md](docs/FEATURES_zh.md)
 
 This project is my graduation design project, implementing a lightweight desktop P2P file transfer application, and it is open-sourced under the MIT License, with license details in [LICENSE](LICENSE).
 
@@ -8,6 +8,8 @@ It is a desktop P2P downloader based on **Qt 6 (Widgets) + libtorrent (2.0.5)**,
 Parts of the UI design reference qBittorrent.
 
 ## Features
+
+See [docs/FEATURES_zh.md](docs/FEATURES_zh.md) for the full feature guide (Chinese).
 
 - **Transfers:** open `.torrent` files and magnet links; pause/resume; categories, tags, and queue controls.
 - **Task detail panel** (View → show transfer task details): General, Tracker, Peers, **HTTP sources** (Web Seed URLs, BEP17/BEP19), Content, Speed.

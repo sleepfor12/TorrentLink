@@ -33,7 +33,7 @@ void RssSettingsPage::buildLayout() {
 
   auto* hint =
       new QLabel(QStringLiteral("配置 RSS 模块的全局行为。修改后点击「保存」生效。"), this);
-  hint->setStyleSheet(QStringLiteral("color:#6b7280;font-size:12px;"));
+  hint->setStyleSheet(QStringLiteral("color:#6b7280;font-size:13px;"));
   hint->setWordWrap(true);
   root->addWidget(hint);
 
@@ -108,7 +108,7 @@ void RssSettingsPage::buildLayout() {
                      "可在主菜单 - 首选项 - 下载 中修改，或在规则表单中用『浏览』指定独立路径。"),
       pathGroup);
   pathHint->setWordWrap(true);
-  pathHint->setStyleSheet(QStringLiteral("color:#6b7280;font-size:12px;"));
+  pathHint->setStyleSheet(QStringLiteral("color:#6b7280;font-size:13px;"));
   pathForm->addRow(pathHint);
 
   root->addWidget(pathGroup);

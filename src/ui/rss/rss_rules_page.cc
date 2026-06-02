@@ -69,7 +69,7 @@ void RssRulesPage::buildLayout() {
   globalSwitch_ = new QLabel(this);
   globalSwitch_->setStyleSheet(
       QStringLiteral("QLabel{background:#f5f8ff;border:1px solid #d9e5ff;border-radius:8px;"
-                     "padding:8px 14px;color:#41516d;font-size:13px;}"));
+                     "padding:8px 14px;color:#41516d;font-size:14px;}"));
   root->addWidget(globalSwitch_);
 
   // ─── 工具栏 ───

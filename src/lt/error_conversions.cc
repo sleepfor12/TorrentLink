@@ -2,6 +2,8 @@
 
 #include <cerrno>
 
+#include "base/text_encoding.h"
+
 namespace pfd::lt {
 namespace {
 
@@ -56,7 +58,8 @@ pfd::base::Error fromLibtorrentError(const std::error_code& ec, const QString& c
   if (!ec) {
     return pfd::base::Error();
   }
-  return fromLibtorrentError(ec.value(), QString::fromStdString(ec.message()), context, hint);
+  return fromLibtorrentError(ec.value(), pfd::base::QStringFromStdBytes(ec.message()), context,
+                             hint);
 }
 
 }  // namespace pfd::lt

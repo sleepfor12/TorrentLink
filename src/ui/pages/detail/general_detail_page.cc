@@ -18,14 +18,14 @@ const QString kDash = QStringLiteral("--");
 QLabel* makeValueLabel(QWidget* parent) {
   auto* l = new QLabel(kDash, parent);
   l->setTextInteractionFlags(Qt::TextSelectableByMouse);
-  l->setStyleSheet(QStringLiteral("color:#1f2d3d;font-size:12px;"));
+  l->setStyleSheet(QStringLiteral("color:#1f2d3d;font-size:13px;"));
   return l;
 }
 
 QGroupBox* makeGroup(const QString& title, QWidget* parent) {
   auto* g = new QGroupBox(title, parent);
   g->setStyleSheet(
-      QStringLiteral("QGroupBox{font-weight:700;font-size:12px;color:#374151;"
+      QStringLiteral("QGroupBox{font-weight:700;font-size:13px;color:#374151;"
                      "border:1px solid #e5e7eb;border-radius:4px;margin-top:8px;padding-top:14px;}"
                      "QGroupBox::title{subcontrol-origin:margin;left:8px;padding:0 4px;}"));
   return g;
@@ -33,7 +33,7 @@ QGroupBox* makeGroup(const QString& title, QWidget* parent) {
 
 void addRow(QFormLayout* form, const QString& label, QLabel* value) {
   auto* lbl = new QLabel(label);
-  lbl->setStyleSheet(QStringLiteral("color:#6b7280;font-size:12px;"));
+  lbl->setStyleSheet(QStringLiteral("color:#6b7280;font-size:13px;"));
   lbl->setFixedWidth(110);
   form->addRow(lbl, value);
 }
@@ -60,7 +60,7 @@ void GeneralDetailPage::buildLayout() {
   progressBar_->setFixedHeight(20);
   progressLabel_ = new QLabel(QStringLiteral("0.0%"), progressGroup);
   progressLabel_->setAlignment(Qt::AlignRight);
-  progressLabel_->setStyleSheet(QStringLiteral("font-size:11px;color:#374151;"));
+  progressLabel_->setStyleSheet(QStringLiteral("font-size:12px;color:#374151;"));
   pLayout->addWidget(progressBar_);
   pLayout->addWidget(progressLabel_);
   root->addWidget(progressGroup);

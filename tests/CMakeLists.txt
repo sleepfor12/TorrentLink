@@ -15,6 +15,7 @@ set(PFD_TESTS_BASE
   test_time_format.cc
   test_throttle.cc
   test_debounce.cc
+  test_text_encoding.cc
   test_ring_buffer.cc
 )
 

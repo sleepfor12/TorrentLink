@@ -108,7 +108,7 @@ void RssFeedsPage::buildLayout() {
                      "在「自动规则」页配置并启用匹配规则。"
                      "表格支持多选，右键可刷新、编辑、复制链接等。"),
       this);
-  hint->setStyleSheet(QStringLiteral("color:#6b7280;font-size:12px;"));
+  hint->setStyleSheet(QStringLiteral("color:#6b7280;font-size:13px;"));
   root->addWidget(hint);
 }
 
